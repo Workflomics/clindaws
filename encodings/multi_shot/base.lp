@@ -25,11 +25,25 @@ tool_has_output(Tool) :- tool_output(Tool, _).
 
 % Input variants per tool
 tool_input_variant(Tool, TI_ID) :- tool_input(Tool, TI_ID).
+tool_input_port(Tool, Port) :- tool_input(Tool, TI_ID), input_port(TI_ID, Port).
+tool_single_input(Tool) :- tool(Tool), 1 = #count { Port : tool_input_port(Tool, Port) }.
 
 % Static port requirements
 port_requires(Port, PortValue, Category) :-
     input_port(_, Port),
     dimension(Port, (PortValue, Category)).
+
+port_signature_mismatch(PortA, PortB) :-
+    input_port(_, PortA),
+    input_port(_, PortB),
+    port_requires(PortA, ReqV, Cat),
+    not port_requires(PortB, ReqV, Cat).
+
+same_input_signature(PortA, PortB) :-
+    input_port(_, PortA),
+    input_port(_, PortB),
+    not port_signature_mismatch(PortA, PortB),
+    not port_signature_mismatch(PortB, PortA).
 
 % ----------------------------------------------------------------
 % From tool_taxonomy_logic.lp

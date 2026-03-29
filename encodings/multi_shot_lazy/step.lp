@@ -28,6 +28,45 @@ occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_input_port(Candidate, Port).
 
+artifact_parent(out(t, Tool, PortOut), WF) :-
+    occurs(t, output(Tool, _, PortOut)),
+    occurs(t, bind(Tool, _, WF)).
+
+artifact_ancestor(t, Artifact, Ancestor) :-
+    artifact_parent(Artifact, Ancestor).
+
+artifact_ancestor(t, Artifact, Ancestor) :-
+    artifact_parent(Artifact, Mid),
+    artifact_ancestor(t, Mid, Ancestor).
+
+:- occurs(t, use_lazy_candidate(Tool, Candidate)),
+   occurs(t, bind(Tool, Port1, out(T1, Tool1, _))),
+   occurs(t, bind(Tool, Port2, out(T2, Tool2, _))),
+   Port1 < Port2,
+   same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
+   T1 < T2.
+
+paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2) :-
+    T1 < T2,
+    occurs(T1, use_lazy_candidate(Tool1, Candidate1)),
+    occurs(T2, use_lazy_candidate(Tool2, Candidate2)),
+    candidate_single_input(Candidate1),
+    candidate_single_input(Candidate2),
+    occurs(T1, bind(Tool1, Port1, WF1)),
+    occurs(T2, bind(Tool2, Port2, WF2)),
+    same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2),
+    occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
+    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
+    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
+    TJ > T2,
+    JoinPort2 < JoinPort1,
+    same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
+
+:- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF, T2, Tool2, Candidate2, Port2, WF).
+
+:- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2),
+   artifact_ancestor(t, WF1, WF2).
+
 occurs(t, output(Tool, Candidate, Port)) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_output_port(Candidate, Port).
@@ -101,8 +140,6 @@ holds(t, goal) :- holds(t-1, goal).
 :- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
 :- occurs(t, run(_)), holds(t-1, goal).
 
-:- occurs(T1, run(Tool)), occurs(t, run(Tool)), T1 < t,
-   occurs(T1, bind(Tool, Port, WF)),
-   occurs(t, bind(Tool, Port, WF)).
-
-:- occurs(t, run(Tool)), not multi_run(Tool), occurs(T1, run(Tool)), T1 < t.
+% SAT mode does not forbid repeated tool occurrences during synthesis. The
+% config-level tool_seq_repeat flag is applied later as a solution-distinction
+% policy, so repeated runs remain legal here.

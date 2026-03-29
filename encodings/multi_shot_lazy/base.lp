@@ -20,6 +20,10 @@ tool_input_port(Tool, Port) :-
     lazy_tool_candidate(Candidate, Tool),
     lazy_candidate_input_port(Candidate, Port).
 
+candidate_single_input(Candidate) :-
+    lazy_tool_candidate(Candidate, _),
+    1 = #count { Port : lazy_candidate_input_port(Candidate, Port) }.
+
 lazy_candidate_input_category(Candidate, Port, Category) :-
     lazy_candidate_input_value(Candidate, Port, _, Category).
 
@@ -28,6 +32,18 @@ lazy_candidate_output_category(Candidate, Port, Category) :-
 
 lazy_candidate_output_category(Candidate, Port, Category) :-
     lazy_candidate_output_choice_value(Candidate, Port, _, Category).
+
+candidate_input_signature_mismatch(CandidateA, PortA, CandidateB, PortB) :-
+    lazy_candidate_input_port(CandidateA, PortA),
+    lazy_candidate_input_port(CandidateB, PortB),
+    lazy_candidate_input_value(CandidateA, PortA, ReqV, Cat),
+    not lazy_candidate_input_value(CandidateB, PortB, ReqV, Cat).
+
+same_candidate_input_signature(CandidateA, PortA, CandidateB, PortB) :-
+    lazy_candidate_input_port(CandidateA, PortA),
+    lazy_candidate_input_port(CandidateB, PortB),
+    not candidate_input_signature_mismatch(CandidateA, PortA, CandidateB, PortB),
+    not candidate_input_signature_mismatch(CandidateB, PortB, CandidateA, PortA).
 
 goal_id(GoalID) :- goal_output(GoalID, _, _).
 

@@ -88,6 +88,47 @@ eligible(t, Port, WF) :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
+% Artifact ancestry over committed runs.
+artifact_parent(out(t, Tool, PortOut), WF) :-
+    occurs(t, output(Tool, _, PortOut)),
+    occurs(t, bind(Tool, _, WF)).
+
+artifact_ancestor(t, Artifact, Ancestor) :-
+    artifact_parent(Artifact, Ancestor).
+
+artifact_ancestor(t, Artifact, Ancestor) :-
+    artifact_parent(Artifact, Mid),
+    artifact_ancestor(t, Mid, Ancestor).
+
+% Symmetry breaking for duplicate input signatures on the same join tool.
+:- occurs(t, bind(Tool, Port1, out(T1, Tool1, _))),
+   occurs(t, bind(Tool, Port2, out(T2, Tool2, _))),
+   Port1 < Port2,
+   same_input_signature(Port1, Port2),
+   T1 < T2.
+
+% When two single-input producer runs with the same input signature later feed a
+% symmetric join, keep the earlier producer on the more-derived source and the
+% later producer on the older source. This removes the extra branch-swapped
+% variants while preserving the SAT-aligned one.
+paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2) :-
+    T1 < T2,
+    tool_single_input(Tool1),
+    tool_single_input(Tool2),
+    occurs(T1, bind(Tool1, Port1, WF1)),
+    occurs(T2, bind(Tool2, Port2, WF2)),
+    same_input_signature(Port1, Port2),
+    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
+    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
+    TJ > T2,
+    JoinPort2 < JoinPort1,
+    same_input_signature(JoinPort1, JoinPort2).
+
+:- paired_symmetric_producers(t, T1, Tool1, Port1, WF, T2, Tool2, Port2, WF).
+
+:- paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2),
+   artifact_ancestor(t, WF1, WF2).
+
 % ----------------------------------------------------------------
 % From output_production.lp — output port selection and dimensions
 % ----------------------------------------------------------------
@@ -261,16 +302,9 @@ pipeline_has_at(t, Prop) :-
 % No runs after goal is reached
 :- occurs(t, run(_)), holds(t-1, goal).
 
-% No repeated port binding for same tool instance across runs
-:- occurs(T1, run(Tool)), occurs(t, run(Tool)), T1 < t,
-   occurs(T1, bind(Tool, Port, WF)),
-   occurs(t,  bind(Tool, Port, WF)).
-
-% ----------------------------------------------------------------
-% From tool_repetition_constraints.lp
-% ----------------------------------------------------------------
-
-:- occurs(t, run(Tool)), not multi_run(Tool), occurs(T1, run(Tool)), T1 < t.
+% SAT mode does not forbid repeated tool occurrences during synthesis. The
+% config-level tool_seq_repeat flag is handled later as a solution-distinction
+% policy, so repeated runs remain legal here.
 
 % ----------------------------------------------------------------
 % Sequential workflow: at most one tool runs per timestep
@@ -278,4 +312,3 @@ pipeline_has_at(t, Prop) :-
 % ----------------------------------------------------------------
 
 :- 2 { occurs(t, run(_)) }.
-

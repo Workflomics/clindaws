@@ -43,5 +43,5 @@ useful_check(t, T, Tool) :-
 % Constraint: every tool that runs must be useful
 :- query(t), occurs(T, run(Tool)), not useful_check(t, T, Tool).
 
-% Self-loop prevention
-:- query(t), occurs(T2, bind(Tool, _, out(T1, Tool, _))), T2 > T1.
+% SAT permits reusing outputs from earlier runs of the same tool, so do not
+% forbid these chains here.
