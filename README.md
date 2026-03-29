@@ -1,1 +1,154 @@
 # snakeAPE
+
+## Running
+
+Run from the repo root with:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE <path-to-config.json> [flags]
+```
+
+Example:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+```
+
+## Modes
+
+The CLI supports 6 runtime modes:
+
+- `single-shot`
+- `single-shot-opt`
+- `single-shot-lazy`
+- `multi-shot`
+- `multi-shot-opt`
+- `multi-shot-lazy`
+
+Meaning:
+
+- `single-shot` / `multi-shot`: legacy runtime schema
+- `*-opt`: candidate/full-variant runtime schema
+- `*-lazy`: lazy candidate runtime schema
+
+All runtime ASP encodings are vendored under `snakeAPE/encodings`.
+
+## Common Commands
+
+Normal run:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+```
+
+Legacy single-shot:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-single
+```
+
+Legacy multi-shot:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi
+```
+
+Grounding only:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot-lazy --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
+```
+
+Translation only:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
+```
+
+Translation only with candidate full variants:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-opt --translate-only-full-variants --output-dir /tmp/snakeape-opt-translate
+```
+
+Translation only with lazy candidates:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-lazy --translate-only-lazy --output-dir /tmp/snakeape-lazy-translate
+```
+
+Single-shot optimized:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-opt --solutions 1 --no-graphs --output-dir /tmp/snakeape-single-opt
+```
+
+Single-shot lazy:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-lazy --solutions 1 --no-graphs --output-dir /tmp/snakeape-single-lazy
+```
+
+Multi-shot optimized:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-opt --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi-opt
+```
+
+Multi-shot lazy:
+
+```bash
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-multi-lazy
+```
+
+## Output Artifacts
+
+Each run writes artifacts into `--output-dir` or the directory from the config.
+
+Important files:
+
+- `translation.lp`
+- `translation_summary.json`
+- `grounding_summary.json` for `--ground-only`
+- `answer_sets.txt` and `solutions.txt` for normal runs
+- `snakeAPE/run_log.csv`
+- `snakeAPE/run_summary.csv`
+
+The CSV logs are written to the root of the `snakeAPE` project directory, not to `--output-dir`.
+
+`snakeAPE/run_log.csv` is append-only and records runtime information per completed stage or horizon, including:
+
+- `mode`
+- `solver_family`
+- `solver_approach`
+- `translation_builder`
+- `translation_schema`
+- timing columns
+- peak RSS memory columns
+- satisfiability / stored-solution counts
+
+`snakeAPE/run_summary.csv` is append-only and contains one row per completed invocation with total:
+
+- translation time
+- base grounding time
+- total grounding time
+- total solving time
+- total rendering time
+- total runtime
+- final solution count
+
+If a run is interrupted, `snakeAPE/run_log.csv` still contains all stages that were completed before the interruption.
+
+## Useful Flags
+
+- `--mode ...`
+- `--output-dir ...`
+- `--solutions N`
+- `--min-length N`
+- `--max-length N`
+- `--no-graphs`
+- `--ground-only`
+- `--ground-only-stage base|full`
+- `--translate-only`
+- `--translate-only-full-variants`
+- `--translate-only-lazy`
