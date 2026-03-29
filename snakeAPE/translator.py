@@ -295,12 +295,17 @@ def _group_port_values_by_dimension(
 
 
 def _workflow_input_matches_lazy_port(
+    ontology: Ontology,
     workflow_input: Mapping[str, tuple[str, ...]],
     port_values_by_dimension: Mapping[str, tuple[str, ...]],
 ) -> bool:
     for dim, accepted_values in port_values_by_dimension.items():
         actual_values = workflow_input.get(dim, ())
-        if not any(value in accepted_values for value in actual_values):
+        if not any(
+            actual_value in ontology.ancestors_of(required_value)
+            for actual_value in actual_values
+            for required_value in accepted_values
+        ):
             return False
     return True
 
@@ -456,7 +461,7 @@ def build_fact_bundle_grounding_opt_lazy(
                 )
                 emitted_count += 1
             for wf_index, workflow_input in enumerate(config.inputs):
-                if _workflow_input_matches_lazy_port(workflow_input, port_values_by_dimension):
+                if _workflow_input_matches_lazy_port(ontology, workflow_input, port_values_by_dimension):
                     writer.emit_fact(
                         "lazy_initial_bindable",
                         _quote(candidate_id),
@@ -629,5 +634,78 @@ def build_fact_bundle(
         predicate_counts=dict(writer.predicate_counts),
         tool_stats=tuple(tool_stats),
         cache_stats={**ontology.cache_stats(), **resolver.stats()},
+        emit_stats=writer.stats(),
+    )
+
+
+def build_fact_bundle_ape_multi_shot(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> FactBundle:
+    """Build facts matching APE's Java ClingoSynthesisEngine contract.
+
+    This intentionally avoids any legacy variant expansion:
+    - one `tool_input(..., "<tool>_v0")` per tool with inputs
+    - one `tool_output(..., "<tool>_out_<i>")` per declared output port
+    - raw declared dimension values only
+    """
+
+    writer = _FactWriter()
+    _build_common_facts(writer, config, ontology, tools)
+    tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_stats: list[ToolExpansionStat] = []
+
+    for tool in tools:
+        tool_stats.append(
+            ToolExpansionStat(
+                tool_id=tool.mode_id,
+                tool_label=tool.label,
+                input_ports=len(tool.inputs),
+                output_ports=len(tool.outputs),
+                input_variant_count=1 if tool.inputs else 0,
+                output_variant_count=len(tool.outputs),
+            )
+        )
+
+        if tool.inputs:
+            variant_id = f"{tool.mode_id}_v0"
+            writer.emit_fact("tool_input", _quote(tool.mode_id), _quote(variant_id))
+            for port_index, port in enumerate(tool.inputs):
+                port_id = f"{variant_id}_p{port_index}"
+                writer.emit_fact("input_port", _quote(variant_id), _quote(port_id))
+                for dim, values in sorted(_normalize_dim_map(port.dimensions).items()):
+                    for value in values:
+                        writer.emit_fact(
+                            "dimension",
+                            _quote(port_id),
+                            f"({_quote(value)}, {_quote(dim)})",
+                        )
+
+        for output_index, port in enumerate(tool.outputs):
+            output_id = f"{tool.mode_id}_out_{output_index}"
+            port_id = f"{output_id}_port_0"
+            writer.emit_fact("tool_output", _quote(tool.mode_id), _quote(output_id))
+            writer.emit_fact("output_port", _quote(output_id), _quote(port_id))
+            for dim, values in sorted(_normalize_dim_map(port.dimensions).items()):
+                for value in values:
+                    writer.emit_fact(
+                        "dimension",
+                        _quote(port_id),
+                        f"({_quote(value)}, {_quote(dim)})",
+                    )
+
+    workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
+    facts = writer.text()
+
+    return FactBundle(
+        facts=facts,
+        fact_count=writer.fact_count,
+        tool_labels=tool_labels,
+        workflow_input_ids=tuple(workflow_input_ids),
+        goal_count=len(config.outputs),
+        predicate_counts=dict(writer.predicate_counts),
+        tool_stats=tuple(tool_stats),
+        cache_stats=dict(ontology.cache_stats()),
         emit_stats=writer.stats(),
     )

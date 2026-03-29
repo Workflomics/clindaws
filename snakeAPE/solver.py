@@ -192,6 +192,7 @@ def _lazy_program_paths() -> tuple[Path, ...]:
     return (
         base / "base.lp",
         base / "step_initial.lp",
+        base / "step_seed.lp",
         base / "step.lp",
         base / "check.lp",
         base / "ape_extract.lp",
@@ -282,6 +283,7 @@ def _solve_multi_shot_with_programs(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     initial_step_program: str | None = None,
+    initial_seed_program: str | None = None,
     solve_all_horizons: bool = False,
 ) -> SolveOutput:
     control = clingo.Control(["0", "--warn=none"])
@@ -326,6 +328,14 @@ def _solve_multi_shot_with_programs(
                     ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
                 else:
                     ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
+                    if (
+                        initial_seed_program is not None
+                        and horizon == config.solution_length_min + 1
+                    ):
+                        ground_parts.insert(
+                            0,
+                            (initial_seed_program, [clingo.Number(config.solution_length_min)]),
+                        )
                 _run_interruptible(
                     lambda parts=tuple(ground_parts): control.ground(list(parts)),
                     is_interrupted,
@@ -622,6 +632,7 @@ def _ground_multi_shot_control(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     initial_step_program: str | None = None,
+    initial_seed_program: str | None = None,
 ) -> GroundingOutput:
     total_grounding = 0.0
     base_grounding_peak_rss_mb = 0.0
@@ -652,6 +663,14 @@ def _ground_multi_shot_control(
                         ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
                     else:
                         ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
+                        if (
+                            initial_seed_program is not None
+                            and horizon == config.solution_length_min + 1
+                        ):
+                            ground_parts.insert(
+                                0,
+                                (initial_seed_program, [clingo.Number(config.solution_length_min)]),
+                            )
                     _run_interruptible(
                         lambda parts=tuple(ground_parts): control.ground(list(parts)),
                         is_interrupted,
@@ -779,6 +798,7 @@ def solve_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
+        initial_seed_program="step_seed",
         solve_all_horizons=True,
     )
 
@@ -831,4 +851,5 @@ def ground_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
+        initial_seed_program="step_seed",
     )

@@ -8,7 +8,8 @@ holds(t, dim(WF, V, Category)) :- holds(t-1, dim(WF, V, Category)), holds(t, ava
 lazy_port_category_match(t, Candidate, Port, WF, Category) :-
     holds(t, avail(WF)),
     lazy_candidate_input_value(Candidate, Port, ReqV, Category),
-    holds(t, dim(WF, ReqV, Category)).
+    holds(t, dim(WF, ActualV, Category)),
+    compatible(ReqV, ActualV).
 
 eligible(t, Candidate, Port, WF) :-
     holds(t, avail(WF)),

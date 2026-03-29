@@ -5,9 +5,27 @@ time(t).
 holds(t, avail(WF)) :- holds(t-1, avail(WF)).
 holds(t, dim(WF, V, Category)) :- holds(t-1, dim(WF, V, Category)), holds(t, avail(WF)).
 
-1 { occurs(t, run(Tool)) : tool(Tool) } 1.
+initial_goal_filter_active(t) :-
+    t = 1,
+    query(t),
+    exact_horizon_mode,
+    not initial_goal_holds.
+
+1 { occurs(t, run(Tool)) : lazy_initial_goal_tool(Tool) } 1 :-
+    initial_goal_filter_active(t).
+
+1 { occurs(t, run(Tool)) : tool(Tool) } 1 :-
+    not initial_goal_filter_active(t).
+:- initial_goal_filter_active(t), not occurs(t, run(_)).
+
+1 { occurs(t, use_lazy_candidate(Tool, Candidate)) :
+    lazy_tool_candidate(Candidate, Tool),
+    lazy_initial_goal_candidate(Candidate) } 1 :-
+    initial_goal_filter_active(t),
+    occurs(t, run(Tool)).
 
 1 { occurs(t, use_lazy_candidate(Tool, Candidate)) : lazy_tool_candidate(Candidate, Tool) } 1 :-
+    not initial_goal_filter_active(t),
     occurs(t, run(Tool)).
 
 occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).

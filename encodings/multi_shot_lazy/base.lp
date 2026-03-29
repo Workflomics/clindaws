@@ -29,6 +29,60 @@ lazy_candidate_output_category(Candidate, Port, Category) :-
 lazy_candidate_output_category(Candidate, Port, Category) :-
     lazy_candidate_output_choice_value(Candidate, Port, _, Category).
 
+goal_id(GoalID) :- goal_output(GoalID, _, _).
+
+lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :-
+    goal_output(GoalID, GoalV, Category),
+    lazy_candidate_output_singleton(Candidate, Port, ActualV, Category),
+    compatible(ActualV, GoalV).
+
+lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :-
+    goal_output(GoalID, GoalV, Category),
+    lazy_candidate_output_choice_value(Candidate, Port, ActualV, Category),
+    compatible(ActualV, GoalV).
+
+lazy_candidate_output_goal_satisfies(Candidate, Port, GoalID) :-
+    goal_id(GoalID),
+    lazy_candidate_output_port(Candidate, Port),
+    lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :
+        goal_output(GoalID, _, Category).
+
+lazy_candidate_goal_satisfies(Candidate, GoalID) :-
+    lazy_candidate_output_port(Candidate, Port),
+    lazy_candidate_output_goal_satisfies(Candidate, Port, GoalID).
+
+lazy_initial_goal_candidate(Candidate) :-
+    lazy_tool_candidate(Candidate, _),
+    lazy_candidate_goal_satisfies(Candidate, GoalID) : goal_id(GoalID).
+
+lazy_initial_goal_tool(Tool) :-
+    lazy_tool_candidate(Candidate, Tool),
+    lazy_initial_goal_candidate(Candidate).
+
+initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
+    goal_output(GoalID, GoalV, Category),
+    holds(0, avail(WF)),
+    holds(0, dim(WF, ActualV, Category)),
+    compatible(ActualV, GoalV).
+
+initial_goal_dim_missing(GoalID, WF) :-
+    goal_output(GoalID, GoalV, Category),
+    holds(0, avail(WF)),
+    not initial_goal_dim_match(GoalID, WF, GoalV, Category).
+
+initial_goal_satisfied_by(GoalID, WF) :-
+    holds(0, avail(WF)),
+    goal_output(GoalID, _, _),
+    initial_goal_dim_match(GoalID, WF, _, _),
+    not initial_goal_dim_missing(GoalID, WF).
+
+initial_goal_satisfied(GoalID) :-
+    goal_id(GoalID),
+    initial_goal_satisfied_by(GoalID, WF).
+
+initial_goal_holds :-
+    initial_goal_satisfied(GoalID) : goal_id(GoalID).
+
 tool_abstract_class(Class) :- tool_taxonomy(_, (_, Class)).
 tool_concrete(Tool)        :- tool(Tool), not tool_abstract_class(Tool).
 tool_parent(Child, Parent) :- tool_taxonomy(_, (Child, Parent)).

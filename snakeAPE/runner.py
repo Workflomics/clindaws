@@ -40,6 +40,7 @@ from .solver import (
 from .tool_annotations import load_tool_annotations
 from .translator import (
     build_fact_bundle,
+    build_fact_bundle_ape_multi_shot,
     build_fact_bundle_grounding_opt,
     build_fact_bundle_grounding_opt_lazy,
 )
@@ -738,6 +739,10 @@ def _prepare_run_context(
             fact_bundle = build_fact_bundle_grounding_opt(config, ontology, tools)
             effective_translation_strategy = "python"
             resolved_translation_builder = FULL_VARIANT_TRANSLATION_BUILDER
+        elif mode == "multi-shot":
+            fact_bundle = build_fact_bundle_ape_multi_shot(config, ontology, tools)
+            effective_translation_strategy = "ape_clingo_legacy"
+            resolved_translation_builder = RUNTIME_TRANSLATION_BUILDER
         else:
             fact_bundle = build_fact_bundle(config, ontology, tools, effective_translation_strategy)
             resolved_translation_builder = RUNTIME_TRANSLATION_BUILDER

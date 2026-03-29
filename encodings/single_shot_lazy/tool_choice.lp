@@ -8,10 +8,14 @@
 
 occurs(T, run(Tool)) :- occurs(T, use_lazy_candidate(Tool, _)).
 
+% First-step binding comes from eligible(0, ...) in pre_compute.lp.
+% Later runs still depend on eligible(T-1), so generic eligibility must be
+% available starting at T=1 to support runs at T=2 and beyond.
 lazy_port_category_match(T, Candidate, Port, WF, Category) :-
     holds(T, avail(WF)),
     lazy_candidate_input_value(Candidate, Port, ReqV, Category),
-    holds(T, dim(WF, ReqV, Category)).
+    holds(T, dim(WF, ActualV, Category)),
+    compatible(ReqV, ActualV).
 
 eligible(T, Candidate, Port, WF) :-
     holds(T, avail(WF)),

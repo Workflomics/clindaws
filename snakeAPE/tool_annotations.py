@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections import Counter, defaultdict
 
 from .models import ToolMode, ToolPortSpec
 
@@ -22,8 +23,17 @@ def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
     with path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
 
+    functions = raw.get("functions", [])
+    id_counts = Counter(str(item["id"]) for item in functions)
+    id_offsets: dict[str, int] = defaultdict(int)
+
     tools = []
-    for item in raw.get("functions", []):
+    for item in functions:
+        raw_id = str(item["id"])
+        internal_id = raw_id
+        if id_counts[raw_id] > 1:
+            internal_id = f"{raw_id}__ann{id_offsets[raw_id]}"
+            id_offsets[raw_id] += 1
         inputs = tuple(
             ToolPortSpec.from_mapping(
                 {
@@ -48,7 +58,7 @@ def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
         tools.append(
             ToolMode(
                 label=str(item["label"]),
-                mode_id=str(item["id"]),
+                mode_id=internal_id,
                 taxonomy_operations=taxonomy_operations,
                 inputs=inputs,
                 outputs=outputs,
