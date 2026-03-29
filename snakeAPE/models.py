@@ -100,6 +100,7 @@ class FactBundle:
     facts: str
     fact_count: int
     tool_labels: Mapping[str, str]
+    tool_input_signatures: Mapping[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]]
     workflow_input_ids: tuple[str, ...]
     goal_count: int
     predicate_counts: Mapping[str, int]

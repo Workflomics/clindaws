@@ -14,7 +14,7 @@ import clingo
 
 from .models import FactBundle, HorizonRecord, SnakeConfig
 from .runtime_stats import current_peak_rss_mb
-from .workflow import reconstruct_solution
+from .workflow import canonicalize_shown_symbols, reconstruct_solution
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -301,6 +301,7 @@ def _solve_multi_shot_with_programs(
     horizon_records: list[HorizonRecord] = []
     solving_started = False
     tool_labels = dict(facts.tool_labels)
+    tool_input_signatures = dict(facts.tool_input_signatures)
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -366,7 +367,10 @@ def _solve_multi_shot_with_programs(
                             for model in handle:
                                 nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                                 models_seen += 1
-                                shown = tuple(model.symbols(shown=True))
+                                shown = canonicalize_shown_symbols(
+                                    model.symbols(shown=True),
+                                    tool_input_signatures,
+                                )
                                 solution = reconstruct_solution(0, shown, tool_labels)
                                 canonical_key = solution.canonical_key
                                 if canonical_key not in seen_unique_keys:
@@ -451,6 +455,7 @@ def _solve_single_shot_with_programs(
     horizon_records: list[HorizonRecord] = []
     solving_started = False
     tool_labels = dict(facts.tool_labels)
+    tool_input_signatures = dict(facts.tool_input_signatures)
 
     horizon = config.solution_length_min
     while horizon <= config.solution_length_max:
@@ -499,7 +504,10 @@ def _solve_single_shot_with_programs(
                         for model in handle:
                             nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                             models_seen += 1
-                            shown = tuple(model.symbols(shown=True))
+                            shown = canonicalize_shown_symbols(
+                                model.symbols(shown=True),
+                                tool_input_signatures,
+                            )
                             solution = reconstruct_solution(0, shown, tool_labels)
                             canonical_key = solution.canonical_key
                             if canonical_key not in seen_unique_keys:

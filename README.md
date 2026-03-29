@@ -2,13 +2,31 @@
 
 ## Running
 
-Run from the repo root with:
+Run from the `snakeAPE` root with either of these forms:
+
+```bash
+python snakeAPE <path-to-config.json> [flags]
+```
+
+or:
+
+```bash
+python -m snakeAPE <path-to-config.json> [flags]
+```
+
+Example from `/Volumes/ZGMF-X20A/GARYU/snakeAPE`:
+
+```bash
+python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+```
+
+Run from the workspace root with:
 
 ```bash
 PYTHONPATH=snakeAPE python -m snakeAPE <path-to-config.json> [flags]
 ```
 
-Example:
+Example from `/Volumes/ZGMF-X20A/GARYU`:
 
 ```bash
 PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
@@ -39,6 +57,12 @@ Normal run:
 
 ```bash
 PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+```
+
+Normal run from the `snakeAPE` root:
+
+```bash
+python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
 ```
 
 Legacy single-shot:
@@ -100,6 +124,35 @@ Multi-shot lazy:
 ```bash
 PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-multi-lazy
 ```
+
+## Comparing SAT and snakeAPE Outputs
+
+The comparison utility now lives in the `snakeAPE` root:
+
+```bash
+cd snakeAPE
+python3 compare_solutions.py <left-solutions-file> <right-solutions-file> [flags]
+```
+
+Example comparing APE SAT output against snakeAPE answer sets for exact length 8:
+
+```bash
+cd snakeAPE
+python3 compare_solutions.py \
+  /tmp/ape_sat_compare/sat_output/solutions.txt \
+  /tmp/ape_sat_compare/snake_output/answer_sets.txt \
+  --left-config /tmp/ape_sat_compare/config_sat_compare.json \
+  --left-name SAT \
+  --right-name snakeAPE \
+  --length 8 \
+  --sample-limit 5
+```
+
+The comparator explains three levels of agreement:
+
+- exact normalized workflow matches
+- same tool sequence but different strict signature
+- workflows present on only one side at the tool-sequence level
 
 ## Output Artifacts
 

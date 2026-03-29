@@ -44,6 +44,20 @@ def _dedupe_stable(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _port_signature(spec) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        (str(dim), tuple(str(value) for value in values))
+        for dim, values in sorted(_normalize_dim_map(spec.dimensions).items())
+    )
+
+
+def _tool_input_signatures(tools: tuple[ToolMode, ...]) -> dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]]:
+    signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]] = {}
+    for tool in tools:
+        signatures[tool.mode_id] = tuple(_port_signature(port) for port in tool.inputs)
+    return signatures
+
+
 @dataclass
 class _FactWriter:
     """Incrementally build fact text and counts."""
@@ -326,6 +340,7 @@ def build_fact_bundle_grounding_opt(
     roots = _build_common_facts(writer, config, ontology, tools)
     resolver = _ExpansionResolver(ontology, roots, "python")
     tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     _cand_offset: dict[str, int] = defaultdict(int)
@@ -400,6 +415,7 @@ def build_fact_bundle_grounding_opt(
         facts=facts,
         fact_count=writer.fact_count,
         tool_labels=tool_labels,
+        tool_input_signatures=tool_input_signatures,
         workflow_input_ids=tuple(workflow_input_ids),
         goal_count=len(config.outputs),
         predicate_counts=dict(writer.predicate_counts),
@@ -420,6 +436,7 @@ def build_fact_bundle_grounding_opt_lazy(
     roots = _build_common_facts(writer, config, ontology, tools)
     resolver = _ExpansionResolver(ontology, roots, "python")
     tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     lazy_offset: dict[str, int] = defaultdict(int)
@@ -532,6 +549,7 @@ def build_fact_bundle_grounding_opt_lazy(
         facts=facts,
         fact_count=writer.fact_count,
         tool_labels=tool_labels,
+        tool_input_signatures=tool_input_signatures,
         workflow_input_ids=tuple(workflow_input_ids),
         goal_count=len(config.outputs),
         predicate_counts=dict(writer.predicate_counts),
@@ -553,6 +571,7 @@ def build_fact_bundle(
     roots = _build_common_facts(writer, config, ontology, tools)
     resolver = _ExpansionResolver(ontology, roots, strategy)
     tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     # Per-mode_id offsets to avoid ID collisions when multiple ToolMode objects
@@ -629,6 +648,7 @@ def build_fact_bundle(
         facts=facts,
         fact_count=writer.fact_count,
         tool_labels=tool_labels,
+        tool_input_signatures=tool_input_signatures,
         workflow_input_ids=tuple(workflow_input_ids),
         goal_count=len(config.outputs),
         predicate_counts=dict(writer.predicate_counts),
@@ -654,6 +674,7 @@ def build_fact_bundle_ape_multi_shot(
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, tools)
     tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     for tool in tools:
@@ -702,6 +723,7 @@ def build_fact_bundle_ape_multi_shot(
         facts=facts,
         fact_count=writer.fact_count,
         tool_labels=tool_labels,
+        tool_input_signatures=tool_input_signatures,
         workflow_input_ids=tuple(workflow_input_ids),
         goal_count=len(config.outputs),
         predicate_counts=dict(writer.predicate_counts),
