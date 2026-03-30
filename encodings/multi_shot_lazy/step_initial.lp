@@ -81,9 +81,9 @@ holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, _, Port)).
 
 1 { occurs(t, output_dim(Tool, Port, V, Category)) :
-    lazy_candidate_output_choice_value(Candidate, Port, V, Category) } 1 :-
+    lazy_initial_goal_output_value(Candidate, Port, V, Category) } 1 :-
     occurs(t, output(Tool, Candidate, Port)),
-    lazy_candidate_output_choice_value(Candidate, Port, _, Category).
+    lazy_initial_goal_output_value(Candidate, Port, _, Category).
 
 holds(t, dim(out(t, Tool, Port), V, Category)) :-
     occurs(t, output_dim(Tool, Port, V, Category)).

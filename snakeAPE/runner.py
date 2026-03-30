@@ -58,6 +58,7 @@ SCHEMA_PREDICATES = (
     "lazy_tool_candidate",
     "lazy_initial_bindable",
     "lazy_candidate_input_port",
+    "lazy_candidate_input_signature_id",
     "lazy_candidate_input_value",
     "lazy_candidate_output_port",
     "lazy_candidate_output_singleton",

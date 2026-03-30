@@ -285,6 +285,7 @@ def _solve_multi_shot_with_programs(
     initial_step_program: str | None = None,
     initial_seed_program: str | None = None,
     solve_all_horizons: bool = False,
+    stop_on_solution: bool = True,
 ) -> SolveOutput:
     control = clingo.Control(["0", "--warn=none"])
     for program_path in program_paths:
@@ -416,7 +417,7 @@ def _solve_multi_shot_with_programs(
                     f"unique workflows stored={unique_workflows_stored}, "
                     f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
                 )
-                if unique_collected and not solve_all_horizons:
+                if unique_collected and not solve_all_horizons and stop_on_solution:
                     break
                 horizon += 1
     finally:
@@ -807,7 +808,8 @@ def solve_multi_shot_lazy(
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
         initial_seed_program="step_seed",
-        solve_all_horizons=True,
+        solve_all_horizons=False,
+        stop_on_solution=False,
     )
 
 

@@ -440,6 +440,7 @@ def build_fact_bundle_grounding_opt_lazy(
     tool_stats: list[ToolExpansionStat] = []
 
     lazy_offset: dict[str, int] = defaultdict(int)
+    _input_sig_to_id: dict[frozenset, int] = {}
 
     for tool in tools:
         candidate_index = lazy_offset[tool.mode_id]
@@ -477,6 +478,15 @@ def build_fact_bundle_grounding_opt_lazy(
                     _quote(dim),
                 )
                 emitted_count += 1
+            sig = frozenset(port_values)
+            if sig not in _input_sig_to_id:
+                _input_sig_to_id[sig] = len(_input_sig_to_id)
+            writer.emit_fact(
+                "lazy_candidate_input_signature_id",
+                _quote(candidate_id),
+                str(port_idx),
+                str(_input_sig_to_id[sig]),
+            )
             for wf_index, workflow_input in enumerate(config.inputs):
                 if _workflow_input_matches_lazy_port(ontology, workflow_input, port_values_by_dimension):
                     writer.emit_fact(

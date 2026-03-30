@@ -33,17 +33,9 @@ lazy_candidate_output_category(Candidate, Port, Category) :-
 lazy_candidate_output_category(Candidate, Port, Category) :-
     lazy_candidate_output_choice_value(Candidate, Port, _, Category).
 
-candidate_input_signature_mismatch(CandidateA, PortA, CandidateB, PortB) :-
-    lazy_candidate_input_port(CandidateA, PortA),
-    lazy_candidate_input_port(CandidateB, PortB),
-    lazy_candidate_input_value(CandidateA, PortA, ReqV, Cat),
-    not lazy_candidate_input_value(CandidateB, PortB, ReqV, Cat).
-
 same_candidate_input_signature(CandidateA, PortA, CandidateB, PortB) :-
-    lazy_candidate_input_port(CandidateA, PortA),
-    lazy_candidate_input_port(CandidateB, PortB),
-    not candidate_input_signature_mismatch(CandidateA, PortA, CandidateB, PortB),
-    not candidate_input_signature_mismatch(CandidateB, PortB, CandidateA, PortA).
+    lazy_candidate_input_signature_id(CandidateA, PortA, SigID),
+    lazy_candidate_input_signature_id(CandidateB, PortB, SigID).
 
 goal_id(GoalID) :- goal_output(GoalID, _, _).
 
@@ -74,6 +66,17 @@ lazy_initial_goal_candidate(Candidate) :-
 lazy_initial_goal_tool(Tool) :-
     lazy_tool_candidate(Candidate, Tool),
     lazy_initial_goal_candidate(Candidate).
+
+lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
+    lazy_initial_goal_candidate(Candidate),
+    lazy_candidate_output_choice_value(Candidate, Port, V, Category),
+    goal_output(_, GoalV, Category),
+    compatible(V, GoalV).
+
+lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
+    lazy_initial_goal_candidate(Candidate),
+    lazy_candidate_output_choice_value(Candidate, Port, V, Category),
+    not goal_output(_, _, Category).
 
 initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
