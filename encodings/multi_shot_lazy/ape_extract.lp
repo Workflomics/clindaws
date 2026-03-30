@@ -11,7 +11,7 @@ ape_bind(t, Port, WF) :- occurs(t, bind(_, Port, WF)).
 ape_holds_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, _, Port)),
     artifact_dim(out(t, Tool, Port), V, Category).
-ape_goal_out(t, GoalID, WF) :- goal_satisfied_by(t, GoalID, WF).
+ape_goal_out(t, GoalID, WF) :- chosen_goal_output(t, GoalID, WF).
 
 #program step(t).
 
@@ -20,4 +20,4 @@ ape_bind(t, Port, WF) :- occurs(t, bind(_, Port, WF)).
 ape_holds_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, _, Port)),
     artifact_dim(out(t, Tool, Port), V, Category).
-ape_goal_out(t, GoalID, WF) :- goal_satisfied_by(t, GoalID, WF).
+ape_goal_out(t, GoalID, WF) :- chosen_goal_output(t, GoalID, WF).

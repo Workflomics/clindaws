@@ -76,6 +76,29 @@ def filter_by_length(parsed: ParsedSolutions, length: int | None) -> ParsedSolut
     )
 
 
+def parse_tool_sequence_filter(raw: str) -> tuple[str, ...]:
+    text = raw.strip()
+    separator = "->" if "->" in text else ","
+    return tuple(part.strip() for part in text.split(separator) if part.strip())
+
+
+def filter_by_tool_sequence(
+    parsed: ParsedSolutions,
+    tool_sequence: tuple[str, ...] | None,
+) -> ParsedSolutions:
+    if tool_sequence is None:
+        return parsed
+    return ParsedSolutions(
+        parser_kind=parsed.parser_kind,
+        path=parsed.path,
+        solutions=tuple(
+            solution
+            for solution in parsed.solutions
+            if solution.tool_sequence == tool_sequence
+        ),
+    )
+
+
 def extract_local_name(value: str) -> str:
     return value.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
 
@@ -447,6 +470,13 @@ def describe_length_filter(length: int | None) -> str:
     return f"workflow length {length}"
 
 
+def describe_scope(length: int | None, tool_sequence: tuple[str, ...] | None) -> str:
+    scope = describe_length_filter(length)
+    if tool_sequence is None:
+        return scope
+    return f"{scope}, tool sequence {format_sequence(tool_sequence)}"
+
+
 def format_bindings(bindings: tuple[str, ...]) -> str:
     return ", ".join(bindings) if bindings else "<none>"
 
@@ -558,6 +588,195 @@ def sample_workflow_key(key: tuple[object, ...]) -> tuple[tuple[str, ...], tuple
     return tool_sequence, bindings, outputs
 
 
+def serialize_solution(solution: NormalizedSolution) -> dict[str, object]:
+    return {
+        "index": solution.index,
+        "tool_sequence": list(solution.tool_sequence),
+        "tool_sequence_text": format_sequence(solution.tool_sequence),
+        "bindings": list(solution.bindings),
+        "outputs": list(solution.outputs),
+    }
+
+
+def serialize_workflow_key(
+    key: tuple[object, ...],
+    *,
+    count: int,
+) -> dict[str, object]:
+    tool_sequence, bindings, outputs = sample_workflow_key(key)
+    return {
+        "count": count,
+        "tool_sequence": list(tool_sequence),
+        "tool_sequence_text": format_sequence(tool_sequence),
+        "bindings": list(bindings),
+        "outputs": list(outputs),
+    }
+
+
+def build_single_summary_report(
+    parsed: ParsedSolutions,
+    *,
+    sample_limit: int,
+    length: int | None,
+    tool_sequence: tuple[str, ...] | None,
+) -> dict[str, object]:
+    report = {
+        "path": str(parsed.path),
+        "format": parsed.parser_kind,
+        "scope": describe_scope(length, tool_sequence),
+        "solutions_parsed": len(parsed.solutions),
+        "unique_tool_sequences": len(parsed.tool_counter),
+        "unique_workflow_signatures": len(parsed.workflow_counter),
+        "top_tool_sequences": [
+            {
+                "count": count,
+                "tool_sequence": list(sequence),
+                "tool_sequence_text": format_sequence(sequence),
+            }
+            for sequence, count in parsed.tool_counter.most_common(sample_limit)
+        ],
+    }
+    if parsed.parser_kind != "summary":
+        report["sample_workflows"] = [
+            serialize_solution(solution)
+            for solution in parsed.solutions[:sample_limit]
+        ]
+    return report
+
+
+def build_comparison_report(
+    left: ParsedSolutions,
+    right: ParsedSolutions,
+    *,
+    left_name: str,
+    right_name: str,
+    sample_limit: int,
+    length: int | None,
+    tool_sequence: tuple[str, ...] | None,
+) -> dict[str, object]:
+    left_tool_counter = left.tool_counter
+    right_tool_counter = right.tool_counter
+    left_workflow_counter = left.workflow_counter
+    right_workflow_counter = right.workflow_counter
+
+    common_workflow_keys = set(left_workflow_counter) & set(right_workflow_counter)
+    exact_matches = sum(min(left_workflow_counter[key], right_workflow_counter[key]) for key in common_workflow_keys)
+    left_only = left_workflow_counter - right_workflow_counter
+    right_only = right_workflow_counter - left_workflow_counter
+
+    left_only_same_tool = sum(
+        count for key, count in left_only.items() if key[0] in right_tool_counter
+    )
+    right_only_same_tool = sum(
+        count for key, count in right_only.items() if key[0] in left_tool_counter
+    )
+    left_only_new_tools = sum(
+        count for key, count in left_only.items() if key[0] not in right_tool_counter
+    )
+    right_only_new_tools = sum(
+        count for key, count in right_only.items() if key[0] not in left_tool_counter
+    )
+
+    differences = []
+    for tool_sequence_key in set(left_tool_counter) | set(right_tool_counter):
+        left_count = left_tool_counter.get(tool_sequence_key, 0)
+        right_count = right_tool_counter.get(tool_sequence_key, 0)
+        if left_count != right_count:
+            differences.append(
+                {
+                    "delta": abs(left_count - right_count),
+                    "tool_sequence": list(tool_sequence_key),
+                    "tool_sequence_text": format_sequence(tool_sequence_key),
+                    left_name: left_count,
+                    right_name: right_count,
+                }
+            )
+    differences.sort(
+        key=lambda item: (item["delta"], item["tool_sequence_text"]),
+        reverse=True,
+    )
+
+    mismatch_groups: dict[tuple[str, ...], dict[str, list[tuple[tuple[object, ...], int]]]] = defaultdict(
+        lambda: {"left": [], "right": []}
+    )
+    for key, count in left_only.items():
+        if key[0] in right_tool_counter:
+            mismatch_groups[key[0]]["left"].append((key, count))
+    for key, count in right_only.items():
+        if key[0] in left_tool_counter:
+            mismatch_groups[key[0]]["right"].append((key, count))
+
+    strict_signature_mismatches = []
+    ranked_groups = sorted(
+        mismatch_groups.items(),
+        key=lambda item: (
+            sum(count for _, count in item[1]["left"]) + sum(count for _, count in item[1]["right"]),
+            format_sequence(item[0]),
+        ),
+        reverse=True,
+    )
+    for tool_sequence_key, bucket in ranked_groups[:sample_limit]:
+        entry: dict[str, object] = {
+            "tool_sequence": list(tool_sequence_key),
+            "tool_sequence_text": format_sequence(tool_sequence_key),
+            f"{left_name}_only_total": sum(count for _, count in bucket["left"]),
+            f"{right_name}_only_total": sum(count for _, count in bucket["right"]),
+        }
+        if bucket["left"]:
+            key, count = bucket["left"][0]
+            entry[f"{left_name}_sample"] = serialize_workflow_key(key, count=count)
+        if bucket["right"]:
+            key, count = bucket["right"][0]
+            entry[f"{right_name}_sample"] = serialize_workflow_key(key, count=count)
+        if bucket["left"] and bucket["right"]:
+            left_key, _ = bucket["left"][0]
+            right_key, _ = bucket["right"][0]
+            _, left_bindings, left_outputs = sample_workflow_key(left_key)
+            _, right_bindings, right_outputs = sample_workflow_key(right_key)
+            entry["explanation"] = describe_workflow_difference(
+                left_bindings,
+                right_bindings,
+                left_outputs,
+                right_outputs,
+            )
+        strict_signature_mismatches.append(entry)
+
+    return {
+        "left": {
+            "name": left_name,
+            "path": str(left.path),
+            "format": left.parser_kind,
+        },
+        "right": {
+            "name": right_name,
+            "path": str(right.path),
+            "format": right.parser_kind,
+        },
+        "scope": describe_scope(length, tool_sequence),
+        "counts": {
+            f"{left_name}_total_solutions": len(left.solutions),
+            f"{right_name}_total_solutions": len(right.solutions),
+            f"{left_name}_unique_tool_sequences": len(left_tool_counter),
+            f"{right_name}_unique_tool_sequences": len(right_tool_counter),
+            f"{left_name}_unique_workflow_signatures": len(left_workflow_counter),
+            f"{right_name}_unique_workflow_signatures": len(right_workflow_counter),
+        },
+        "workflow_level": {
+            "exact_workflow_matches": exact_matches,
+            "strict_signature_mismatch": {
+                left_name: left_only_same_tool,
+                right_name: right_only_same_tool,
+            },
+            "tool_sequence_only_mismatch": {
+                left_name: left_only_new_tools,
+                right_name: right_only_new_tools,
+            },
+        },
+        "tool_sequence_count_differences": differences[:sample_limit],
+        "strict_signature_mismatches": strict_signature_mismatches,
+    }
+
+
 def print_comparison(
     left: ParsedSolutions,
     right: ParsedSolutions,
@@ -565,6 +784,7 @@ def print_comparison(
     right_name: str,
     sample_limit: int,
     length: int | None,
+    tool_sequence: tuple[str, ...] | None,
 ) -> None:
     left_tool_counter = left.tool_counter
     right_tool_counter = right.tool_counter
@@ -591,7 +811,7 @@ def print_comparison(
 
     print(f"{left_name}: {left.path} [{left.parser_kind}]")
     print(f"{right_name}: {right.path} [{right.parser_kind}]")
-    print(f"Scope: {describe_length_filter(length)}")
+    print(f"Scope: {describe_scope(length, tool_sequence)}")
     print("\n--- Counts ---")
     print(f"{left_name} total solutions: {len(left.solutions)}")
     print(f"{right_name} total solutions: {len(right.solutions)}")
@@ -726,23 +946,52 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Optional workflow length filter applied after parsing.",
     )
+    parser.add_argument(
+        "--tool-sequence",
+        help='Optional exact tool-sequence filter after normalization, e.g. "Tool A -> Tool B".',
+    )
+    parser.add_argument(
+        "--json-out",
+        help="Optional path for a structured JSON report.",
+    )
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    tool_sequence = parse_tool_sequence_filter(args.tool_sequence) if args.tool_sequence else None
 
     left_path = Path(args.left).resolve()
     left_config = Path(args.left_config).resolve() if args.left_config else None
-    left_parsed = filter_by_length(parse_any(left_path, left_config), args.length)
+    left_parsed = filter_by_tool_sequence(
+        filter_by_length(parse_any(left_path, left_config), args.length),
+        tool_sequence,
+    )
 
     if not args.right:
         print_single_summary(left_parsed, args.sample_limit)
+        if args.json_out:
+            Path(args.json_out).resolve().write_text(
+                json.dumps(
+                    build_single_summary_report(
+                        left_parsed,
+                        sample_limit=args.sample_limit,
+                        length=args.length,
+                        tool_sequence=tool_sequence,
+                    ),
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         return 0
 
     right_path = Path(args.right).resolve()
     right_config = Path(args.right_config).resolve() if args.right_config else None
-    right_parsed = filter_by_length(parse_any(right_path, right_config), args.length)
+    right_parsed = filter_by_tool_sequence(
+        filter_by_length(parse_any(right_path, right_config), args.length),
+        tool_sequence,
+    )
     print_comparison(
         left_parsed,
         right_parsed,
@@ -750,7 +999,25 @@ def main() -> int:
         args.right_name,
         args.sample_limit,
         args.length,
+        tool_sequence,
     )
+    if args.json_out:
+        Path(args.json_out).resolve().write_text(
+            json.dumps(
+                build_comparison_report(
+                    left_parsed,
+                    right_parsed,
+                    left_name=args.left_name,
+                    right_name=args.right_name,
+                    sample_limit=args.sample_limit,
+                    length=args.length,
+                    tool_sequence=tool_sequence,
+                ),
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return 0
 
 

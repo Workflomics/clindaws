@@ -318,7 +318,7 @@ def _solve_multi_shot_with_programs(
                 base_grounding_callback(base_grounding_sec, base_grounding_peak_rss_mb)
             _report(progress_callback, f"Grounding progress: base program finished after {elapsed:.3f}s.")
 
-            horizon = config.solution_length_min
+            horizon = 1
             while horizon <= config.solution_length_max:
                 if not solve_all_horizons and len(unique_collected) >= config.solutions:
                     break
@@ -326,13 +326,13 @@ def _solve_multi_shot_with_programs(
                 _report(progress_callback, f"Grounding: horizon {horizon}...")
                 start = perf_counter()
                 ground_parts = [("check", [clingo.Number(horizon)])]
-                if initial_step_program is not None and horizon == config.solution_length_min:
+                if initial_step_program is not None and horizon == 1:
                     ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
                 else:
                     ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
                     if (
                         initial_seed_program is not None
-                        and horizon > config.solution_length_min
+                        and horizon > 1
                     ):
                         ground_parts.insert(
                             0,
@@ -348,6 +348,10 @@ def _solve_multi_shot_with_programs(
                     progress_callback,
                     f"Grounding progress: horizon {horizon} finished after {ground_elapsed:.3f}s.",
                 )
+
+                if horizon < config.solution_length_min:
+                    horizon += 1
+                    continue
 
                 query_symbol = clingo.Function("query", [clingo.Number(horizon)])
                 control.assign_external(query_symbol, True)
@@ -664,17 +668,17 @@ def _ground_multi_shot_control(
             _report(progress_callback, f"Grounding progress: base program finished after {elapsed:.3f}s.")
 
             if stage == "full":
-                for horizon in range(config.solution_length_min, config.solution_length_max + 1):
+                for horizon in range(1, config.solution_length_max + 1):
                     _report(progress_callback, f"Grounding: horizon {horizon}...")
                     start = perf_counter()
                     ground_parts = [("check", [clingo.Number(horizon)])]
-                    if initial_step_program is not None and horizon == config.solution_length_min:
+                    if initial_step_program is not None and horizon == 1:
                         ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
                     else:
                         ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
                         if (
                             initial_seed_program is not None
-                            and horizon > config.solution_length_min
+                            and horizon > 1
                         ):
                             ground_parts.insert(
                                 0,

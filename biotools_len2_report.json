@@ -1,0 +1,213 @@
+{
+  "left": {
+    "name": "SAT",
+    "path": "/Volumes/ZGMF-X20A/GARYU/snakeAPE/bio_tools_solutions.txt",
+    "format": "sat-complete"
+  },
+  "right": {
+    "name": "snakeAPE",
+    "path": "/Volumes/ZGMF-X20A/GARYU/ironAPE/APE_Example/biotools/solutions/answer_sets.txt",
+    "format": "snake-answer-sets"
+  },
+  "scope": "workflow length 2",
+  "counts": {
+    "SAT_total_solutions": 763,
+    "snakeAPE_total_solutions": 901,
+    "SAT_unique_tool_sequences": 763,
+    "snakeAPE_unique_tool_sequences": 874,
+    "SAT_unique_workflow_signatures": 763,
+    "snakeAPE_unique_workflow_signatures": 874
+  },
+  "workflow_level": {
+    "exact_workflow_matches": 2,
+    "strict_signature_mismatch": {
+      "SAT": 0,
+      "snakeAPE": 1
+    },
+    "tool_sequence_only_mismatch": {
+      "SAT": 761,
+      "snakeAPE": 898
+    }
+  },
+  "tool_sequence_count_differences": [
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "cytofkit",
+        "presartools"
+      ],
+      "tool_sequence_text": "cytofkit -> presartools",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "PEAKS De Novo",
+        "kronaextract"
+      ],
+      "tool_sequence_text": "PEAKS De Novo -> kronaextract",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "PEAKS De Novo",
+        "Graph Extract"
+      ],
+      "tool_sequence_text": "PEAKS De Novo -> Graph Extract",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "taxonomy_summary"
+      ],
+      "tool_sequence_text": "MapQuant -> taxonomy_summary",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "solid_qual_stats"
+      ],
+      "tool_sequence_text": "MapQuant -> solid_qual_stats",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "sabund"
+      ],
+      "tool_sequence_text": "MapQuant -> sabund",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "replace_regex"
+      ],
+      "tool_sequence_text": "MapQuant -> replace_regex",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "reformat_fastq"
+      ],
+      "tool_sequence_text": "MapQuant -> reformat_fastq",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "presartools"
+      ],
+      "tool_sequence_text": "MapQuant -> presartools",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "peakcalling_findpeaks"
+      ],
+      "tool_sequence_text": "MapQuant -> peakcalling_findpeaks",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "master2pgsnp"
+      ],
+      "tool_sequence_text": "MapQuant -> master2pgsnp",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "kronaextract"
+      ],
+      "tool_sequence_text": "MapQuant -> kronaextract",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "grep_count"
+      ],
+      "tool_sequence_text": "MapQuant -> grep_count",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "gdtools_simulate-mutations"
+      ],
+      "tool_sequence_text": "MapQuant -> gdtools_simulate-mutations",
+      "SAT": 0,
+      "snakeAPE": 2
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "filtercontrol"
+      ],
+      "tool_sequence_text": "MapQuant -> filtercontrol",
+      "SAT": 0,
+      "snakeAPE": 2
+    }
+  ],
+  "strict_signature_mismatches": [
+    {
+      "tool_sequence": [
+        "cytofkit",
+        "filtercontrol"
+      ],
+      "tool_sequence_text": "cytofkit -> filtercontrol",
+      "SAT_only_total": 0,
+      "snakeAPE_only_total": 1,
+      "snakeAPE_sample": {
+        "count": 1,
+        "tool_sequence": [
+          "cytofkit",
+          "filtercontrol"
+        ],
+        "tool_sequence_text": "cytofkit -> filtercontrol",
+        "bindings": [
+          "t1:in0<-wf_input_0",
+          "t2:in0<-t1:out0",
+          "t2:in1<-t1:out1"
+        ],
+        "outputs": [
+          "t1:out0",
+          "t1:out1",
+          "t2:out0"
+        ]
+      }
+    }
+  ]
+}
