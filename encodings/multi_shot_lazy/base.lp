@@ -8,6 +8,9 @@ is_terminal(V) :- taxonomy(_, _, (_, V, _)), not taxonomy(_, _, (_, _, V)).
 compatible(V, V)        :- is_terminal(V).
 compatible(V, Ancestor) :- is_terminal(V), ancestor(V, Ancestor).
 
+artifact_dim(WF, V, Category) :-
+    holds(0, dim(WF, V, Category)).
+
 tool_has_input(Tool) :-
     lazy_tool_candidate(Candidate, Tool),
     lazy_candidate_input_port(Candidate, _).
@@ -49,6 +52,13 @@ lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :-
     lazy_candidate_output_choice_value(Candidate, Port, ActualV, Category),
     compatible(ActualV, GoalV).
 
+lazy_initial_goal_candidate_output_mismatch(Candidate) :-
+    enable_all_outputs_consumed,
+    lazy_tool_candidate(Candidate, _),
+    NP = #count { Port : lazy_candidate_output_port(Candidate, Port) },
+    NG = #count { G : goal_id(G) },
+    NP != NG.
+
 lazy_candidate_output_goal_satisfies(Candidate, Port, GoalID) :-
     goal_id(GoalID),
     lazy_candidate_output_port(Candidate, Port),
@@ -61,17 +71,31 @@ lazy_candidate_goal_satisfies(Candidate, GoalID) :-
 
 lazy_initial_goal_candidate(Candidate) :-
     lazy_tool_candidate(Candidate, _),
-    lazy_candidate_goal_satisfies(Candidate, GoalID) : goal_id(GoalID).
+    lazy_candidate_goal_satisfies(Candidate, GoalID) : goal_id(GoalID),
+    not lazy_initial_goal_candidate_output_mismatch(Candidate).
 
 lazy_initial_goal_tool(Tool) :-
     lazy_tool_candidate(Candidate, Tool),
     lazy_initial_goal_candidate(Candidate).
 
-lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
+lazy_initial_goal_output_preferred_value(Candidate, Port, V, Category) :-
     lazy_initial_goal_candidate(Candidate),
     lazy_candidate_output_choice_value(Candidate, Port, V, Category),
     goal_output(_, GoalV, Category),
-    compatible(V, GoalV).
+    compatible(V, GoalV),
+    not lazy_initial_goal_output_smaller_value(Candidate, Port, V, Category).
+
+lazy_initial_goal_output_smaller_value(Candidate, Port, V, Category) :-
+    lazy_initial_goal_candidate(Candidate),
+    lazy_candidate_output_choice_value(Candidate, Port, V, Category),
+    lazy_candidate_output_choice_value(Candidate, Port, V2, Category),
+    goal_output(_, GoalV, Category),
+    compatible(V, GoalV),
+    compatible(V2, GoalV),
+    V2 < V.
+
+lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
+    lazy_initial_goal_output_preferred_value(Candidate, Port, V, Category).
 
 lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
     lazy_initial_goal_candidate(Candidate),
@@ -81,7 +105,7 @@ lazy_initial_goal_output_value(Candidate, Port, V, Category) :-
 initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
     holds(0, avail(WF)),
-    holds(0, dim(WF, ActualV, Category)),
+    artifact_dim(WF, ActualV, Category),
     compatible(ActualV, GoalV).
 
 initial_goal_dim_missing(GoalID, WF) :-
@@ -142,5 +166,5 @@ port_env_compatible(Tool, Port) :-
     tool_input_port(Tool, Port),
     port_requirement_met(Tool, Port, Type) : target_capability(Type, _).
 
-eligible(0, Candidate, Port, WF) :-
+eligible(Candidate, Port, WF) :-
     lazy_initial_bindable(Candidate, Port, WF).

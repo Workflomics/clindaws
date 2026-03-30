@@ -156,3 +156,65 @@ The comparator output was expanded to include:
 ### Why
 
 This makes the tool usable as an engineering diagnosis aid rather than only a raw diff utility.
+
+## 10. Biotools length-1 SAT parity fix in `multi-shot-lazy`
+
+### Issue
+
+For the Biotools `config.json` problem, APE SAT produced exactly one length-1 workflow (`IDBac`), while `snakeAPE` `multi-shot-lazy` produced `5000` length-1 answer sets. The mismatch was dominated by thousands of spurious `clc_mapping_info` models plus seven one-step `IDBAc` variants.
+
+### Root Cause
+
+There were three separate horizon-1 lazy-path problems:
+
+- the exact-horizon step-1 goal filter was disabled whenever the original workflow input broadly matched the goal taxonomy, even though SAT does not allow workflow inputs to count as final outputs
+- the intended `use_all_generated_data=ALL` output-count guard was not reliably excluding multi-output candidates in the lazy horizon-1 specialization
+- for one-step exact-goal solving, lazy output-choice facts still allowed every compatible terminal descendant of the goal class, which created multiple `IDBAc` variants
+
+### Change
+
+The lazy horizon-1 path was tightened to match SAT/APE semantics:
+
+- `initial_goal_filter_active(1)` now stays active in exact-horizon mode instead of turning off when `initial_goal_holds`
+- `multi-shot-lazy/check.lp` now forbids reusing workflow inputs as final goal outputs, mirroring APE's `inputsAreNotOutputs` rule
+- `multi-shot-lazy/step_initial.lp` now applies a direct hard constraint that rejects candidates whose output-port count does not match the goal count under `use_all_generated_data=ALL`
+- `multi-shot-lazy/base.lp` now collapses goal-matching output-choice values in the horizon-1 goal filter to one deterministic representative per category, removing the one-step terminal-descendant explosion
+
+### Why
+
+This fixes a true solver-semantics mismatch, not just a formatting or extraction issue. It restores exact Biotools length-1 parity with SAT without changing the later-horizon `defect_concentration` reference counts.
+
+### Validation
+
+- Biotools exact length 1:
+  - SAT: `1`
+  - `snakeAPE multi-shot-lazy`: `1`
+  - normalized workflow comparison: exact parity, no tool-sequence mismatch, no strict-signature mismatch
+- `defect_concentration` regression:
+  - length 7: `72`
+  - cumulative through length 8: `1332`
+
+## 11. Later-horizon `multi-shot-lazy` grounding reduction for Biotools
+
+### Issue
+
+After the horizon-1 SAT mismatch was fixed, Biotools could still stall at later lazy horizons, especially horizon 2. The main known causes were the generic later-horizon `eligible/4` reconstruction and the repeated carry-forward of all artifact dimension facts.
+
+### Change
+
+The lazy later-horizon path was restructured in three exact ways:
+
+- artifact dimensions are now time-independent via `artifact_dim(...)` instead of being copied forward as `holds(t, dim(...))` at every horizon
+- later-step bindings no longer rebuild eligibility from the full artifact-state join; they use direct workflow-input bindability plus previous-output port compatibility
+- the lazy translator now emits `lazy_candidate_port_bindable(...)` facts and conservatively prunes lazy candidates that cannot reach the workflow goal through the precomputed compatibility graph
+
+### Why
+
+This moves repeated later-horizon work into one-time translation/indexing and shrinks the lazy grounding domain without changing accepted workflows.
+
+### Validation
+
+- `defect_concentration` still matches the accepted lazy reference:
+  - length 7: `72`
+  - cumulative through length 8: `1332`
+- Biotools horizon-2 grounding is now isolated to the remaining slow stage instead of the earlier raw eligibility/dimension-carry-forward shape, but it is not fully eliminated yet in this session.

@@ -332,11 +332,11 @@ def _solve_multi_shot_with_programs(
                     ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
                     if (
                         initial_seed_program is not None
-                        and horizon == config.solution_length_min + 1
+                        and horizon > config.solution_length_min
                     ):
                         ground_parts.insert(
                             0,
-                            (initial_seed_program, [clingo.Number(config.solution_length_min)]),
+                            (initial_seed_program, [clingo.Number(horizon - 1)]),
                         )
                 _run_interruptible(
                     lambda parts=tuple(ground_parts): control.ground(list(parts)),
@@ -674,11 +674,11 @@ def _ground_multi_shot_control(
                         ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
                         if (
                             initial_seed_program is not None
-                            and horizon == config.solution_length_min + 1
+                            and horizon > config.solution_length_min
                         ):
                             ground_parts.insert(
                                 0,
-                                (initial_seed_program, [clingo.Number(config.solution_length_min)]),
+                                (initial_seed_program, [clingo.Number(horizon - 1)]),
                             )
                     _run_interruptible(
                         lambda parts=tuple(ground_parts): control.ground(list(parts)),
@@ -807,7 +807,6 @@ def solve_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
-        initial_seed_program="step_seed",
         solve_all_horizons=False,
         stop_on_solution=False,
     )
@@ -861,5 +860,4 @@ def ground_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
-        initial_seed_program="step_seed",
     )

@@ -3,13 +3,11 @@
 time(t).
 
 holds(t, avail(WF)) :- holds(t-1, avail(WF)).
-holds(t, dim(WF, V, Category)) :- holds(t-1, dim(WF, V, Category)), holds(t, avail(WF)).
 
 initial_goal_filter_active(t) :-
     t = 1,
     query(t),
-    exact_horizon_mode,
-    not initial_goal_holds.
+    exact_horizon_mode.
 
 1 { occurs(t, run(Tool)) : lazy_initial_goal_tool(Tool) } 1 :-
     initial_goal_filter_active(t).
@@ -29,6 +27,13 @@ initial_goal_filter_active(t) :-
     occurs(t, run(Tool)).
 
 occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
+
+:- initial_goal_filter_active(t),
+   occurs(t, use_lazy_candidate(_, Candidate)),
+   enable_all_outputs_consumed,
+   NP = #count { Port : lazy_candidate_output_port(Candidate, Port) },
+   NG = #count { GoalID : goal_id(GoalID) },
+   NP != NG.
 
 1 { occurs(t, bind(Tool, Port, WF)) : lazy_initial_bindable(Candidate, Port, WF) } 1 :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
@@ -85,10 +90,17 @@ holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_initial_goal_output_value(Candidate, Port, _, Category).
 
-holds(t, dim(out(t, Tool, Port), V, Category)) :-
+1 { occurs(t, output_dim(Tool, Port, V, Category)) :
+    lazy_candidate_output_choice_value(Candidate, Port, V, Category) } 1 :-
+    occurs(t, output(Tool, Candidate, Port)),
+    lazy_candidate_output_choice_value(Candidate, Port, _, Category),
+    not lazy_initial_goal_output_value(Candidate, Port, _, Category),
+    not initial_goal_filter_active(t).
+
+artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output_dim(Tool, Port, V, Category)).
 
-holds(t, dim(out(t, Tool, Port), V, Category)) :-
+artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_singleton(Candidate, Port, V, Category).
 
@@ -109,7 +121,7 @@ reachable(t, Tool) :- is_root(t, Tool).
 goal_dim_match(t, GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
     holds(t, avail(WF)),
-    holds(t, dim(WF, ActualV, Category)),
+    artifact_dim(WF, ActualV, Category),
     compatible(ActualV, GoalV).
 
 goal_dim_missing(t, GoalID, WF) :-

@@ -1,16 +1,17 @@
 #program step_seed(t).
 
-% Seed eligible(t, ...) after the specialized first step has been applied.
-% This is grounded only when the next horizon is requested, so horizon-1-only
-% runs keep the fast lazy_initial_bindable path from step_initial.lp.
-lazy_port_category_match(t, Candidate, Port, WF, Category) :-
-    holds(t, avail(WF)),
+% Seed eligibility only for artifacts introduced at horizon t. Artifact
+% compatibility is monotonic, so once an artifact is known to satisfy a lazy
+% candidate port it stays eligible forever and does not need to be recomputed
+% against the full carried-forward state at later horizons.
+lazy_seed_port_category_match(t, Candidate, Port, out(t, Tool, PortOut), Category) :-
+    occurs(t, output(Tool, _, PortOut)),
     lazy_candidate_input_value(Candidate, Port, ReqV, Category),
-    holds(t, dim(WF, ActualV, Category)),
+    artifact_dim(out(t, Tool, PortOut), ActualV, Category),
     compatible(ReqV, ActualV).
 
-eligible(t, Candidate, Port, WF) :-
-    holds(t, avail(WF)),
+eligible(Candidate, Port, out(t, Tool, PortOut)) :-
+    occurs(t, output(Tool, _, PortOut)),
     lazy_candidate_input_port(Candidate, Port),
-    lazy_port_category_match(t, Candidate, Port, WF, Category) :
+    lazy_seed_port_category_match(t, Candidate, Port, out(t, Tool, PortOut), Category) :
         lazy_candidate_input_category(Candidate, Port, Category).

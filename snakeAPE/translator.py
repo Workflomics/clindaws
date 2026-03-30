@@ -324,6 +324,19 @@ def _workflow_input_matches_lazy_port(
     return True
 
 
+def _lazy_output_matches_lazy_input(
+    output_values_by_dimension: Mapping[str, tuple[str, ...]],
+    input_values_by_dimension: Mapping[str, tuple[str, ...]],
+) -> bool:
+    for dim, required_values in input_values_by_dimension.items():
+        produced_values = output_values_by_dimension.get(dim, ())
+        if not produced_values:
+            return False
+        if not set(required_values).intersection(produced_values):
+            return False
+    return True
+
+
 def build_fact_bundle_grounding_opt(
     config: SnakeConfig,
     ontology: Ontology,
@@ -431,13 +444,10 @@ def build_fact_bundle_grounding_opt_lazy(
     tools: tuple[ToolMode, ...],
 ) -> FactBundle:
     """Build a diagnostic lazy candidate bundle without full variant expansion."""
-
-    writer = _FactWriter()
-    roots = _build_common_facts(writer, config, ontology, tools)
+    roots = _build_roots(config, ontology)
     resolver = _ExpansionResolver(ontology, roots, "python")
-    tool_labels = {tool.mode_id: tool.label for tool in tools}
-    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
+    candidate_records: list[dict[str, object]] = []
 
     lazy_offset: dict[str, int] = defaultdict(int)
     _input_sig_to_id: dict[frozenset, int] = {}
@@ -447,91 +457,60 @@ def build_fact_bundle_grounding_opt_lazy(
         candidate_id = f"{tool.mode_id}_lc{candidate_index}"
         lazy_offset[tool.mode_id] += 1
 
-        writer.emit_fact("lazy_tool_candidate", _quote(candidate_id), _quote(tool.mode_id))
-
         input_port_value_counts: list[int] = []
         output_port_value_counts: list[int] = []
         input_variant_count = 1
         output_variant_count = 1
         lazy_input_value_count = 0
         lazy_output_value_count = 0
+        input_ports: list[dict[str, object]] = []
+        output_ports: list[dict[str, object]] = []
 
         for port_idx, port in enumerate(tool.inputs):
-            writer.emit_fact(
-                "lazy_candidate_input_port",
-                _quote(candidate_id),
-                str(port_idx),
-            )
             port_values, port_variant_count = _lazy_port_expansion(
                 resolver,
                 _normalize_dim_map(port.dimensions),
                 expand_outputs=False,
             )
             port_values_by_dimension = _group_port_values_by_dimension(port_values)
-            emitted_count = 0
-            for dim, value in port_values:
-                writer.emit_fact(
-                    "lazy_candidate_input_value",
-                    _quote(candidate_id),
-                    str(port_idx),
-                    _quote(value),
-                    _quote(dim),
-                )
-                emitted_count += 1
             sig = frozenset(port_values)
             if sig not in _input_sig_to_id:
                 _input_sig_to_id[sig] = len(_input_sig_to_id)
-            writer.emit_fact(
-                "lazy_candidate_input_signature_id",
-                _quote(candidate_id),
-                str(port_idx),
-                str(_input_sig_to_id[sig]),
+            workflow_input_matches = [
+                wf_index
+                for wf_index, workflow_input in enumerate(config.inputs)
+                if _workflow_input_matches_lazy_port(ontology, workflow_input, port_values_by_dimension)
+            ]
+            input_ports.append(
+                {
+                    "port_idx": port_idx,
+                    "port_values": port_values,
+                    "port_values_by_dimension": port_values_by_dimension,
+                    "signature_id": _input_sig_to_id[sig],
+                    "workflow_input_matches": workflow_input_matches,
+                }
             )
-            for wf_index, workflow_input in enumerate(config.inputs):
-                if _workflow_input_matches_lazy_port(ontology, workflow_input, port_values_by_dimension):
-                    writer.emit_fact(
-                        "lazy_initial_bindable",
-                        _quote(candidate_id),
-                        str(port_idx),
-                        _quote(f"wf_input_{wf_index}"),
-                    )
+            emitted_count = len(port_values)
             input_port_value_counts.append(emitted_count)
             lazy_input_value_count += emitted_count
             input_variant_count *= port_variant_count
 
         for port_idx, port in enumerate(tool.outputs):
-            writer.emit_fact(
-                "lazy_candidate_output_port",
-                _quote(candidate_id),
-                str(port_idx),
-            )
+            declared_dims = _normalize_dim_map(port.dimensions)
             port_values, port_variant_count = _lazy_port_expansion(
                 resolver,
-                _normalize_dim_map(port.dimensions),
+                declared_dims,
                 expand_outputs=True,
             )
             port_values_by_dimension = _group_port_values_by_dimension(port_values)
-            emitted_count = 0
-            for dim, values in sorted(port_values_by_dimension.items()):
-                if len(values) == 1:
-                    writer.emit_fact(
-                        "lazy_candidate_output_singleton",
-                        _quote(candidate_id),
-                        str(port_idx),
-                        _quote(values[0]),
-                        _quote(dim),
-                    )
-                    emitted_count += 1
-                else:
-                    for value in values:
-                        writer.emit_fact(
-                            "lazy_candidate_output_choice_value",
-                            _quote(candidate_id),
-                            str(port_idx),
-                            _quote(value),
-                            _quote(dim),
-                        )
-                        emitted_count += 1
+            output_ports.append(
+                {
+                    "port_idx": port_idx,
+                    "declared_dims": declared_dims,
+                    "port_values_by_dimension": port_values_by_dimension,
+                }
+            )
+            emitted_count = sum(len(values) for values in port_values_by_dimension.values())
             output_port_value_counts.append(emitted_count)
             lazy_output_value_count += emitted_count
             output_variant_count *= port_variant_count
@@ -550,6 +529,159 @@ def build_fact_bundle_grounding_opt_lazy(
                 lazy_output_port_value_counts=tuple(output_port_value_counts),
                 lazy_cross_product_estimate=input_variant_count * output_variant_count,
             )
+        )
+        candidate_records.append(
+            {
+                "tool": tool,
+                "candidate_id": candidate_id,
+                "input_ports": tuple(input_ports),
+                "output_ports": tuple(output_ports),
+            }
+        )
+
+    goal_port_values: list[dict[str, tuple[str, ...]]] = []
+    for goal_item in config.outputs:
+        goal_dims: dict[str, tuple[str, ...]] = {}
+        for dim, values in sorted(goal_item.items()):
+            goal_dims[dim] = _dedupe_stable(
+                expanded_value
+                for value in values
+                for expanded_value in resolver.expanded_values(
+                    dim,
+                    value,
+                    expand_outputs=True,
+                )
+            )
+        goal_port_values.append(goal_dims)
+
+    bindable_pairs: set[tuple[str, int, str, int]] = set()
+    reverse_edges: dict[str, set[str]] = defaultdict(set)
+    direct_goal_candidates: set[str] = set()
+
+    for record in candidate_records:
+        candidate_id = str(record["candidate_id"])
+        output_ports = tuple(record["output_ports"])
+        for output_port in output_ports:
+            output_dims = output_port["port_values_by_dimension"]
+            if any(_lazy_output_matches_lazy_input(output_dims, goal_dims) for goal_dims in goal_port_values):
+                direct_goal_candidates.add(candidate_id)
+
+    for producer_record in candidate_records:
+        producer_candidate = str(producer_record["candidate_id"])
+        for output_port in tuple(producer_record["output_ports"]):
+            producer_port = int(output_port["port_idx"])
+            output_dims = output_port["port_values_by_dimension"]
+            for consumer_record in candidate_records:
+                consumer_candidate = str(consumer_record["candidate_id"])
+                for input_port in tuple(consumer_record["input_ports"]):
+                    consumer_port = int(input_port["port_idx"])
+                    input_dims = input_port["port_values_by_dimension"]
+                    if _lazy_output_matches_lazy_input(output_dims, input_dims):
+                        bindable_pairs.add(
+                            (producer_candidate, producer_port, consumer_candidate, consumer_port)
+                        )
+                        reverse_edges[consumer_candidate].add(producer_candidate)
+
+    relevant_candidates = set(direct_goal_candidates)
+    frontier = list(direct_goal_candidates)
+    while frontier:
+        consumer_candidate = frontier.pop()
+        for producer_candidate in reverse_edges.get(consumer_candidate, set()):
+            if producer_candidate in relevant_candidates:
+                continue
+            relevant_candidates.add(producer_candidate)
+            frontier.append(producer_candidate)
+
+    relevant_records = [
+        record
+        for record in candidate_records
+        if str(record["candidate_id"]) in relevant_candidates
+    ]
+    relevant_tools = tuple(record["tool"] for record in relevant_records)
+
+    writer = _FactWriter()
+    _build_common_facts(writer, config, ontology, relevant_tools)
+    tool_labels = {tool.mode_id: tool.label for tool in relevant_tools}
+    tool_input_signatures = _tool_input_signatures(relevant_tools)
+
+    for record in relevant_records:
+        tool = record["tool"]
+        candidate_id = str(record["candidate_id"])
+        writer.emit_fact("lazy_tool_candidate", _quote(candidate_id), _quote(tool.mode_id))
+
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            writer.emit_fact(
+                "lazy_candidate_input_port",
+                _quote(candidate_id),
+                str(port_idx),
+            )
+            for dim, value in input_port["port_values"]:
+                writer.emit_fact(
+                    "lazy_candidate_input_value",
+                    _quote(candidate_id),
+                    str(port_idx),
+                    _quote(value),
+                    _quote(dim),
+                )
+            writer.emit_fact(
+                "lazy_candidate_input_signature_id",
+                _quote(candidate_id),
+                str(port_idx),
+                str(input_port["signature_id"]),
+            )
+            for wf_index in input_port["workflow_input_matches"]:
+                writer.emit_fact(
+                    "lazy_initial_bindable",
+                    _quote(candidate_id),
+                    str(port_idx),
+                    _quote(f"wf_input_{wf_index}"),
+                )
+
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            writer.emit_fact(
+                "lazy_candidate_output_port",
+                _quote(candidate_id),
+                str(port_idx),
+            )
+            for dim, declared_values in output_port["declared_dims"].items():
+                for declared_value in declared_values:
+                    writer.emit_fact(
+                        "lazy_candidate_output_declared_type",
+                        _quote(candidate_id),
+                        str(port_idx),
+                        _quote(declared_value),
+                        _quote(dim),
+                    )
+            for dim, values in sorted(output_port["port_values_by_dimension"].items()):
+                if len(values) == 1:
+                    writer.emit_fact(
+                        "lazy_candidate_output_singleton",
+                        _quote(candidate_id),
+                        str(port_idx),
+                        _quote(values[0]),
+                        _quote(dim),
+                    )
+                else:
+                    for value in values:
+                        writer.emit_fact(
+                            "lazy_candidate_output_choice_value",
+                            _quote(candidate_id),
+                            str(port_idx),
+                            _quote(value),
+                            _quote(dim),
+                        )
+
+    for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
+        if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
+            continue
+        writer.emit_fact(
+            "lazy_candidate_port_bindable",
+            _quote(producer_candidate),
+            str(producer_port),
+            _quote(consumer_candidate),
+            str(consumer_port),
         )
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]

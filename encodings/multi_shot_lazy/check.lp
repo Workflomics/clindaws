@@ -26,3 +26,6 @@ useful_check(t, T, Tool) :-
 :- query(t), occurs(T, run(Tool)), not useful_check(t, T, Tool).
 % SAT permits reusing outputs from earlier runs of the same tool, so do not
 % forbid these chains here.
+
+% Mirror SAT/APE semantics: workflow inputs cannot be reused as final outputs.
+:- query(t), holds(0, avail(WF)), goal_satisfied_by(t, _, WF).

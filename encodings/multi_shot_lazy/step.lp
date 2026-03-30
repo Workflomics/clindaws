@@ -3,19 +3,6 @@
 time(t).
 
 holds(t, avail(WF)) :- holds(t-1, avail(WF)).
-holds(t, dim(WF, V, Category)) :- holds(t-1, dim(WF, V, Category)), holds(t, avail(WF)).
-
-lazy_port_category_match(t, Candidate, Port, WF, Category) :-
-    holds(t, avail(WF)),
-    lazy_candidate_input_value(Candidate, Port, ReqV, Category),
-    holds(t, dim(WF, ActualV, Category)),
-    compatible(ReqV, ActualV).
-
-eligible(t, Candidate, Port, WF) :-
-    holds(t, avail(WF)),
-    lazy_candidate_input_port(Candidate, Port),
-    lazy_port_category_match(t, Candidate, Port, WF, Category) :
-        lazy_candidate_input_category(Candidate, Port, Category).
 
 1 { occurs(t, run(Tool)) : tool(Tool) } 1.
 
@@ -24,9 +11,26 @@ eligible(t, Candidate, Port, WF) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
 
-1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Candidate, Port, WF) } 1 :-
+1 {
+    occurs(t, bind(Tool, Port, WF)) : eligible(Candidate, Port, WF);
+    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))) :
+        occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+        TPrev < t,
+        lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port)
+} 1 :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_input_port(Candidate, Port).
+
+bound_output_category_match(t, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
+    occurs(t, bind(_, Port, out(TPrev, ToolPrev, ProducerPort))),
+    lazy_candidate_input_value(Candidate, Port, ReqV, Category),
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
+    compatible(ReqV, ActualV).
+
+:- occurs(t, use_lazy_candidate(Tool, Candidate)),
+   occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+   lazy_candidate_input_category(Candidate, Port, Category),
+   not bound_output_category_match(t, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category).
 
 artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
@@ -79,10 +83,10 @@ holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_choice_value(Candidate, Port, _, Category).
 
-holds(t, dim(out(t, Tool, Port), V, Category)) :-
+artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output_dim(Tool, Port, V, Category)).
 
-holds(t, dim(out(t, Tool, Port), V, Category)) :-
+artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_singleton(Candidate, Port, V, Category).
 
@@ -111,7 +115,7 @@ reachable(t, Tool2) :-
 goal_dim_match(t, GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
     holds(t, avail(WF)),
-    holds(t, dim(WF, ActualV, Category)),
+    artifact_dim(WF, ActualV, Category),
     compatible(ActualV, GoalV).
 
 goal_dim_missing(t, GoalID, WF) :-

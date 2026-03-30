@@ -63,6 +63,7 @@ SCHEMA_PREDICATES = (
     "lazy_candidate_output_port",
     "lazy_candidate_output_singleton",
     "lazy_candidate_output_choice_value",
+    "lazy_candidate_output_declared_type",
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 FULL_VARIANT_TRANSLATION_BUILDER = "candidate_full_variants"
