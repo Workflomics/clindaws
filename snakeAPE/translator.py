@@ -337,6 +337,81 @@ def _lazy_output_matches_lazy_input(
     return True
 
 
+def _compress_lazy_output_choice_values(
+    output_values_by_dimension: Mapping[str, tuple[str, ...]],
+    bindable_input_ports: tuple[Mapping[str, object], ...],
+    goal_port_values: tuple[Mapping[str, tuple[str, ...]], ...],
+) -> dict[str, tuple[str, ...]]:
+    globally_bindable_input_ports = tuple(
+        input_port
+        for input_port in bindable_input_ports
+        if _lazy_output_matches_lazy_input(
+            output_values_by_dimension,
+            input_port["port_values_by_dimension"],
+        )
+    )
+    globally_bindable_goal_ids = tuple(
+        goal_id
+        for goal_id, goal_dims in enumerate(goal_port_values)
+        if _lazy_output_matches_lazy_input(output_values_by_dimension, goal_dims)
+    )
+
+    default_consumer_signatures_by_dimension: dict[str, set[int]] = defaultdict(set)
+    consumer_signatures_by_dimension_value: dict[str, dict[str, set[int]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    for input_port in globally_bindable_input_ports:
+        signature_id = int(input_port["signature_id"])
+        input_dims = input_port["port_values_by_dimension"]
+        for dim in output_values_by_dimension:
+            required_values = input_dims.get(dim)
+            if required_values is None:
+                default_consumer_signatures_by_dimension[dim].add(signature_id)
+                continue
+            for value in required_values:
+                consumer_signatures_by_dimension_value[dim][value].add(signature_id)
+
+    default_goal_ids_by_dimension: dict[str, set[int]] = defaultdict(set)
+    goal_ids_by_dimension_value: dict[str, dict[str, set[int]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    for goal_id in globally_bindable_goal_ids:
+        goal_dims = goal_port_values[goal_id]
+        for dim in output_values_by_dimension:
+            required_values = goal_dims.get(dim)
+            if required_values is None:
+                default_goal_ids_by_dimension[dim].add(goal_id)
+                continue
+            for value in required_values:
+                goal_ids_by_dimension_value[dim][value].add(goal_id)
+
+    compressed: dict[str, tuple[str, ...]] = {}
+    for dim, values in output_values_by_dimension.items():
+        if len(values) <= 1:
+            compressed[dim] = values
+            continue
+
+        representatives: dict[tuple[tuple[int, ...], tuple[int, ...]], str] = {}
+        for value in values:
+            consumer_profile = tuple(
+                sorted(
+                    default_consumer_signatures_by_dimension.get(dim, set())
+                    | consumer_signatures_by_dimension_value[dim].get(value, set())
+                )
+            )
+            goal_profile = tuple(
+                sorted(
+                    default_goal_ids_by_dimension.get(dim, set())
+                    | goal_ids_by_dimension_value[dim].get(value, set())
+                )
+            )
+            representatives.setdefault((consumer_profile, goal_profile), value)
+
+        compressed[dim] = tuple(representatives.values())
+
+    return compressed
+
+
 def build_fact_bundle_grounding_opt(
     config: SnakeConfig,
     ontology: Ontology,
@@ -551,8 +626,9 @@ def build_fact_bundle_grounding_opt_lazy(
                     value,
                     expand_outputs=True,
                 )
-            )
+                )
         goal_port_values.append(goal_dims)
+    goal_port_values_tuple = tuple(goal_port_values)
 
     bindable_pairs: set[tuple[str, int, str, int]] = set()
     reverse_edges: dict[str, set[str]] = defaultdict(set)
@@ -597,6 +673,25 @@ def build_fact_bundle_grounding_opt_lazy(
         for record in candidate_records
         if str(record["candidate_id"]) in relevant_candidates
     ]
+    relevant_input_ports = tuple(
+        input_port
+        for record in relevant_records
+        for input_port in tuple(record["input_ports"])
+    )
+    for record in relevant_records:
+        compressed_output_ports: list[dict[str, object]] = []
+        for output_port in tuple(record["output_ports"]):
+            compressed_output_ports.append(
+                {
+                    **output_port,
+                    "port_values_by_dimension": _compress_lazy_output_choice_values(
+                        output_port["port_values_by_dimension"],
+                        relevant_input_ports,
+                        goal_port_values_tuple,
+                    ),
+                }
+            )
+        record["output_ports"] = tuple(compressed_output_ports)
     relevant_tools = tuple(record["tool"] for record in relevant_records)
 
     writer = _FactWriter()

@@ -218,3 +218,49 @@ This moves repeated later-horizon work into one-time translation/indexing and sh
   - length 7: `72`
   - cumulative through length 8: `1332`
 - Biotools horizon-2 grounding is now isolated to the remaining slow stage instead of the earlier raw eligibility/dimension-carry-forward shape, but it is not fully eliminated yet in this session.
+
+## 12. Later-horizon lazy output-choice collapse
+
+### Issue
+
+After the grounding rewrite, later lazy horizons could still carry very large
+output-choice domains. In Biotools this showed up as repeated answer sets for
+the same workflow skeleton, differing only in terminal output descendants that
+the solver could not otherwise distinguish.
+
+### Change
+
+The lazy translator now compresses `lazy_candidate_output_choice_value(...)`
+facts by downstream compatibility profile before emitting them. If several
+terminal descendants behave identically for all relevant consumer input
+signatures and goal outputs, only one representative is kept.
+
+The later lazy step encoding now also canonicalizes query-horizon output
+choices the same way the horizon-1 exact-goal path already did: if multiple
+remaining values satisfy the goal, it keeps one deterministic representative.
+
+### Why
+
+This reduces exact-horizon duplicate answer sets and shrinks the later-horizon
+output-choice grounding domain without changing the compatibility semantics
+that the solver actually reasons over.
+
+### Validation
+
+- `defect_concentration` still matches the accepted lazy reference:
+  - length 7: `72`
+  - cumulative through length 8: `1332`
+- On Biotools exact length 2, the lazy solver moved much closer to SAT:
+  - before these changes: `999` snakeAPE solutions vs `763` SAT
+  - after output-choice compression plus query-step canonicalization: `901` snakeAPE solutions vs `763` SAT
+  - exact normalized workflow matches increased to `691`
+
+### Caveat
+
+The current implementation improves Biotools length-2 parity substantially, but
+it is not yet a full SAT match and it is noticeably slower:
+
+- translation became more expensive because output-choice profiles are now
+  compressed in Python before emission
+- horizon-2 solving also became more expensive because query-time constraints
+  now canonicalize consumed ambiguous outputs against the actual final-step binds

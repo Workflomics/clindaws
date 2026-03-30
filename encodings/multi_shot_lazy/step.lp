@@ -2,6 +2,10 @@
 
 time(t).
 
+query_output_filter_active(t) :-
+    query(t),
+    exact_horizon_mode.
+
 holds(t, avail(WF)) :- holds(t-1, avail(WF)).
 
 1 { occurs(t, run(Tool)) : tool(Tool) } 1.
@@ -79,7 +83,14 @@ holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, _, Port)).
 
 1 { occurs(t, output_dim(Tool, Port, V, Category)) :
+    lazy_query_output_value(Candidate, Port, V, Category) } 1 :-
+    query_output_filter_active(t),
+    occurs(t, output(Tool, Candidate, Port)),
+    lazy_query_output_value(Candidate, Port, _, Category).
+
+1 { occurs(t, output_dim(Tool, Port, V, Category)) :
     lazy_candidate_output_choice_value(Candidate, Port, V, Category) } 1 :-
+    not query_output_filter_active(t),
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_choice_value(Candidate, Port, _, Category).
 
@@ -89,6 +100,43 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_singleton(Candidate, Port, V, Category).
+
+query_bound_output_value_bind_match(t, TPrev, ToolPrev, ProducerPort, V, Category, ConsumerPort) :-
+    query(t),
+    occurs(t, use_lazy_candidate(ConsumerTool, ConsumerCandidate)),
+    occurs(t, bind(ConsumerTool, ConsumerPort, out(TPrev, ToolPrev, ProducerPort))),
+    lazy_candidate_input_value(ConsumerCandidate, ConsumerPort, ReqV, Category),
+    compatible(V, ReqV).
+
+query_bound_output_value_missing_support(t, TPrev, ToolPrev, ProducerPort, V, Category) :-
+    query(t),
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    lazy_candidate_output_choice_value(ProducerCandidate, ProducerPort, V, Category),
+    occurs(t, use_lazy_candidate(ConsumerTool, ConsumerCandidate)),
+    occurs(t, bind(ConsumerTool, ConsumerPort, out(TPrev, ToolPrev, ProducerPort))),
+    lazy_candidate_input_category(ConsumerCandidate, ConsumerPort, Category),
+    not query_bound_output_value_bind_match(t, TPrev, ToolPrev, ProducerPort, V, Category, ConsumerPort).
+
+query_bound_output_value_admissible(t, TPrev, ToolPrev, ProducerPort, V, Category) :-
+    query(t),
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    lazy_candidate_output_choice_value(ProducerCandidate, ProducerPort, V, Category),
+    not query_bound_output_value_missing_support(t, TPrev, ToolPrev, ProducerPort, V, Category).
+
+:- query(t),
+   occurs(t, bind(_, _, out(TPrev, ToolPrev, ProducerPort))),
+   occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+   occurs(TPrev, output_dim(ToolPrev, ProducerPort, V, Category)),
+   lazy_candidate_output_choice_value(ProducerCandidate, ProducerPort, V, Category),
+   not query_bound_output_value_admissible(t, TPrev, ToolPrev, ProducerPort, V, Category).
+
+:- query(t),
+   occurs(t, bind(_, _, out(TPrev, ToolPrev, ProducerPort))),
+   occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+   occurs(TPrev, output_dim(ToolPrev, ProducerPort, V, Category)),
+   lazy_candidate_output_choice_value(ProducerCandidate, ProducerPort, V, Category),
+   query_bound_output_value_admissible(t, TPrev, ToolPrev, ProducerPort, V2, Category),
+   V2 < V.
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
