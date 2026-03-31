@@ -21,3 +21,11 @@ lazy_candidate_input_category(Candidate, Port, Category) :-
 
 eligible(0, Candidate, Port, WF) :-
     lazy_initial_bindable(Candidate, Port, WF).
+
+candidate_single_input(Candidate) :-
+    lazy_tool_candidate(Candidate, _),
+    1 = #count { Port : lazy_candidate_input_port(Candidate, Port) }.
+
+same_candidate_input_signature(CandidateA, PortA, CandidateB, PortB) :-
+    lazy_candidate_input_signature_id(CandidateA, PortA, SigID),
+    lazy_candidate_input_signature_id(CandidateB, PortB, SigID).

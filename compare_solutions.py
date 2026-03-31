@@ -17,9 +17,15 @@ SAT_IN_RE = re.compile(r"In(\d+)\.(\d+)")
 NORMALIZED_BIND_RE = re.compile(r"^t(\d+):in\d+<-")
 SNAKE_TOOL_RE = re.compile(r'tool_at_time\((\d+),"([^"]+)"\)')
 SNAKE_BIND_WF_RE = re.compile(r'ape_bind\((\d+),(\d+),"wf_input_(\d+)"\)')
-SNAKE_BIND_OUT_RE = re.compile(r'ape_bind\((\d+),(\d+),out\((\d+),"[^"]+",(\d+)\)\)')
-SNAKE_HOLDS_OUT_RE = re.compile(r'ape_holds_dim\(out\((\d+),"[^"]+",(\d+)\),"[^"]+","[^"]+"\)')
+SNAKE_BIND_OUT_RE = re.compile(
+    r'ape_bind\((\d+),(\d+),out\((\d+),"[^"]+",(?:(\d+)|"([^"]+)")\)\)'
+)
+SNAKE_HOLDS_OUT_RE = re.compile(
+    r'ape_holds_dim\(out\((\d+),"[^"]+",(?:(\d+)|"([^"]+)")\),"[^"]+","[^"]+"\)'
+)
 SPLIT_BLANK_RE = re.compile(r"\n\s*\n+", re.MULTILINE)
+LEGACY_PORT_SUFFIX_RE = re.compile(r"_p(?:ort_)?(\d+)$")
+STRUCTURED_PORT_SUFFIX_RE = re.compile(r"_port_(\d+)$")
 
 IGNORED_SAT_TOOL_PREFIXES = (
     "operation_",
@@ -233,23 +239,44 @@ def normalize_sat_binding(source_ref: str, target_ref: str) -> str | None:
     return f"t{consumer_step}:in{input_port}<-{source_key}"
 
 
+def parse_snake_port_index(raw_numeric: str, raw_symbolic: str) -> int | None:
+    if raw_numeric:
+        return int(raw_numeric)
+    if not raw_symbolic:
+        return None
+    match = LEGACY_PORT_SUFFIX_RE.search(raw_symbolic)
+    if match is not None:
+        return int(match.group(1))
+    match = STRUCTURED_PORT_SUFFIX_RE.search(raw_symbolic)
+    if match is not None:
+        return int(match.group(1))
+    return None
+
+
 def normalize_snake_bindings(block: str) -> tuple[str, ...]:
     bindings = []
     for time_str, port_str, input_index in SNAKE_BIND_WF_RE.findall(block):
         bindings.append(f"t{int(time_str)}:in{int(port_str)}<-wf_input_{int(input_index)}")
-    for time_str, port_str, source_time_str, source_port_str in SNAKE_BIND_OUT_RE.findall(block):
+    for time_str, port_str, source_time_str, source_port_numeric, source_port_symbolic in SNAKE_BIND_OUT_RE.findall(block):
+        source_port = parse_snake_port_index(source_port_numeric, source_port_symbolic)
+        if source_port is None:
+            continue
         bindings.append(
-            f"t{int(time_str)}:in{int(port_str)}<-t{int(source_time_str)}:out{int(source_port_str)}"
+            f"t{int(time_str)}:in{int(port_str)}<-t{int(source_time_str)}:out{source_port}"
         )
     return tuple(sorted(set(bindings)))
 
 
 def normalize_snake_outputs(block: str) -> tuple[str, ...]:
-    outputs = {
-        f"t{int(step_str)}:out{int(port_str)}"
-        for step_str, port_str in SNAKE_HOLDS_OUT_RE.findall(block)
-        if int(step_str) >= 1
-    }
+    outputs = set()
+    for step_str, port_numeric, port_symbolic in SNAKE_HOLDS_OUT_RE.findall(block):
+        step = int(step_str)
+        if step < 1:
+            continue
+        port_index = parse_snake_port_index(port_numeric, port_symbolic)
+        if port_index is None:
+            continue
+        outputs.add(f"t{step}:out{port_index}")
     return tuple(sorted(outputs))
 
 

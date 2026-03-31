@@ -81,7 +81,6 @@
 %          but if T=3 binds pepperoni to topping_port, then T=5
 %          must bind a different ingredient to topping_port.
 
-:- occurs(T1, run(Tool)), occurs(T2, run(Tool)), T1 < T2,
-   occurs(T1, bind(Tool, Port, WF)),
-   occurs(T2, bind(Tool, Port, WF)).
-
+% SAT-aligned behavior permits rerunning the same tool on the same bound input
+% chain when the workflow remains useful, so do not forbid these repetitions
+% here.

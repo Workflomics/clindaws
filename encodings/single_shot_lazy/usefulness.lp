@@ -23,5 +23,5 @@ useful(T, Tool) :-
 % --- Constraint: every tool that runs must be useful ---
 :- occurs(T, run(Tool)), not useful(T, Tool).
 
-% --- Self-loop prevention ---
-:- occurs(T2, bind(Tool, _, out(T1, Tool, _))), T2 > T1.
+% SAT-aligned behavior permits reusing outputs from earlier runs of the same
+% tool when the resulting workflow remains useful.

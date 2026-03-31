@@ -23,3 +23,18 @@ tool_input_variant(Tool, TI_ID) :- tool_input(Tool, TI_ID).
 port_requires(Port, PortValue, Category) :-
     input_port(_, Port),
     dimension(Port, (PortValue, Category)).
+
+variant_single_input(TI_ID) :-
+    tool_input_variant(_, TI_ID),
+    1 = #count { Port : input_port(TI_ID, Port) }.
+
+input_signature_diff(PortA, PortB) :-
+    input_port(_, PortB),
+    port_requires(PortA, V, Cat),
+    not port_requires(PortB, V, Cat).
+
+same_input_signature(PortA, PortB) :-
+    input_port(_, PortA),
+    input_port(_, PortB),
+    not input_signature_diff(PortA, PortB),
+    not input_signature_diff(PortB, PortA).

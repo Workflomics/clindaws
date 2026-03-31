@@ -110,7 +110,6 @@ def _single_shot_program_paths() -> tuple[Path, ...]:
         base / "plan_constraints.lp",
         base / "temporal_constraint.lp",
         base / "tool_inclusion_constraints.lp",
-        base / "tool_repetition_constraints.lp",
         base / "input_usage_constraints.lp",
     )
 
@@ -154,7 +153,6 @@ def _single_shot_lazy_program_paths() -> tuple[Path, ...]:
         base / "plan_constraints.lp",
         base / "temporal_constraint.lp",
         base / "tool_inclusion_constraints.lp",
-        base / "tool_repetition_constraints.lp",
         base / "input_usage_constraints.lp",
     )
 

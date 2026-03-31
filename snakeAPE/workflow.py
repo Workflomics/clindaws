@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cmp_to_key
@@ -21,6 +22,10 @@ class _MutableArtifact:
     dims: dict[str, set[str]]
 
 
+_LEGACY_PORT_SUFFIX_RE = re.compile(r"_p(\d+)$")
+_STRUCTURED_PORT_SUFFIX_RE = re.compile(r",\s*(\d+)\)$")
+
+
 def _symbol_text(symbol: clingo.Symbol) -> str:
     if symbol.type == clingo.SymbolType.String:
         return symbol.string
@@ -29,6 +34,30 @@ def _symbol_text(symbol: clingo.Symbol) -> str:
 
 def _workflow_key(symbol: clingo.Symbol) -> str:
     return str(symbol)
+
+
+def _port_index(port_id: str) -> int | None:
+    try:
+        return int(port_id)
+    except ValueError:
+        pass
+
+    match = _LEGACY_PORT_SUFFIX_RE.search(port_id)
+    if match is not None:
+        return int(match.group(1))
+
+    match = _STRUCTURED_PORT_SUFFIX_RE.search(port_id)
+    if match is not None:
+        return int(match.group(1))
+
+    return None
+
+
+def _port_sort_key(port_id: str) -> tuple[int, int, str]:
+    port_index = _port_index(port_id)
+    if port_index is not None:
+        return (0, port_index, port_id)
+    return (1, 0, port_id)
 
 
 def _artifact_from_key(ref_id: str, tool_labels: dict[str, str]) -> tuple[int, str | None, str | None]:
@@ -132,9 +161,8 @@ def canonicalize_shown_symbols(
     def _signature(tool_id: str | None, port_id: str) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
         if tool_id is None:
             return None
-        try:
-            port_index = int(port_id)
-        except ValueError:
+        port_index = _port_index(port_id)
+        if port_index is None:
             return None
         signatures = tool_input_signatures.get(tool_id, ())
         if 0 <= port_index < len(signatures):
@@ -154,7 +182,7 @@ def canonicalize_shown_symbols(
         for ports in sig_groups.values():
             if len(ports) < 2:
                 continue
-            ordered_ports = sorted(ports, key=int)
+            ordered_ports = sorted(ports, key=_port_sort_key)
             ordered_artifacts = sorted(
                 (bindings_by_step[time][port_id] for port_id in ordered_ports),
                 key=cmp_to_key(_compare_artifacts),
@@ -176,7 +204,7 @@ def canonicalize_shown_symbols(
         for ports in sig_groups.values():
             if len(ports) < 2:
                 continue
-            consumer_ports = sorted(ports, key=int)
+            consumer_ports = sorted(ports, key=_port_sort_key)
             producer_infos: list[tuple[str, int, str, str, str]] = []
             producer_signatures: set[tuple[tuple[str, tuple[str, ...]], ...]] = set()
             producer_tools: set[str] = set()
@@ -201,7 +229,7 @@ def canonicalize_shown_symbols(
                 producer_tools.add(producer_tool_at_time)
             if len(producer_infos) < 2 or len(producer_signatures) != 1 or len(producer_tools) < 2:
                 continue
-            ordered_infos = sorted(producer_infos, key=lambda item: int(item[0]))
+            ordered_infos = sorted(producer_infos, key=lambda item: _port_sort_key(item[0]))
             ordered_sources = sorted(
                 (item[4] for item in ordered_infos),
                 key=cmp_to_key(_compare_artifacts),
@@ -214,12 +242,13 @@ def canonicalize_shown_symbols(
             "ape_bind",
             [
                 clingo.Number(time),
-                clingo.Number(int(port_id)),
+                clingo.Number(port_index) if port_index is not None else clingo.String(port_id),
                 artifact_symbols[artifact_id],
             ],
         )
         for time in sorted(bindings_by_step)
-        for port_id, artifact_id in sorted(bindings_by_step[time].items(), key=lambda item: int(item[0]))
+        for port_id, artifact_id in sorted(bindings_by_step[time].items(), key=lambda item: _port_sort_key(item[0]))
+        for port_index in [_port_index(port_id)]
     ]
     return tuple(sorted([*other_symbols, *canonical_binds], key=str))
 
@@ -331,7 +360,7 @@ def reconstruct_solution(
                 time=time,
                 tool_id=tool_id,
                 tool_label=tool_label,
-                bindings=tuple(sorted(bindings_by_step.get(time, []), key=lambda item: item.port_id)),
+                bindings=tuple(sorted(bindings_by_step.get(time, []), key=lambda item: _port_sort_key(item.port_id))),
                 outputs=tuple(sorted(outputs_by_step.get(time, []))),
             )
         )
