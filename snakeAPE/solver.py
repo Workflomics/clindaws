@@ -159,7 +159,6 @@ def _lazy_program_paths() -> tuple[Path, ...]:
     return (
         base / "base.lp",
         base / "step_initial.lp",
-        base / "step_seed.lp",
         base / "step.lp",
         base / "step_query.lp",
         base / "constraints.lp",
@@ -271,6 +270,7 @@ def _default_horizon_parts(
     *,
     initial_step_program: str | None,
     initial_seed_program: str | None,
+    grounding_only: bool = False,
 ) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
     parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
     if initial_step_program is not None and horizon == 1:
@@ -279,8 +279,11 @@ def _default_horizon_parts(
         if initial_seed_program is not None and horizon > 1:
             parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
         parts.append(("step", (clingo.Number(horizon),)))
-    parts.append(("constraint_step", (clingo.Number(horizon),)))
-    parts.append(("check", (clingo.Number(horizon),)))
+    if not grounding_only:
+        # constraint_step / check are only useful when query(t) will be assigned
+        # True during solving; skip them for grounding-only runs.
+        parts.append(("constraint_step", (clingo.Number(horizon),)))
+        parts.append(("check", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -301,6 +304,28 @@ def _lazy_horizon_parts(
     parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
     parts.append(("check_usage", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
+def _lazy_grounding_horizon_parts(
+    horizon: int,
+    *,
+    initial_step_program: str | None,
+    initial_seed_program: str | None,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    """Lean horizon parts for grounding-only lazy runs.
+
+    step_query / constraint_step / check / check_usage are all guarded by
+    query(t), which is never assigned during grounding-only runs, so they
+    produce no useful atoms and are omitted entirely.
+    """
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if initial_step_program is not None and horizon == 1:
+        parts.append((initial_step_program, (clingo.Number(horizon),)))
+    else:
+        if initial_seed_program is not None and horizon > 1:
+            parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
+        parts.append(("step", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -424,7 +449,11 @@ def _solve_multi_shot_with_programs(
                     solve_elapsed = perf_counter() - start
                     total_solving += solve_elapsed
                 finally:
-                    control.assign_external(query_symbol, False)
+                    # Permanently retire the external: clingo can now
+                    # garbage-collect all check(t)/step_query(t) rules whose
+                    # bodies referenced query(t).
+                    control.release_external(query_symbol)
+                    control.cleanup()
 
                 record = HorizonRecord(
                     horizon=horizon,
@@ -771,6 +800,12 @@ def ground_multi_shot(
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
+        horizon_parts_builder=lambda horizon: _default_horizon_parts(
+            horizon,
+            initial_step_program=None,
+            initial_seed_program=None,
+            grounding_only=True,
+        ),
     )
 
 
@@ -827,7 +862,7 @@ def ground_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
-        horizon_parts_builder=lambda horizon: _lazy_horizon_parts(
+        horizon_parts_builder=lambda horizon: _lazy_grounding_horizon_parts(
             horizon,
             initial_step_program="step_initial",
             initial_seed_program=None,
