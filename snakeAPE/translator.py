@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from io import StringIO
 from itertools import product
@@ -678,6 +678,12 @@ def build_fact_bundle_grounding_opt_lazy(
         for record in relevant_records
         for input_port in tuple(record["input_ports"])
     )
+    signature_requirements_by_id: dict[int, Mapping[str, tuple[str, ...]]] = {}
+    for input_port in relevant_input_ports:
+        signature_requirements_by_id.setdefault(
+            int(input_port["signature_id"]),
+            input_port["port_values_by_dimension"],
+        )
     for record in relevant_records:
         compressed_output_ports: list[dict[str, object]] = []
         for output_port in tuple(record["output_ports"]):
@@ -693,11 +699,133 @@ def build_fact_bundle_grounding_opt_lazy(
             )
         record["output_ports"] = tuple(compressed_output_ports)
     relevant_tools = tuple(record["tool"] for record in relevant_records)
+    relevant_records_by_candidate = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
+    query_goal_candidates: set[str] = set()
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        output_ports = tuple(record["output_ports"])
+        goals_satisfied = all(
+            any(
+                _lazy_output_matches_lazy_input(
+                    output_port["port_values_by_dimension"],
+                    goal_dims,
+                )
+                for output_port in output_ports
+            )
+            for goal_dims in goal_port_values_tuple
+        )
+        if not goals_satisfied:
+            continue
+        if config.use_all_generated_data == "ALL" and any(
+            not any(
+                _lazy_output_matches_lazy_input(
+                    output_port["port_values_by_dimension"],
+                    goal_dims,
+                )
+                for goal_dims in goal_port_values_tuple
+            )
+            for output_port in output_ports
+        ):
+            continue
+        query_goal_candidates.add(candidate_id)
+    query_goal_tools = {
+        str(record["tool"].mode_id)
+        for record in relevant_records
+        if str(record["candidate_id"]) in query_goal_candidates
+    }
+    min_goal_distance_by_candidate: dict[str, int] = {}
+    frontier: deque[str] = deque(sorted(query_goal_candidates))
+    for candidate_id in frontier:
+        min_goal_distance_by_candidate[candidate_id] = 0
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
+        for producer_candidate in sorted(reverse_edges.get(consumer_candidate, set())):
+            if producer_candidate in min_goal_distance_by_candidate:
+                continue
+            if producer_candidate not in relevant_candidates:
+                continue
+            min_goal_distance_by_candidate[producer_candidate] = next_distance
+            frontier.append(producer_candidate)
+    allowed_candidates_by_step: dict[int, set[str]] = defaultdict(set)
+    allowed_tools_by_step: dict[int, set[str]] = defaultdict(set)
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        goal_distance = min_goal_distance_by_candidate.get(candidate_id)
+        if goal_distance is None:
+            continue
+        tool_id = str(record["tool"].mode_id)
+        for step_index in range(1, config.solution_length_max + 1):
+            remaining_steps = config.solution_length_max - step_index
+            if goal_distance <= remaining_steps:
+                allowed_candidates_by_step[step_index].add(candidate_id)
+                allowed_tools_by_step[step_index].add(tool_id)
+    query_support_signatures_by_producer_port: dict[tuple[str, int], set[int]] = defaultdict(set)
+    for producer_candidate, producer_port, consumer_candidate, consumer_port in bindable_pairs:
+        if (
+            producer_candidate not in relevant_candidates
+            or consumer_candidate not in query_goal_candidates
+        ):
+            continue
+        consumer_record = relevant_records_by_candidate[consumer_candidate]
+        consumer_input_port = next(
+            input_port
+            for input_port in tuple(consumer_record["input_ports"])
+            if int(input_port["port_idx"]) == consumer_port
+        )
+        query_support_signatures_by_producer_port[(producer_candidate, producer_port)].add(
+            int(consumer_input_port["signature_id"])
+        )
 
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
     tool_labels = {tool.mode_id: tool.label for tool in relevant_tools}
     tool_input_signatures = _tool_input_signatures(relevant_tools)
+
+    for candidate_id in sorted(query_goal_candidates):
+        writer.emit_fact("lazy_query_goal_candidate", _quote(candidate_id))
+    for tool_id in sorted(query_goal_tools):
+        writer.emit_fact("lazy_query_goal_tool", _quote(tool_id))
+    for candidate_id, goal_distance in sorted(min_goal_distance_by_candidate.items()):
+        writer.emit_fact("lazy_candidate_goal_distance", _quote(candidate_id), str(goal_distance))
+    for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
+        for candidate_id in sorted(candidate_ids):
+            writer.emit_fact(
+                "lazy_candidate_allowed_at_step",
+                _quote(candidate_id),
+                str(step_index),
+            )
+    for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
+        for tool_id in sorted(tool_ids):
+            writer.emit_fact(
+                "lazy_step_allowed_tool",
+                _quote(tool_id),
+                str(step_index),
+            )
+    bindable_pairs_by_step: dict[int, list[tuple[str, int, str, int]]] = defaultdict(list)
+    for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
+        if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
+            continue
+        for step_index, candidate_ids in allowed_candidates_by_step.items():
+            if consumer_candidate in candidate_ids:
+                bindable_pairs_by_step[step_index].append(
+                    (producer_candidate, producer_port, consumer_candidate, consumer_port)
+                )
+    step_support_signatures_by_producer_port: dict[tuple[str, int, int], set[int]] = defaultdict(set)
+    for step_index, step_pairs in bindable_pairs_by_step.items():
+        for producer_candidate, producer_port, consumer_candidate, consumer_port in step_pairs:
+            consumer_record = relevant_records_by_candidate[consumer_candidate]
+            consumer_input_port = next(
+                input_port
+                for input_port in tuple(consumer_record["input_ports"])
+                if int(input_port["port_idx"]) == consumer_port
+            )
+            step_support_signatures_by_producer_port[
+                (producer_candidate, producer_port, step_index)
+            ].add(int(consumer_input_port["signature_id"]))
 
     for record in relevant_records:
         tool = record["tool"]
@@ -768,6 +896,51 @@ def build_fact_bundle_grounding_opt_lazy(
                             _quote(dim),
                         )
 
+            for signature_id in sorted(
+                query_support_signatures_by_producer_port.get((candidate_id, port_idx), set())
+            ):
+                required_dims = signature_requirements_by_id[signature_id]
+                for dim, values in sorted(output_port["port_values_by_dimension"].items()):
+                    required_values = required_dims.get(dim)
+                    if not required_values:
+                        continue
+                    for value in values:
+                        if any(
+                            value in ontology.ancestors_of(required_value)
+                            for required_value in required_values
+                        ):
+                            writer.emit_fact(
+                                "lazy_query_bound_output_support",
+                                _quote(candidate_id),
+                                str(port_idx),
+                                str(signature_id),
+                                _quote(value),
+                                _quote(dim),
+                            )
+            for step_index in range(1, config.solution_length_max + 1):
+                for signature_id in sorted(
+                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, step_index), set())
+                ):
+                    required_dims = signature_requirements_by_id[signature_id]
+                    for dim, values in sorted(output_port["port_values_by_dimension"].items()):
+                        required_values = required_dims.get(dim)
+                        if not required_values:
+                            continue
+                        for value in values:
+                            if any(
+                                value in ontology.ancestors_of(required_value)
+                                for required_value in required_values
+                            ):
+                                writer.emit_fact(
+                                    "lazy_step_bound_output_support",
+                                    _quote(candidate_id),
+                                    str(port_idx),
+                                    str(signature_id),
+                                    _quote(value),
+                                    _quote(dim),
+                                    str(step_index),
+                                )
+
     for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
             continue
@@ -778,6 +951,16 @@ def build_fact_bundle_grounding_opt_lazy(
             _quote(consumer_candidate),
             str(consumer_port),
         )
+    for step_index, step_pairs in sorted(bindable_pairs_by_step.items()):
+        for producer_candidate, producer_port, consumer_candidate, consumer_port in step_pairs:
+            writer.emit_fact(
+                "lazy_candidate_port_bindable_at_step",
+                _quote(producer_candidate),
+                str(producer_port),
+                _quote(consumer_candidate),
+                str(consumer_port),
+                str(step_index),
+            )
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
     facts = writer.text()

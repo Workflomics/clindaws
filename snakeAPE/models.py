@@ -190,6 +190,7 @@ class HorizonRecord:
     models_stored: int
     unique_workflows_seen: int
     unique_workflows_stored: int
+    grounding_parts: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)

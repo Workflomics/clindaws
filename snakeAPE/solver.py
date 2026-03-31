@@ -192,6 +192,7 @@ def _lazy_program_paths() -> tuple[Path, ...]:
         base / "step_initial.lp",
         base / "step_seed.lp",
         base / "step.lp",
+        base / "step_query.lp",
         base / "check.lp",
         base / "ape_extract.lp",
         base / "tool_inclusion.lp",
@@ -272,6 +273,68 @@ def _run_interruptible(operation: Callable[[], None], is_interrupted: Callable[[
     _raise_if_interrupted(is_interrupted)
 
 
+def _ground_program_parts(
+    control: clingo.Control,
+    parts: tuple[tuple[str, tuple[clingo.Symbol, ...]], ...],
+    *,
+    is_interrupted: Callable[[], bool],
+    progress_callback: ProgressCallback,
+    horizon: int,
+) -> tuple[float, tuple[tuple[str, float], ...]]:
+    total_elapsed = 0.0
+    part_timings: list[tuple[str, float]] = []
+    for name, args in parts:
+        _report(progress_callback, f"Grounding: horizon {horizon} {name}...")
+        start = perf_counter()
+        _run_interruptible(
+            lambda program_name=name, program_args=args: control.ground([(program_name, list(program_args))]),
+            is_interrupted,
+        )
+        elapsed = perf_counter() - start
+        total_elapsed += elapsed
+        part_timings.append((name, elapsed))
+        _report(
+            progress_callback,
+            f"Grounding progress: horizon {horizon} {name} finished after {elapsed:.3f}s.",
+        )
+    return total_elapsed, tuple(part_timings)
+
+
+def _default_horizon_parts(
+    horizon: int,
+    *,
+    initial_step_program: str | None,
+    initial_seed_program: str | None,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = [("check", (clingo.Number(horizon),))]
+    if initial_step_program is not None and horizon == 1:
+        parts.insert(0, (initial_step_program, (clingo.Number(horizon),)))
+    else:
+        parts.insert(0, ("step", (clingo.Number(horizon),)))
+        if initial_seed_program is not None and horizon > 1:
+            parts.insert(0, (initial_seed_program, (clingo.Number(horizon - 1),)))
+    return tuple(parts)
+
+
+def _lazy_horizon_parts(
+    horizon: int,
+    *,
+    initial_step_program: str | None,
+    initial_seed_program: str | None,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if initial_step_program is not None and horizon == 1:
+        parts.append((initial_step_program, (clingo.Number(horizon),)))
+    else:
+        if initial_seed_program is not None and horizon > 1:
+            parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
+        parts.append(("step", (clingo.Number(horizon),)))
+        parts.append(("step_query", (clingo.Number(horizon),)))
+    parts.append(("check", (clingo.Number(horizon),)))
+    parts.append(("check_usage", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
 def _solve_multi_shot_with_programs(
     config: SnakeConfig,
     facts: FactBundle,
@@ -284,6 +347,7 @@ def _solve_multi_shot_with_programs(
     initial_seed_program: str | None = None,
     solve_all_horizons: bool = False,
     stop_on_solution: bool = True,
+    horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
 ) -> SolveOutput:
     control = clingo.Control(["0", "--warn=none"])
     for program_path in program_paths:
@@ -322,25 +386,21 @@ def _solve_multi_shot_with_programs(
                     break
 
                 _report(progress_callback, f"Grounding: horizon {horizon}...")
-                start = perf_counter()
-                ground_parts = [("check", [clingo.Number(horizon)])]
-                if initial_step_program is not None and horizon == 1:
-                    ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
+                if horizon_parts_builder is None:
+                    ground_parts = _default_horizon_parts(
+                        horizon,
+                        initial_step_program=initial_step_program,
+                        initial_seed_program=initial_seed_program,
+                    )
                 else:
-                    ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
-                    if (
-                        initial_seed_program is not None
-                        and horizon > 1
-                    ):
-                        ground_parts.insert(
-                            0,
-                            (initial_seed_program, [clingo.Number(horizon - 1)]),
-                        )
-                _run_interruptible(
-                    lambda parts=tuple(ground_parts): control.ground(list(parts)),
-                    is_interrupted,
+                    ground_parts = horizon_parts_builder(horizon)
+                ground_elapsed, grounding_parts = _ground_program_parts(
+                    control,
+                    ground_parts,
+                    is_interrupted=is_interrupted,
+                    progress_callback=progress_callback,
+                    horizon=horizon,
                 )
-                ground_elapsed = perf_counter() - start
                 total_grounding += ground_elapsed
                 _report(
                     progress_callback,
@@ -407,6 +467,7 @@ def _solve_multi_shot_with_programs(
                     models_stored=models_stored,
                     unique_workflows_seen=unique_workflows_seen,
                     unique_workflows_stored=unique_workflows_stored,
+                    grounding_parts=grounding_parts,
                 )
                 horizon_records.append(record)
                 if horizon_record_callback is not None:
@@ -644,6 +705,7 @@ def _ground_multi_shot_control(
     horizon_record_callback: HorizonRecordCallback = None,
     initial_step_program: str | None = None,
     initial_seed_program: str | None = None,
+    horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
 ) -> GroundingOutput:
     total_grounding = 0.0
     base_grounding_peak_rss_mb = 0.0
@@ -668,25 +730,21 @@ def _ground_multi_shot_control(
             if stage == "full":
                 for horizon in range(1, config.solution_length_max + 1):
                     _report(progress_callback, f"Grounding: horizon {horizon}...")
-                    start = perf_counter()
-                    ground_parts = [("check", [clingo.Number(horizon)])]
-                    if initial_step_program is not None and horizon == 1:
-                        ground_parts.insert(0, (initial_step_program, [clingo.Number(horizon)]))
+                    if horizon_parts_builder is None:
+                        ground_parts = _default_horizon_parts(
+                            horizon,
+                            initial_step_program=initial_step_program,
+                            initial_seed_program=initial_seed_program,
+                        )
                     else:
-                        ground_parts.insert(0, ("step", [clingo.Number(horizon)]))
-                        if (
-                            initial_seed_program is not None
-                            and horizon > 1
-                        ):
-                            ground_parts.insert(
-                                0,
-                                (initial_seed_program, [clingo.Number(horizon - 1)]),
-                            )
-                    _run_interruptible(
-                        lambda parts=tuple(ground_parts): control.ground(list(parts)),
-                        is_interrupted,
+                        ground_parts = horizon_parts_builder(horizon)
+                    elapsed, grounding_parts = _ground_program_parts(
+                        control,
+                        ground_parts,
+                        is_interrupted=is_interrupted,
+                        progress_callback=progress_callback,
+                        horizon=horizon,
                     )
-                    elapsed = perf_counter() - start
                     total_grounding += elapsed
                     grounded_horizons.append(horizon)
                     record = HorizonRecord(
@@ -699,6 +757,7 @@ def _ground_multi_shot_control(
                         models_stored=0,
                         unique_workflows_seen=0,
                         unique_workflows_stored=0,
+                        grounding_parts=grounding_parts,
                     )
                     horizon_records.append(record)
                     if horizon_record_callback is not None:
@@ -811,6 +870,11 @@ def solve_multi_shot_lazy(
         initial_step_program="step_initial",
         solve_all_horizons=False,
         stop_on_solution=False,
+        horizon_parts_builder=lambda horizon: _lazy_horizon_parts(
+            horizon,
+            initial_step_program="step_initial",
+            initial_seed_program=None,
+        ),
     )
 
 
@@ -862,4 +926,9 @@ def ground_multi_shot_lazy(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         initial_step_program="step_initial",
+        horizon_parts_builder=lambda horizon: _lazy_horizon_parts(
+            horizon,
+            initial_step_program="step_initial",
+            initial_seed_program=None,
+        ),
     )

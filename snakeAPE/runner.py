@@ -287,6 +287,11 @@ class _RunLogWriter:
     def log_horizon(self, record: HorizonRecord) -> None:
         self.cumulative_raw_solutions += record.models_stored
         self.cumulative_unique_solutions += record.unique_workflows_stored
+        step_grounding_sec = sum(
+            elapsed
+            for name, elapsed in record.grounding_parts
+            if name.startswith("step")
+        ) or record.grounding_sec
         self._write_row(
             {
                 **self.base_row,
@@ -297,7 +302,7 @@ class _RunLogWriter:
                 "base_grounding_sec": "",
                 "base_grounding_peak_rss_mb": "",
                 "horizon_grounding_sec": f"{record.grounding_sec:.6f}",
-                "step_grounding_sec": f"{record.grounding_sec:.6f}",
+                "step_grounding_sec": f"{step_grounding_sec:.6f}",
                 "solving_sec": f"{record.solving_sec:.6f}" if record.solving_sec else "",
                 "step_solving_sec": f"{record.solving_sec:.6f}" if record.solving_sec else "",
                 "peak_rss_mb": f"{record.peak_rss_mb:.3f}" if record.peak_rss_mb else "",

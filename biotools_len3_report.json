@@ -1,0 +1,255 @@
+{
+  "left": {
+    "name": "SAT",
+    "path": "/Volumes/ZGMF-X20A/GARYU/snakeAPE/bio_tools_solutions.txt",
+    "format": "sat-complete"
+  },
+  "right": {
+    "name": "snakeAPE",
+    "path": "/Volumes/ZGMF-X20A/GARYU/ironAPE/APE_Example/biotools/solutions/answer_sets.txt",
+    "format": "snake-answer-sets"
+  },
+  "scope": "workflow length 3",
+  "counts": {
+    "SAT_total_solutions": 236,
+    "snakeAPE_total_solutions": 304,
+    "SAT_unique_tool_sequences": 235,
+    "snakeAPE_unique_tool_sequences": 7,
+    "SAT_unique_workflow_signatures": 235,
+    "snakeAPE_unique_workflow_signatures": 50
+  },
+  "workflow_level": {
+    "exact_workflow_matches": 0,
+    "strict_signature_mismatch": {
+      "SAT": 0,
+      "snakeAPE": 0
+    },
+    "tool_sequence_only_mismatch": {
+      "SAT": 236,
+      "snakeAPE": 304
+    }
+  },
+  "tool_sequence_count_differences": [
+    {
+      "delta": 96,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "clc_mapper_legacy"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> clc_mapper_legacy",
+      "SAT": 0,
+      "snakeAPE": 96
+    },
+    {
+      "delta": 74,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "clc_mapper"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> clc_mapper",
+      "SAT": 0,
+      "snakeAPE": 74
+    },
+    {
+      "delta": 54,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "gmap_iit_store"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> gmap_iit_store",
+      "SAT": 0,
+      "snakeAPE": 54
+    },
+    {
+      "delta": 36,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "frogs_demultiplex"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> frogs_demultiplex",
+      "SAT": 0,
+      "snakeAPE": 36
+    },
+    {
+      "delta": 16,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "roi_feature_projection"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> roi_feature_projection",
+      "SAT": 0,
+      "snakeAPE": 16
+    },
+    {
+      "delta": 16,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "fqduplicate"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> fqduplicate",
+      "SAT": 0,
+      "snakeAPE": 16
+    },
+    {
+      "delta": 12,
+      "tool_sequence": [
+        "MapQuant",
+        "GRENITS",
+        "bedtools_mergebedgraph"
+      ],
+      "tool_sequence_text": "MapQuant -> GRENITS -> bedtools_mergebedgraph",
+      "SAT": 0,
+      "snakeAPE": 12
+    },
+    {
+      "delta": 2,
+      "tool_sequence": [
+        "MapQuant",
+        "reformat_fastq",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "MapQuant -> reformat_fastq -> T-Bio.Info",
+      "SAT": 2,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "unfinnigan",
+        "MapQuant",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "unfinnigan -> MapQuant -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "unfinnigan",
+        "IDBac",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "unfinnigan -> IDBac -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "raw2mzDB",
+        "IDBac",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "raw2mzDB -> IDBac -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "mzBruker",
+        "MapQuant",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "mzBruker -> MapQuant -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "mzBruker",
+        "IDBac",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "mzBruker -> IDBac -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "reformat_fastq",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "msConvert -> reformat_fastq -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "load_multifastq",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "msConvert -> load_multifastq -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "export_sbw",
+        "MeroX"
+      ],
+      "tool_sequence_text": "msConvert -> export_sbw -> MeroX",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "export_one_data",
+        "MeroX"
+      ],
+      "tool_sequence_text": "msConvert -> export_one_data -> MeroX",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "export",
+        "MeroX"
+      ],
+      "tool_sequence_text": "msConvert -> export -> MeroX",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "MapQuant",
+        "T-Bio.Info"
+      ],
+      "tool_sequence_text": "msConvert -> MapQuant -> T-Bio.Info",
+      "SAT": 1,
+      "snakeAPE": 0
+    },
+    {
+      "delta": 1,
+      "tool_sequence": [
+        "msConvert",
+        "MEME Suite",
+        "MeroX"
+      ],
+      "tool_sequence_text": "msConvert -> MEME Suite -> MeroX",
+      "SAT": 1,
+      "snakeAPE": 0
+    }
+  ],
+  "strict_signature_mismatches": []
+}
