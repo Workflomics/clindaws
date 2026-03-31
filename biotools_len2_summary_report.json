@@ -1,0 +1,34 @@
+{
+  "left": {
+    "name": "SAT",
+    "path": "/Volumes/ZGMF-X20A/GARYU/ironAPE/APE_Example/biotools/solutions/solutions.txt",
+    "format": "summary"
+  },
+  "right": {
+    "name": "snakeAPE",
+    "path": "/Volumes/ZGMF-X20A/GARYU/results_bio_3step/solutions.txt",
+    "format": "summary"
+  },
+  "scope": "workflow length 2",
+  "counts": {
+    "SAT_total_solutions": 693,
+    "snakeAPE_total_solutions": 693,
+    "SAT_unique_tool_sequences": 681,
+    "snakeAPE_unique_tool_sequences": 681,
+    "SAT_unique_workflow_signatures": 681,
+    "snakeAPE_unique_workflow_signatures": 681
+  },
+  "workflow_level": {
+    "exact_workflow_matches": 693,
+    "strict_signature_mismatch": {
+      "SAT": 0,
+      "snakeAPE": 0
+    },
+    "tool_sequence_only_mismatch": {
+      "SAT": 0,
+      "snakeAPE": 0
+    }
+  },
+  "tool_sequence_count_differences": [],
+  "strict_signature_mismatches": []
+}

@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output-dir",
-        help="Override the solutions directory from the config.",
+        help="Override the output directory. Defaults to a sibling snakeAPE_results directory next to the config file.",
     )
     parser.add_argument(
         "--solutions",

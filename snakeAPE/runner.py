@@ -69,9 +69,6 @@ RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 FULL_VARIANT_TRANSLATION_BUILDER = "candidate_full_variants"
 LAZY_TRANSLATION_BUILDER = "candidate_lazy"
 ProgressCallback = Callable[[str], None] | None
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     if mode in {"single-shot-opt", "single-shot-lazy", "multi-shot-opt", "multi-shot-lazy"}:
         return "python"
@@ -151,48 +148,22 @@ def _ensure_csv_header(csv_path: Path, fieldnames: list[str]) -> None:
 
 
 class _RunLogWriter:
-    """Append-only per-stage CSV logger."""
+    """APE-style per-horizon CSV logger."""
 
     fieldnames = [
-        "run_id",
-        "timestamp_utc",
-        "mode",
-        "solver_family",
-        "solver_approach",
-        "grounding_strategy",
-        "config_path",
-        "ontology_used",
-        "ontology_entry_count",
-        "tool_annotation_used",
-        "tool_count",
-        "constraints_used",
-        "constraint_count",
-        "translation_builder",
-        "translation_schema",
-        "stage",
-        "step",
-        "translation_sec",
-        "translation_peak_rss_mb",
-        "base_grounding_sec",
-        "base_grounding_peak_rss_mb",
-        "horizon_grounding_sec",
-        "step_grounding_sec",
-        "solving_sec",
-        "step_solving_sec",
-        "peak_rss_mb",
-        "raw_models_seen",
-        "raw_models_stored",
-        "unique_workflows_seen",
-        "unique_workflows_stored",
-        "raw_solutions_found",
+        "test",
+        "horizon",
+        "setup_grounding_ms",
+        "solving_ms",
+        "memory_used_mb",
         "solutions_found",
-        "satisfiable",
-        "fact_count",
+        "constraints_used",
     ]
 
     def __init__(
         self,
         *,
+        csv_path: Path,
         mode: str,
         grounding_strategy: str,
         fact_count: int,
@@ -202,29 +173,12 @@ class _RunLogWriter:
         run_id: str,
         timestamp_utc: str,
     ) -> None:
-        self.csv_path = PROJECT_ROOT / "run_log.csv"
-        self.run_id = run_id
-        self.timestamp_utc = timestamp_utc
-        self.cumulative_raw_solutions = 0
+        self.csv_path = csv_path
         self.cumulative_unique_solutions = 0
-        self.base_row = {
-            "run_id": self.run_id,
-            "timestamp_utc": self.timestamp_utc,
-            "mode": mode,
-            "solver_family": _solver_family(mode),
-            "solver_approach": _solver_approach(mode),
-            "grounding_strategy": grounding_strategy,
-            "config_path": run_metadata["config_path"],
-            "ontology_used": run_metadata["ontology_used"],
-            "ontology_entry_count": run_metadata["ontology_entry_count"],
-            "tool_annotation_used": run_metadata["tool_annotation_used"],
-            "tool_count": run_metadata["tool_count"],
-            "constraints_used": run_metadata["constraints_used"],
-            "constraint_count": run_metadata["constraint_count"],
-            "translation_builder": translation_builder,
-            "translation_schema": translation_schema,
-            "fact_count": fact_count,
-        }
+        self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
+        self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
+        self.base_grounding_ms = 0
+        self.base_grounding_peak_rss_mb = 0.0
         _ensure_csv_header(self.csv_path, self.fieldnames)
 
     def _write_row(self, row: dict[str, object]) -> None:
@@ -233,86 +187,28 @@ class _RunLogWriter:
             writer.writerow(row)
 
     def log_translation(self, *, translation_sec: float, translation_peak_rss_mb: float) -> None:
-        self._write_row(
-            {
-                **self.base_row,
-                "stage": "translation",
-                "step": 0,
-                "translation_sec": f"{translation_sec:.6f}",
-                "translation_peak_rss_mb": f"{translation_peak_rss_mb:.3f}" if translation_peak_rss_mb else "",
-                "base_grounding_sec": "",
-                "base_grounding_peak_rss_mb": "",
-                "horizon_grounding_sec": "",
-                "step_grounding_sec": "",
-                "solving_sec": "",
-                "step_solving_sec": "",
-                "peak_rss_mb": "",
-                "raw_models_seen": "",
-                "raw_models_stored": "",
-                "unique_workflows_seen": "",
-                "unique_workflows_stored": "",
-                "raw_solutions_found": "",
-                "solutions_found": "",
-                "satisfiable": "",
-            }
-        )
+        return None
 
     def log_base_grounding(self, *, base_grounding_sec: float, base_grounding_peak_rss_mb: float) -> None:
-        self._write_row(
-            {
-                **self.base_row,
-                "stage": "base_grounding",
-                "step": 0,
-                "translation_sec": "",
-                "translation_peak_rss_mb": "",
-                "base_grounding_sec": f"{base_grounding_sec:.6f}" if base_grounding_sec else "",
-                "base_grounding_peak_rss_mb": (
-                    f"{base_grounding_peak_rss_mb:.3f}" if base_grounding_peak_rss_mb else ""
-                ),
-                "horizon_grounding_sec": "",
-                "step_grounding_sec": "",
-                "solving_sec": "",
-                "step_solving_sec": "",
-                "peak_rss_mb": "",
-                "raw_models_seen": "",
-                "raw_models_stored": "",
-                "unique_workflows_seen": "",
-                "unique_workflows_stored": "",
-                "raw_solutions_found": "",
-                "solutions_found": "",
-                "satisfiable": "",
-            }
-        )
+        self.base_grounding_ms = round(base_grounding_sec * 1000)
+        self.base_grounding_peak_rss_mb = base_grounding_peak_rss_mb
 
     def log_horizon(self, record: HorizonRecord) -> None:
-        self.cumulative_raw_solutions += record.models_stored
         self.cumulative_unique_solutions += record.unique_workflows_stored
-        step_grounding_sec = sum(
-            elapsed
-            for name, elapsed in record.grounding_parts
-            if name.startswith("step")
-        ) or record.grounding_sec
+        setup_grounding_ms = round(record.grounding_sec * 1000)
+        memory_used_mb = record.peak_rss_mb or 0.0
+        if record.horizon == 1:
+            setup_grounding_ms += self.base_grounding_ms
+            memory_used_mb = max(memory_used_mb, self.base_grounding_peak_rss_mb)
         self._write_row(
             {
-                **self.base_row,
-                "stage": f"horizon_{record.horizon}",
-                "step": record.horizon,
-                "translation_sec": "",
-                "translation_peak_rss_mb": "",
-                "base_grounding_sec": "",
-                "base_grounding_peak_rss_mb": "",
-                "horizon_grounding_sec": f"{record.grounding_sec:.6f}",
-                "step_grounding_sec": f"{step_grounding_sec:.6f}",
-                "solving_sec": f"{record.solving_sec:.6f}" if record.solving_sec else "",
-                "step_solving_sec": f"{record.solving_sec:.6f}" if record.solving_sec else "",
-                "peak_rss_mb": f"{record.peak_rss_mb:.3f}" if record.peak_rss_mb else "",
-                "raw_models_seen": record.models_seen,
-                "raw_models_stored": record.models_stored,
-                "unique_workflows_seen": record.unique_workflows_seen,
-                "unique_workflows_stored": record.unique_workflows_stored,
-                "raw_solutions_found": self.cumulative_raw_solutions,
+                "test": self.test_name,
+                "horizon": record.horizon,
+                "setup_grounding_ms": setup_grounding_ms,
+                "solving_ms": round(record.solving_sec * 1000),
+                "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
                 "solutions_found": self.cumulative_unique_solutions,
-                "satisfiable": str(record.satisfiable).lower(),
+                "constraints_used": self.constraints_used,
             }
         )
 
@@ -355,6 +251,7 @@ class _RunSummaryWriter:
     def __init__(
         self,
         *,
+        csv_path: Path,
         mode: str,
         grounding_strategy: str,
         fact_count: int,
@@ -364,7 +261,7 @@ class _RunSummaryWriter:
         run_id: str,
         timestamp_utc: str,
     ) -> None:
-        self.csv_path = PROJECT_ROOT / "run_summary.csv"
+        self.csv_path = csv_path
         self.base_row = {
             "run_id": run_id,
             "timestamp_utc": timestamp_utc,
@@ -421,11 +318,12 @@ class _RunSummaryWriter:
 
 
 class _RunCsvWriters:
-    """Root-level run CSV writers sharing one run id."""
+    """Per-run CSV writers sharing one run id."""
 
     def __init__(
         self,
         *,
+        csv_dir: Path,
         mode: str,
         grounding_strategy: str,
         fact_count: int,
@@ -435,7 +333,9 @@ class _RunCsvWriters:
     ) -> None:
         run_id = str(uuid4())
         timestamp_utc = datetime.now(timezone.utc).isoformat()
+        csv_dir.mkdir(parents=True, exist_ok=True)
         self.step_writer = _RunLogWriter(
+            csv_path=csv_dir / "asp_run_log.csv",
             mode=mode,
             grounding_strategy=grounding_strategy,
             fact_count=fact_count,
@@ -446,6 +346,7 @@ class _RunCsvWriters:
             timestamp_utc=timestamp_utc,
         )
         self.summary_writer = _RunSummaryWriter(
+            csv_path=csv_dir / "asp_run_summary.csv",
             mode=mode,
             grounding_strategy=grounding_strategy,
             fact_count=fact_count,
@@ -692,6 +593,12 @@ def _write_translation_summary(
     return translation_summary_path, payload
 
 
+def _default_solution_dir(config: SnakeConfig) -> Path:
+    """Return the default output directory when none is provided."""
+
+    return config.base_dir / "snakeAPE_results"
+
+
 def _prepare_run_context(
     config_path: str | Path,
     *,
@@ -713,7 +620,7 @@ def _prepare_run_context(
         solution_length_min=min_length if min_length is not None else config.solution_length_min,
         solution_length_max=max_length if max_length is not None else config.solution_length_max,
     )
-    solution_dir = Path(output_dir).resolve() if output_dir else config.solutions_dir_path
+    solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
     solution_dir.mkdir(parents=True, exist_ok=True)
 
     effective_translation_strategy = _effective_translation_strategy(mode, grounding_strategy)
@@ -805,6 +712,7 @@ def run_translate_only(
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
+        csv_dir=config.solutions_dir_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
         fact_count=fact_bundle.fact_count,
@@ -960,6 +868,7 @@ def run_once(
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
+        csv_dir=config.solutions_dir_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
         fact_count=fact_bundle.fact_count,
@@ -1169,6 +1078,7 @@ def run_ground_only(
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
+        csv_dir=config.solutions_dir_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
         fact_count=fact_bundle.fact_count,
@@ -1324,11 +1234,8 @@ def benchmark_grounding(
     """Benchmark all three grounding strategies."""
 
     strategies = ("python", "hybrid", "clingo")
-    solution_dir = (
-        Path(output_dir).resolve()
-        if output_dir
-        else load_config(config_path).solutions_dir_path
-    )
+    config = load_config(config_path)
+    solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
     benchmark_dir = solution_dir / "benchmarks"
     benchmark_dir.mkdir(parents=True, exist_ok=True)
 

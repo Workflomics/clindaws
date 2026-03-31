@@ -42,11 +42,16 @@ artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, WF)).
 
+% Carry forward ancestors from the previous step (artifact graph is monotone).
 artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Ancestor).
+    artifact_ancestor(t-1, Artifact, Ancestor).
 
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Mid),
+% Only compute fresh entries for artifacts produced at THIS step.
+artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+    artifact_parent(out(t, Tool, PortOut), Ancestor).
+
+artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+    artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
 
 :- occurs(t, use_lazy_candidate(Tool, Candidate)),
@@ -60,17 +65,14 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
     T1 < T2,
     occurs(T1, use_lazy_candidate(Tool1, Candidate1)),
     occurs(T2, use_lazy_candidate(Tool2, Candidate2)),
-    candidate_single_input(Candidate1),
-    candidate_single_input(Candidate2),
     occurs(T1, bind(Tool1, Port1, WF1)),
     occurs(T2, bind(Tool2, Port2, WF2)),
-    same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2),
+    symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2),
     occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
     occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
     occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
     TJ > T2,
-    JoinPort2 < JoinPort1,
-    same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
+    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2).
 
 :- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF, T2, Tool2, Candidate2, Port2, WF).
 
@@ -111,11 +113,16 @@ is_root(t, Tool) :-
 
 reachable(t, Tool) :- is_root(t, Tool).
 
+% Carry forward: tools reachable at t-1 remain reachable (includes all prior steps).
+reachable(t, Tool) :- reachable(t-1, Tool).
+
+% Use reachable(t-1, ...) instead of free-variable T1 range — semantically equivalent
+% because carry-forward already accumulates all prior reachable sets.
 reachable(t, Tool2) :-
-    reachable(T1, Tool1),
+    reachable(t-1, Tool1),
     occurs(T1, output(Tool1, _, Port)),
     occurs(t, bind(Tool2, _, out(T1, Tool1, Port))),
-    t > T1.
+    T1 < t.
 
 :- occurs(t, run(Tool)), not reachable(t, Tool).
 

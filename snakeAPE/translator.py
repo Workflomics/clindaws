@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from io import StringIO
 from itertools import product
+from time import perf_counter
 from typing import Iterable, Mapping
 
 from .models import FactBundle, SnakeConfig, ToolExpansionStat, ToolMode
@@ -337,23 +338,38 @@ def _lazy_output_matches_lazy_input(
     return True
 
 
+def _lazy_output_matches_lazy_input_fset(
+    output_fsets: Mapping[str, frozenset[str]],
+    input_fsets: Mapping[str, frozenset[str]],
+) -> bool:
+    for dim, required_fset in input_fsets.items():
+        produced_fset = output_fsets.get(dim)
+        if not produced_fset:
+            return False
+        if required_fset.isdisjoint(produced_fset):
+            return False
+    return True
+
+
 def _compress_lazy_output_choice_values(
     output_values_by_dimension: Mapping[str, tuple[str, ...]],
+    output_fsets: Mapping[str, frozenset[str]],
     bindable_input_ports: tuple[Mapping[str, object], ...],
     goal_port_values: tuple[Mapping[str, tuple[str, ...]], ...],
+    goal_fsets: tuple[Mapping[str, frozenset[str]], ...],
 ) -> dict[str, tuple[str, ...]]:
     globally_bindable_input_ports = tuple(
         input_port
         for input_port in bindable_input_ports
-        if _lazy_output_matches_lazy_input(
-            output_values_by_dimension,
-            input_port["port_values_by_dimension"],
+        if _lazy_output_matches_lazy_input_fset(
+            output_fsets,
+            input_port["port_values_fset"],
         )
     )
     globally_bindable_goal_ids = tuple(
         goal_id
-        for goal_id, goal_dims in enumerate(goal_port_values)
-        if _lazy_output_matches_lazy_input(output_values_by_dimension, goal_dims)
+        for goal_id, goal_fset in enumerate(goal_fsets)
+        if _lazy_output_matches_lazy_input_fset(output_fsets, goal_fset)
     )
 
     default_consumer_signatures_by_dimension: dict[str, set[int]] = defaultdict(set)
@@ -561,6 +577,7 @@ def build_fact_bundle_grounding_opt_lazy(
                     "port_idx": port_idx,
                     "port_values": port_values,
                     "port_values_by_dimension": port_values_by_dimension,
+                    "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
                     "signature_id": _input_sig_to_id[sig],
                     "workflow_input_matches": workflow_input_matches,
                 }
@@ -583,6 +600,7 @@ def build_fact_bundle_grounding_opt_lazy(
                     "port_idx": port_idx,
                     "declared_dims": declared_dims,
                     "port_values_by_dimension": port_values_by_dimension,
+                    "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
                 }
             )
             emitted_count = sum(len(values) for values in port_values_by_dimension.values())
@@ -629,6 +647,11 @@ def build_fact_bundle_grounding_opt_lazy(
                 )
         goal_port_values.append(goal_dims)
     goal_port_values_tuple = tuple(goal_port_values)
+    goal_fsets: tuple[dict[str, frozenset[str]], ...] = tuple(
+        {dim: frozenset(vals) for dim, vals in g.items()} for g in goal_port_values
+    )
+
+    _t0 = perf_counter()
 
     bindable_pairs: set[tuple[str, int, str, int]] = set()
     reverse_edges: dict[str, set[str]] = defaultdict(set)
@@ -638,25 +661,28 @@ def build_fact_bundle_grounding_opt_lazy(
         candidate_id = str(record["candidate_id"])
         output_ports = tuple(record["output_ports"])
         for output_port in output_ports:
-            output_dims = output_port["port_values_by_dimension"]
-            if any(_lazy_output_matches_lazy_input(output_dims, goal_dims) for goal_dims in goal_port_values):
+            output_fset = output_port["port_values_fset"]
+            if any(_lazy_output_matches_lazy_input_fset(output_fset, gf) for gf in goal_fsets):
                 direct_goal_candidates.add(candidate_id)
+
+    _t1 = perf_counter()
 
     for producer_record in candidate_records:
         producer_candidate = str(producer_record["candidate_id"])
         for output_port in tuple(producer_record["output_ports"]):
             producer_port = int(output_port["port_idx"])
-            output_dims = output_port["port_values_by_dimension"]
+            output_fset = output_port["port_values_fset"]
             for consumer_record in candidate_records:
                 consumer_candidate = str(consumer_record["candidate_id"])
                 for input_port in tuple(consumer_record["input_ports"]):
                     consumer_port = int(input_port["port_idx"])
-                    input_dims = input_port["port_values_by_dimension"]
-                    if _lazy_output_matches_lazy_input(output_dims, input_dims):
+                    if _lazy_output_matches_lazy_input_fset(output_fset, input_port["port_values_fset"]):
                         bindable_pairs.add(
                             (producer_candidate, producer_port, consumer_candidate, consumer_port)
                         )
                         reverse_edges[consumer_candidate].add(producer_candidate)
+
+    _t2 = perf_counter()
 
     relevant_candidates = set(direct_goal_candidates)
     frontier = list(direct_goal_candidates)
@@ -667,6 +693,8 @@ def build_fact_bundle_grounding_opt_lazy(
                 continue
             relevant_candidates.add(producer_candidate)
             frontier.append(producer_candidate)
+
+    _t3 = perf_counter()
 
     relevant_records = [
         record
@@ -687,17 +715,24 @@ def build_fact_bundle_grounding_opt_lazy(
     for record in relevant_records:
         compressed_output_ports: list[dict[str, object]] = []
         for output_port in tuple(record["output_ports"]):
+            compressed_vals = _compress_lazy_output_choice_values(
+                output_port["port_values_by_dimension"],
+                output_port["port_values_fset"],
+                relevant_input_ports,
+                goal_port_values_tuple,
+                goal_fsets,
+            )
+            compressed_fset = {dim: frozenset(vals) for dim, vals in compressed_vals.items()}
             compressed_output_ports.append(
                 {
                     **output_port,
-                    "port_values_by_dimension": _compress_lazy_output_choice_values(
-                        output_port["port_values_by_dimension"],
-                        relevant_input_ports,
-                        goal_port_values_tuple,
-                    ),
+                    "port_values_by_dimension": compressed_vals,
+                    "port_values_fset": compressed_fset,
                 }
             )
         record["output_ports"] = tuple(compressed_output_ports)
+
+    _t4 = perf_counter()
     relevant_tools = tuple(record["tool"] for record in relevant_records)
     relevant_records_by_candidate = {
         str(record["candidate_id"]): record
@@ -709,23 +744,23 @@ def build_fact_bundle_grounding_opt_lazy(
         output_ports = tuple(record["output_ports"])
         goals_satisfied = all(
             any(
-                _lazy_output_matches_lazy_input(
-                    output_port["port_values_by_dimension"],
-                    goal_dims,
+                _lazy_output_matches_lazy_input_fset(
+                    output_port["port_values_fset"],
+                    gf,
                 )
                 for output_port in output_ports
             )
-            for goal_dims in goal_port_values_tuple
+            for gf in goal_fsets
         )
         if not goals_satisfied:
             continue
         if config.use_all_generated_data == "ALL" and any(
             not any(
-                _lazy_output_matches_lazy_input(
-                    output_port["port_values_by_dimension"],
-                    goal_dims,
+                _lazy_output_matches_lazy_input_fset(
+                    output_port["port_values_fset"],
+                    gf,
                 )
-                for goal_dims in goal_port_values_tuple
+                for gf in goal_fsets
             )
             for output_port in output_ports
         ):
@@ -827,6 +862,20 @@ def build_fact_bundle_grounding_opt_lazy(
                 (producer_candidate, producer_port, step_index)
             ].add(int(consumer_input_port["signature_id"]))
 
+    _t5 = perf_counter()
+
+    # Pre-compute: for each (sig_id, dim), the frozenset of output values compatible
+    # with any required value in that signature+dim. Compatible means value is in
+    # ancestors_of(required_value), i.e., value is at least as general as required.
+    # This avoids the O(|values| × |required_values|) inner loop per emitted fact.
+    compat_by_sig_dim: dict[tuple[int, str], frozenset[str]] = {}
+    for sig_id, requirements in signature_requirements_by_id.items():
+        for dim, required_values in requirements.items():
+            ancestor_union: set[str] = set()
+            for req_val in required_values:
+                ancestor_union.update(ontology.ancestors_of(req_val))
+            compat_by_sig_dim[(sig_id, dim)] = frozenset(ancestor_union)
+
     for record in relevant_records:
         tool = record["tool"]
         candidate_id = str(record["candidate_id"])
@@ -896,50 +945,55 @@ def build_fact_bundle_grounding_opt_lazy(
                             _quote(dim),
                         )
 
+            # Collect all sig_ids this producer supports (query + all steps).
+            output_fset_for_port = output_port["port_values_fset"]
+            all_sig_ids = set(
+                query_support_signatures_by_producer_port.get((candidate_id, port_idx), set())
+            )
+            for _s in range(1, config.solution_length_max + 1):
+                all_sig_ids.update(
+                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, _s), set())
+                )
+            # Pre-compute matching output values per (sig_id, dim) using set intersection.
+            # compat_by_sig_dim[(sig_id, dim)] is the union of ancestors_of(req) for all
+            # required values, so intersecting with output values gives exactly the facts
+            # we would emit in the original O(values × required_values) loop.
+            matching_by_sig_dim: dict[tuple[int, str], frozenset[str]] = {}
+            for sig_id in all_sig_ids:
+                for dim, out_fset in output_fset_for_port.items():
+                    if dim in signature_requirements_by_id[sig_id]:
+                        matches = out_fset & compat_by_sig_dim.get((sig_id, dim), frozenset())
+                        if matches:
+                            matching_by_sig_dim[(sig_id, dim)] = matches
+
             for signature_id in sorted(
                 query_support_signatures_by_producer_port.get((candidate_id, port_idx), set())
             ):
-                required_dims = signature_requirements_by_id[signature_id]
-                for dim, values in sorted(output_port["port_values_by_dimension"].items()):
-                    required_values = required_dims.get(dim)
-                    if not required_values:
-                        continue
-                    for value in values:
-                        if any(
-                            value in ontology.ancestors_of(required_value)
-                            for required_value in required_values
-                        ):
+                for dim in sorted(output_fset_for_port):
+                    for value in sorted(matching_by_sig_dim.get((signature_id, dim), frozenset())):
+                        writer.emit_fact(
+                            "lazy_query_bound_output_support",
+                            _quote(candidate_id),
+                            str(port_idx),
+                            str(signature_id),
+                            _quote(value),
+                            _quote(dim),
+                        )
+            for step_index in range(1, config.solution_length_max + 1):
+                for signature_id in sorted(
+                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, step_index), set())
+                ):
+                    for dim in sorted(output_fset_for_port):
+                        for value in sorted(matching_by_sig_dim.get((signature_id, dim), frozenset())):
                             writer.emit_fact(
-                                "lazy_query_bound_output_support",
+                                "lazy_step_bound_output_support",
                                 _quote(candidate_id),
                                 str(port_idx),
                                 str(signature_id),
                                 _quote(value),
                                 _quote(dim),
+                                str(step_index),
                             )
-            for step_index in range(1, config.solution_length_max + 1):
-                for signature_id in sorted(
-                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, step_index), set())
-                ):
-                    required_dims = signature_requirements_by_id[signature_id]
-                    for dim, values in sorted(output_port["port_values_by_dimension"].items()):
-                        required_values = required_dims.get(dim)
-                        if not required_values:
-                            continue
-                        for value in values:
-                            if any(
-                                value in ontology.ancestors_of(required_value)
-                                for required_value in required_values
-                            ):
-                                writer.emit_fact(
-                                    "lazy_step_bound_output_support",
-                                    _quote(candidate_id),
-                                    str(port_idx),
-                                    str(signature_id),
-                                    _quote(value),
-                                    _quote(dim),
-                                    str(step_index),
-                                )
 
     for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
@@ -961,6 +1015,17 @@ def build_fact_bundle_grounding_opt_lazy(
                 str(consumer_port),
                 str(step_index),
             )
+
+    _t6 = perf_counter()
+    print(
+        f"  lazy builder phases: "
+        f"goal_check={_t1-_t0:.2f}s "
+        f"bindable_pairs={_t2-_t1:.2f}s "
+        f"bfs_pruning={_t3-_t2:.2f}s "
+        f"compression={_t4-_t3:.2f}s "
+        f"step_indexing={_t5-_t4:.2f}s "
+        f"fact_emission={_t6-_t5:.2f}s"
+    )
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
     facts = writer.text()

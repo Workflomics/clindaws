@@ -201,3 +201,13 @@ port_env_compatible(Tool, Port) :-
 
 eligible(Candidate, Port, WF) :-
     lazy_initial_bindable(Candidate, Port, WF).
+
+% Pre-computed helpers for paired_symmetric_producers to reduce per-step join cost.
+symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
+    candidate_single_input(Candidate1),
+    candidate_single_input(Candidate2),
+    same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2).
+
+join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
+    JoinPort2 < JoinPort1,
+    same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).

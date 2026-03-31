@@ -43,15 +43,22 @@ def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
             )
             for port in item.get("inputs") or []
         )
-        outputs = tuple(
-            ToolPortSpec.from_mapping(
+        _seen_output_keys: set[frozenset] = set()
+        _deduped_outputs: list[ToolPortSpec] = []
+        for port in item.get("outputs") or []:
+            spec = ToolPortSpec.from_mapping(
                 {
                     dim: tuple(_strip_prefix(value, prefix) for value in values)
                     for dim, values in port.items()
                 }
             )
-            for port in item.get("outputs") or []
-        )
+            key = frozenset(
+                (dim, frozenset(vals)) for dim, vals in spec.dimensions.items()
+            )
+            if key not in _seen_output_keys:
+                _seen_output_keys.add(key)
+                _deduped_outputs.append(spec)
+        outputs = tuple(_deduped_outputs)
         taxonomy_operations = tuple(
             _strip_prefix(value, prefix) for value in item.get("taxonomyOperations", [])
         )
