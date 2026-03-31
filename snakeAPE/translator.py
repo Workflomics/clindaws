@@ -1,13 +1,16 @@
-"""Translate config, OWL, and tool annotations into encoding-compatible facts."""
+"""Translate config, OWL, tool annotations, and supported constraints into facts."""
 
 from __future__ import annotations
 
+import json
+import re
 from collections import defaultdict, deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from io import StringIO
 from itertools import product
 from time import perf_counter
-from typing import Iterable, Mapping
+from typing import Any
 
 from .models import FactBundle, SnakeConfig, ToolExpansionStat, ToolMode
 from .ontology import Ontology
@@ -84,6 +87,9 @@ class _FactWriter:
             self.buffer.write("\n")
         self.predicate_counts[name] += 1
         self.fact_count += 1
+
+    def emit_comment(self, text: str) -> None:
+        self.buffer.write(f"% {text}\n")
 
     def text(self) -> str:
         return self.buffer.getvalue()
@@ -270,6 +276,450 @@ def _build_common_facts(
     return roots
 
 
+_LAZY_SUPPORTED_CONSTRAINTS = {
+    "use_m",
+    "nuse_m",
+    "ite_m",
+    "depend_m",
+    "itn_m",
+    "next_m",
+    "unique_inputs",
+    "first_m",
+    "connected_op",
+}
+
+_LAZY_NATIVE_CONSTRAINTS = _LAZY_SUPPORTED_CONSTRAINTS | {
+    "at_step",
+    "used_iff_used",
+    "max_uses",
+    "mutex_tools",
+    "not_consecutive",
+}
+
+_CONSTRAINT_ATOM_PATTERN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\((.*)\)\s*$")
+
+
+def _strip_constraint_value(value: str, prefix: str) -> str:
+    if prefix and value.startswith(prefix):
+        return value[len(prefix):]
+    if "#" in value:
+        return value.rsplit("#", 1)[1]
+    return value
+
+
+def _extract_constraint_selector(
+    parameter: Mapping[str, Any],
+    *,
+    prefix: str,
+) -> str:
+    if not parameter:
+        raise ValueError("empty parameter")
+
+    for raw_values in parameter.values():
+        if isinstance(raw_values, str):
+            return _strip_constraint_value(raw_values, prefix)
+        if isinstance(raw_values, Iterable):
+            for raw_value in raw_values:
+                return _strip_constraint_value(str(raw_value), prefix)
+        break
+    raise ValueError("parameter did not contain a selector value")
+
+
+def _parse_constraint_atom(text: str) -> tuple[str, tuple[str | int, ...]]:
+    match = _CONSTRAINT_ATOM_PATTERN.fullmatch(text.strip())
+    if match is None:
+        raise ValueError("expected atom syntax name(arg1, arg2, ...)")
+
+    atom_name = match.group(1)
+    raw_args = match.group(2).strip()
+    if not raw_args:
+        return atom_name, ()
+
+    args: list[str | int] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in raw_args:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if quote is not None:
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            else:
+                current.append(char)
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            continue
+        if char == ",":
+            token = "".join(current).strip()
+            if not token:
+                raise ValueError("empty argument")
+            args.append(int(token) if token.lstrip("-").isdigit() else token)
+            current = []
+            continue
+        current.append(char)
+
+    if quote is not None:
+        raise ValueError("unterminated quoted string")
+    if escaped:
+        raise ValueError("dangling escape sequence")
+
+    token = "".join(current).strip()
+    if not token:
+        raise ValueError("empty argument")
+    args.append(int(token) if token.lstrip("-").isdigit() else token)
+    return atom_name, tuple(args)
+
+
+def _lazy_allowed_selectors(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> set[str]:
+    allowed_selectors = set(ontology.descendants_of(config.tools_taxonomy_root))
+    allowed_selectors.add(config.tools_taxonomy_root)
+    for tool in tools:
+        allowed_selectors.add(tool.mode_id)
+        allowed_selectors.update(tool.taxonomy_operations)
+    return allowed_selectors
+
+
+def _emit_lazy_constraint(
+    writer: _FactWriter,
+    *,
+    config: SnakeConfig,
+    constraint_name: str,
+    args: tuple[str | int, ...],
+    allowed_selectors: set[str],
+    selector_ids: dict[str, str],
+    source_name: str,
+    index: int,
+) -> None:
+    def _skip(reason: str) -> None:
+        writer.emit_comment(f"skipping {source_name} constraint {index}: {reason}")
+
+    def _selector_id_for(selector: str) -> str:
+        selector_id = selector_ids.get(selector)
+        if selector_id is None:
+            selector_id = f"constraint_selector_{len(selector_ids)}"
+            selector_ids[selector] = selector_id
+            writer.emit_fact("constraint_selector", _quote(selector_id), _quote(selector))
+        return selector_id
+
+    def _selector_arg(position: int) -> str | None:
+        if position >= len(args):
+            _skip(f"{constraint_name} is missing selector argument {position + 1}")
+            return None
+        raw_value = args[position]
+        if not isinstance(raw_value, str):
+            _skip(f"{constraint_name} expects selector argument {position + 1}")
+            return None
+        selector = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+        if not selector:
+            _skip(f"{constraint_name} has an empty selector argument")
+            return None
+        if selector not in allowed_selectors:
+            _skip(f"unknown selector {selector}")
+            return None
+        return selector
+
+    def _int_arg(position: int, *, minimum: int | None = None) -> int | None:
+        if position >= len(args):
+            _skip(f"{constraint_name} is missing integer argument {position + 1}")
+            return None
+        raw_value = args[position]
+        if not isinstance(raw_value, int):
+            _skip(f"{constraint_name} expects integer argument {position + 1}")
+            return None
+        if minimum is not None and raw_value < minimum:
+            _skip(
+                f"{constraint_name} expects argument {position + 1} >= {minimum}"
+            )
+            return None
+        return raw_value
+
+    if constraint_name == "use_m":
+        if len(args) != 1:
+            _skip("use_m expects 1 selector")
+            return
+        selector = _selector_arg(0)
+        if selector is not None:
+            writer.emit_fact("must_use", _quote(selector))
+        return
+
+    if constraint_name == "nuse_m":
+        if len(args) != 1:
+            _skip("nuse_m expects 1 selector")
+            return
+        selector = _selector_arg(0)
+        if selector is not None:
+            writer.emit_fact("must_not_use", _quote(selector))
+        return
+
+    if constraint_name == "unique_inputs":
+        if len(args) != 1:
+            _skip("unique_inputs expects 1 selector")
+            return
+        selector = _selector_arg(0)
+        if selector is not None:
+            writer.emit_fact(
+                "constraint_unique_inputs",
+                _quote(_selector_id_for(selector)),
+            )
+        return
+
+    if constraint_name == "first_m":
+        if len(args) != 1:
+            _skip("first_m expects 1 selector")
+            return
+        selector = _selector_arg(0)
+        if selector is not None:
+            writer.emit_fact(
+                "constraint_first",
+                _quote(_selector_id_for(selector)),
+            )
+        return
+
+    if constraint_name == "not_consecutive":
+        if len(args) != 1:
+            _skip("not_consecutive expects 1 selector")
+            return
+        selector = _selector_arg(0)
+        if selector is not None:
+            writer.emit_fact(
+                "constraint_not_consecutive",
+                _quote(_selector_id_for(selector)),
+            )
+        return
+
+    if constraint_name == "at_step":
+        if len(args) != 2:
+            _skip("at_step expects selector and step")
+            return
+        selector = _selector_arg(0)
+        step = _int_arg(1, minimum=1)
+        if step is not None and selector is not None:
+            writer.emit_fact(
+                "constraint_tool_at_step",
+                str(step),
+                _quote(_selector_id_for(selector)),
+            )
+        return
+
+    if constraint_name == "max_uses":
+        if len(args) != 2:
+            _skip("max_uses expects selector and limit")
+            return
+        selector = _selector_arg(0)
+        limit = _int_arg(1, minimum=0)
+        if selector is not None and limit is not None:
+            writer.emit_fact(
+                "constraint_max_uses",
+                _quote(_selector_id_for(selector)),
+                str(limit),
+            )
+        return
+
+    if len(args) != 2:
+        _skip(f"{constraint_name} expects 2 selectors")
+        return
+
+    selector_a = _selector_arg(0)
+    selector_b = _selector_arg(1)
+    if selector_a is None or selector_b is None:
+        return
+
+    selector_a_id = _quote(_selector_id_for(selector_a))
+    selector_b_id = _quote(_selector_id_for(selector_b))
+    if constraint_name == "ite_m":
+        writer.emit_fact("constraint_implies_future", selector_a_id, selector_b_id)
+    elif constraint_name == "depend_m":
+        writer.emit_fact("constraint_depends_prior", selector_a_id, selector_b_id)
+    elif constraint_name == "itn_m":
+        writer.emit_fact("constraint_forbid_later", selector_a_id, selector_b_id)
+    elif constraint_name == "next_m":
+        writer.emit_fact("constraint_next", selector_a_id, selector_b_id)
+    elif constraint_name == "used_iff_used":
+        writer.emit_fact("constraint_used_iff_used", selector_a_id, selector_b_id)
+    elif constraint_name == "mutex_tools":
+        writer.emit_fact("constraint_mutex", selector_a_id, selector_b_id)
+    elif constraint_name == "connected_op":
+        writer.emit_fact("constraint_connected", selector_a_id, selector_b_id)
+    else:
+        _skip(f"unsupported constraint {constraint_name}")
+
+
+def _emit_lazy_template_constraints(
+    writer: _FactWriter,
+    *,
+    config: SnakeConfig,
+    constraints_path,
+    constraints: list[Mapping[str, Any]],
+    allowed_selectors: set[str],
+    selector_ids: dict[str, str],
+) -> None:
+    writer.emit_comment(
+        f"lazy constraint translation from {constraints_path.name}"
+    )
+
+    for index, raw_constraint in enumerate(constraints):
+        constraint_id = str(raw_constraint.get("constraintid", "")).strip()
+        if not constraint_id:
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: missing constraintid"
+            )
+            continue
+        if constraint_id == "SLTLx":
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: SLTLx is unsupported"
+            )
+            continue
+        if constraint_id not in _LAZY_SUPPORTED_CONSTRAINTS:
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: unsupported template {constraint_id}"
+            )
+            continue
+
+        raw_parameters = raw_constraint.get("parameters") or []
+        try:
+            selectors = tuple(
+                _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+                for parameter in raw_parameters
+            )
+        except ValueError as exc:
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: invalid parameters ({exc})"
+            )
+            continue
+
+        _emit_lazy_constraint(
+            writer,
+            config=config,
+            constraint_name=constraint_id,
+            args=selectors,
+            allowed_selectors=allowed_selectors,
+            selector_ids=selector_ids,
+            source_name=constraints_path.name,
+            index=index,
+        )
+
+
+def _emit_lazy_native_constraints(
+    writer: _FactWriter,
+    *,
+    config: SnakeConfig,
+    constraints_path,
+    constraints: list[str],
+    allowed_selectors: set[str],
+    selector_ids: dict[str, str],
+) -> None:
+    writer.emit_comment(
+        f"lazy native constraint translation from {constraints_path.name}"
+    )
+
+    for index, raw_constraint in enumerate(constraints):
+        if not isinstance(raw_constraint, str):
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: expected atom string"
+            )
+            continue
+        try:
+            constraint_name, args = _parse_constraint_atom(raw_constraint)
+        except ValueError as exc:
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: invalid atom ({exc})"
+            )
+            continue
+        if constraint_name not in _LAZY_NATIVE_CONSTRAINTS:
+            writer.emit_comment(
+                f"skipping {constraints_path.name} constraint {index}: unsupported native atom {constraint_name}"
+            )
+            continue
+        _emit_lazy_constraint(
+            writer,
+            config=config,
+            constraint_name=constraint_name,
+            args=args,
+            allowed_selectors=allowed_selectors,
+            selector_ids=selector_ids,
+            source_name=constraints_path.name,
+            index=index,
+        )
+
+
+def _load_lazy_constraints(config: SnakeConfig) -> tuple[object, list[Any], str] | None:
+    constraints_path = config.constraints_path
+    if constraints_path is None or not constraints_path.exists():
+        return None
+
+    with constraints_path.open("r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+
+    constraints = raw.get("constraints", [])
+    if not constraints:
+        return None
+
+    has_strings = any(isinstance(entry, str) for entry in constraints)
+    has_mappings = any(isinstance(entry, Mapping) for entry in constraints)
+    if has_strings and has_mappings:
+        raise ValueError(
+            f"{constraints_path} mixes native atom strings and APE-style constraint objects"
+        )
+    if has_strings:
+        if not all(isinstance(entry, str) for entry in constraints):
+            raise ValueError(
+                f"{constraints_path} contains unsupported native constraint entries"
+            )
+        return constraints_path, list(constraints), "native"
+    if has_mappings:
+        if not all(isinstance(entry, Mapping) for entry in constraints):
+            raise ValueError(
+                f"{constraints_path} contains unsupported APE-style constraint entries"
+            )
+        return constraints_path, list(constraints), "template"
+    raise ValueError(
+        f"{constraints_path} must contain either native atom strings or APE-style constraint objects"
+    )
+
+
+def _emit_lazy_constraints(
+    writer: _FactWriter,
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> None:
+    allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    selector_ids: dict[str, str] = {}
+    loaded_constraints = _load_lazy_constraints(config)
+    if loaded_constraints is None:
+        return
+
+    constraints_path, constraints, constraint_kind = loaded_constraints
+    if constraint_kind == "template":
+        _emit_lazy_template_constraints(
+            writer,
+            config=config,
+            constraints_path=constraints_path,
+            constraints=constraints,
+            allowed_selectors=allowed_selectors,
+            selector_ids=selector_ids,
+        )
+    else:
+        _emit_lazy_native_constraints(
+            writer,
+            config=config,
+            constraints_path=constraints_path,
+            constraints=constraints,
+            allowed_selectors=allowed_selectors,
+            selector_ids=selector_ids,
+        )
+
+
 def _lazy_port_expansion(
     resolver: _ExpansionResolver,
     dims: Mapping[str, tuple[str, ...]],
@@ -428,111 +878,13 @@ def _compress_lazy_output_choice_values(
     return compressed
 
 
-def build_fact_bundle_grounding_opt(
-    config: SnakeConfig,
-    ontology: Ontology,
-    tools: tuple[ToolMode, ...],
-) -> FactBundle:
-    """Build a solver-ready fact bundle using the grounding-optimised candidate schema.
-
-    Each (tool, input_variant, output_variant) triple is pre-expanded to a flat
-    ``tool_candidate`` fact with ``candidate_in`` / ``candidate_out`` facts carrying
-    fully-resolved terminal dimension values.  This eliminates the multi-layer choice
-    rules and the ``compatible/2`` join from the eligibility check in the ASP encoding.
-    """
-    writer = _FactWriter()
-    roots = _build_common_facts(writer, config, ontology, tools)
-    resolver = _ExpansionResolver(ontology, roots, "python")
-    tool_labels = {tool.mode_id: tool.label for tool in tools}
-    tool_input_signatures = _tool_input_signatures(tools)
-    tool_stats: list[ToolExpansionStat] = []
-
-    _cand_offset: dict[str, int] = defaultdict(int)
-
-    for tool in tools:
-        input_port_variants = tuple(
-            tuple(
-                resolver.iter_dimension_maps(
-                    _normalize_dim_map(port.dimensions),
-                    expand_outputs=False,
-                )
-            )
-            for port in tool.inputs
-        )
-        output_port_variants = tuple(
-            tuple(
-                resolver.iter_dimension_maps(
-                    _normalize_dim_map(port.dimensions),
-                    expand_outputs=True,
-                )
-            )
-            for port in tool.outputs
-        )
-        input_variant_count = _product(len(variants) for variants in input_port_variants) if input_port_variants else 1
-        output_variant_count = _product(len(variants) for variants in output_port_variants) if output_port_variants else 1
-        tool_stats.append(
-            ToolExpansionStat(
-                tool_id=tool.mode_id,
-                tool_label=tool.label,
-                input_ports=len(tool.inputs),
-                output_ports=len(tool.outputs),
-                input_variant_count=input_variant_count,
-                output_variant_count=output_variant_count,
-                candidate_count=input_variant_count * output_variant_count,
-            )
-        )
-
-        base = _cand_offset[tool.mode_id]
-        counter = 0
-        input_variant_iter = product(*input_port_variants) if input_port_variants else [()]
-        for port_specs in input_variant_iter:
-            for out_combo in (product(*output_port_variants) if output_port_variants else [()]):
-                cand_id = f"{tool.mode_id}_c{base + counter}"
-                counter += 1
-                writer.emit_fact("tool_candidate", _quote(cand_id), _quote(tool.mode_id))
-                for port_idx, dims in enumerate(port_specs):
-                    for dim, value in sorted(dims.items()):
-                        writer.emit_fact(
-                            "candidate_in",
-                            _quote(cand_id),
-                            str(port_idx),
-                            _quote(value),
-                            _quote(dim),
-                        )
-                # out_combo is () (empty tuple) when the tool has no outputs,
-                # otherwise a tuple of per-output-port dim dicts.
-                for out_idx, out_dims in enumerate(out_combo):
-                    for dim, value in sorted(out_dims.items()):
-                        writer.emit_fact(
-                            "candidate_out",
-                            _quote(cand_id),
-                            str(out_idx),
-                            _quote(value),
-                            _quote(dim),
-                        )
-        _cand_offset[tool.mode_id] += counter
-
-    workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
-    facts = writer.text()
-
-    return FactBundle(
-        facts=facts,
-        fact_count=writer.fact_count,
-        tool_labels=tool_labels,
-        tool_input_signatures=tool_input_signatures,
-        workflow_input_ids=tuple(workflow_input_ids),
-        goal_count=len(config.outputs),
-        predicate_counts=dict(writer.predicate_counts),
-        tool_stats=tuple(tool_stats),
-        cache_stats={**ontology.cache_stats(), **resolver.stats()},
-        emit_stats=writer.stats(),
-    )
-
 
 def build_fact_bundle_grounding_opt_lazy(
     config: SnakeConfig,
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
+    *,
+    mode: str | None = None,
 ) -> FactBundle:
     """Build a diagnostic lazy candidate bundle without full variant expansion."""
     roots = _build_roots(config, ontology)
@@ -817,6 +1169,7 @@ def build_fact_bundle_grounding_opt_lazy(
 
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
+    _emit_lazy_constraints(writer, config, ontology, relevant_tools)
     tool_labels = {tool.mode_id: tool.label for tool in relevant_tools}
     tool_input_signatures = _tool_input_signatures(relevant_tools)
 
@@ -1127,6 +1480,7 @@ def build_fact_bundle(
         _output_offset[tool.mode_id] += len(output_port_variants)
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
+    _emit_lazy_constraints(writer, config, ontology, tools)
     facts = writer.text()
 
     return FactBundle(
@@ -1202,6 +1556,7 @@ def build_fact_bundle_ape_multi_shot(
                     )
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
+    _emit_lazy_constraints(writer, config, ontology, tools)
     facts = writer.text()
 
     return FactBundle(

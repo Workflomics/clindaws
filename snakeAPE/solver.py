@@ -107,31 +107,10 @@ def _single_shot_program_paths() -> tuple[Path, ...]:
         base / "constraints.lp",
         base / "tool_taxonomy_logic.lp",
         base / "user_constraints.lp",
+        base / "generated_constraints.lp",
         base / "plan_constraints.lp",
         base / "temporal_constraint.lp",
         base / "tool_inclusion_constraints.lp",
-        base / "input_usage_constraints.lp",
-    )
-
-
-def _single_shot_opt_program_paths() -> tuple[Path, ...]:
-    base = ENCODINGS_ROOT / "single_shot_opt"
-    return (
-        base / "show.lp",
-        base / "pre_compute.lp",
-        base / "propagation.lp",
-        base / "tool_choice.lp",
-        base / "output_production.lp",
-        base / "reachability.lp",
-        base / "goal.lp",
-        base / "usefulness.lp",
-        base / "constraints.lp",
-        base / "tool_taxonomy_logic.lp",
-        base / "user_constraints.lp",
-        base / "plan_constraints.lp",
-        base / "temporal_constraint.lp",
-        base / "tool_inclusion_constraints.lp",
-        base / "tool_repetition_constraints.lp",
         base / "input_usage_constraints.lp",
     )
 
@@ -150,6 +129,7 @@ def _single_shot_lazy_program_paths() -> tuple[Path, ...]:
         base / "constraints.lp",
         base / "tool_taxonomy_logic.lp",
         base / "user_constraints.lp",
+        base / "generated_constraints.lp",
         base / "plan_constraints.lp",
         base / "temporal_constraint.lp",
         base / "tool_inclusion_constraints.lp",
@@ -162,6 +142,7 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
     return (
         base / "base.lp",
         base / "step.lp",
+        base / "constraints.lp",
         base / "check.lp",
         base / "ape_extract.lp",
         base / "tool_inclusion.lp",
@@ -172,18 +153,6 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
     )
 
 
-def _grounding_opt_program_paths() -> tuple[Path, ...]:
-    base = ENCODINGS_ROOT / "multi_shot_opt"
-    return (
-        base / "base.lp",
-        base / "step.lp",
-        base / "check.lp",
-        base / "ape_extract.lp",
-        base / "tool_inclusion.lp",
-        base / "input_usage.lp",
-        base / "output_usage.lp",
-    )
-
 
 def _lazy_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot_lazy"
@@ -193,6 +162,7 @@ def _lazy_program_paths() -> tuple[Path, ...]:
         base / "step_seed.lp",
         base / "step.lp",
         base / "step_query.lp",
+        base / "constraints.lp",
         base / "check.lp",
         base / "ape_extract.lp",
         base / "tool_inclusion.lp",
@@ -206,14 +176,10 @@ def program_paths_for_mode(mode: str) -> tuple[Path, ...]:
 
     if mode == "single-shot":
         return _single_shot_program_paths()
-    if mode == "single-shot-opt":
-        return _single_shot_opt_program_paths()
     if mode == "single-shot-lazy":
         return _single_shot_lazy_program_paths()
     if mode == "multi-shot":
         return _multi_shot_program_paths()
-    if mode == "multi-shot-opt":
-        return _grounding_opt_program_paths()
     if mode == "multi-shot-lazy":
         return _lazy_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")
@@ -306,13 +272,15 @@ def _default_horizon_parts(
     initial_step_program: str | None,
     initial_seed_program: str | None,
 ) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = [("check", (clingo.Number(horizon),))]
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
     if initial_step_program is not None and horizon == 1:
-        parts.insert(0, (initial_step_program, (clingo.Number(horizon),)))
+        parts.append((initial_step_program, (clingo.Number(horizon),)))
     else:
-        parts.insert(0, ("step", (clingo.Number(horizon),)))
         if initial_seed_program is not None and horizon > 1:
-            parts.insert(0, (initial_seed_program, (clingo.Number(horizon - 1),)))
+            parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
+        parts.append(("step", (clingo.Number(horizon),)))
+    parts.append(("constraint_step", (clingo.Number(horizon),)))
+    parts.append(("check", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -330,6 +298,7 @@ def _lazy_horizon_parts(
             parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
         parts.append(("step", (clingo.Number(horizon),)))
         parts.append(("step_query", (clingo.Number(horizon),)))
+    parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
     parts.append(("check_usage", (clingo.Number(horizon),)))
     return tuple(parts)
@@ -653,26 +622,6 @@ def solve_single_shot(
     )
 
 
-def solve_single_shot_opt(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> SolveOutput:
-    """Solve using the optimized candidate single-shot encoding."""
-
-    return _solve_single_shot_with_programs(
-        config,
-        facts,
-        _single_shot_opt_program_paths(),
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=True,
-    )
-
 
 def solve_single_shot_lazy(
     config: SnakeConfig,
@@ -825,30 +774,6 @@ def ground_multi_shot(
     )
 
 
-def solve_multi_shot_grounding_opt(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> SolveOutput:
-    """Solve using the grounding-optimised multi-shot encoding.
-
-    Uses pre-expanded ``tool_candidate`` / ``candidate_in`` / ``candidate_out``
-    facts so the per-step choice rules reduce to a single aggregate constraint,
-    eliminating the ``compatible/2`` join from eligibility checks.
-    """
-    return _solve_multi_shot_with_programs(
-        config,
-        facts,
-        _grounding_opt_program_paths(),
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=True,
-    )
-
 
 def solve_multi_shot_lazy(
     config: SnakeConfig,
@@ -877,30 +802,6 @@ def solve_multi_shot_lazy(
         ),
     )
 
-
-def ground_multi_shot_grounding_opt(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    stage: str = "base",
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> GroundingOutput:
-    """Ground the grounding-optimised multi-shot encoding without solving."""
-
-    control = clingo.Control(["0", "--warn=none"])
-    for program_path in _grounding_opt_program_paths():
-        control.load(str(program_path))
-    control.add("base", [], facts.facts)
-    return _ground_multi_shot_control(
-        control,
-        config,
-        stage=stage,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-    )
 
 
 def ground_multi_shot_lazy(

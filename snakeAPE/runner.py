@@ -27,21 +27,17 @@ from .rendering import render_solution_graphs, write_solution_summary
 from .runtime_stats import current_peak_rss_mb
 from .solver import (
     ground_multi_shot,
-    ground_multi_shot_grounding_opt,
     ground_multi_shot_lazy,
     program_paths_for_mode,
     solve_multi_shot,
-    solve_multi_shot_grounding_opt,
     solve_multi_shot_lazy,
     solve_single_shot,
     solve_single_shot_lazy,
-    solve_single_shot_opt,
 )
 from .tool_annotations import load_tool_annotations
 from .translator import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
-    build_fact_bundle_grounding_opt,
     build_fact_bundle_grounding_opt_lazy,
 )
 from .workflow import reconstruct_solution
@@ -66,11 +62,10 @@ SCHEMA_PREDICATES = (
     "lazy_candidate_output_declared_type",
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
-FULL_VARIANT_TRANSLATION_BUILDER = "candidate_full_variants"
 LAZY_TRANSLATION_BUILDER = "candidate_lazy"
 ProgressCallback = Callable[[str], None] | None
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
-    if mode in {"single-shot-opt", "single-shot-lazy", "multi-shot-opt", "multi-shot-lazy"}:
+    if mode in {"single-shot-lazy", "multi-shot-lazy"}:
         return "python"
     return grounding_strategy
 
@@ -80,8 +75,6 @@ def _solver_family(mode: str) -> str:
 
 
 def _solver_approach(mode: str) -> str:
-    if mode.endswith("-opt"):
-        return "opt"
     if mode.endswith("-lazy"):
         return "lazy"
     return "legacy"
@@ -430,10 +423,6 @@ def _translation_warnings(
     translation_schema = _translation_schema(fact_bundle)
     encoding_presence = encoding_summary["predicate_presence"]
 
-    if mode.endswith("-opt") and translation_schema != "candidate":
-        warnings.append(
-            f"{mode} expects candidate-based translation, but the emitted translation schema is {translation_schema}."
-        )
     if mode.endswith("-lazy") and translation_schema != "lazy_candidate":
         warnings.append(
             f"{mode} expects lazy candidate translation, but the emitted translation schema is {translation_schema}."
@@ -630,29 +619,29 @@ def _prepare_run_context(
     ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
     tools = load_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
-    if translation_builder == FULL_VARIANT_TRANSLATION_BUILDER:
-        if mode not in {"single-shot-opt", "multi-shot-opt"}:
-            raise ValueError("Full-variant translation is supported only for single-shot-opt and multi-shot-opt modes.")
-        fact_bundle = build_fact_bundle_grounding_opt(config, ontology, tools)
-        effective_translation_strategy = "python"
-        resolved_translation_builder = FULL_VARIANT_TRANSLATION_BUILDER
-    elif translation_builder == LAZY_TRANSLATION_BUILDER:
-        if mode not in {"single-shot-opt", "single-shot-lazy", "multi-shot-opt", "multi-shot-lazy"}:
+    if translation_builder == LAZY_TRANSLATION_BUILDER:
+        if mode not in {"single-shot-lazy", "multi-shot-lazy"}:
             raise ValueError(
-                "Lazy candidate translation is supported only for single-shot-opt, single-shot-lazy, multi-shot-opt, and multi-shot-lazy modes."
+                "Lazy candidate translation is supported only for single-shot-lazy and multi-shot-lazy modes."
             )
-        fact_bundle = build_fact_bundle_grounding_opt_lazy(config, ontology, tools)
+        fact_bundle = build_fact_bundle_grounding_opt_lazy(
+            config,
+            ontology,
+            tools,
+            mode=mode,
+        )
         effective_translation_strategy = "python"
         resolved_translation_builder = LAZY_TRANSLATION_BUILDER
     elif translation_builder == RUNTIME_TRANSLATION_BUILDER:
         if mode.endswith("-lazy"):
-            fact_bundle = build_fact_bundle_grounding_opt_lazy(config, ontology, tools)
+            fact_bundle = build_fact_bundle_grounding_opt_lazy(
+                config,
+                ontology,
+                tools,
+                mode=mode,
+            )
             effective_translation_strategy = "python"
             resolved_translation_builder = LAZY_TRANSLATION_BUILDER
-        elif mode.endswith("-opt"):
-            fact_bundle = build_fact_bundle_grounding_opt(config, ontology, tools)
-            effective_translation_strategy = "python"
-            resolved_translation_builder = FULL_VARIANT_TRANSLATION_BUILDER
         elif mode == "multi-shot":
             fact_bundle = build_fact_bundle_ape_multi_shot(config, ontology, tools)
             effective_translation_strategy = "ape_clingo_legacy"
@@ -777,33 +766,6 @@ def run_translate_only(
     )
 
 
-def run_translate_only_full_variants(
-    config_path: str | Path,
-    *,
-    mode: str,
-    grounding_strategy: str,
-    output_dir: str | Path | None = None,
-    solutions: int | None = None,
-    min_length: int | None = None,
-    max_length: int | None = None,
-    summary_top_tools: int = 20,
-    progress_callback: ProgressCallback = None,
-) -> TranslationRunResult:
-    """Run translate-only using the eager full-variant candidate expansion."""
-
-    return run_translate_only(
-        config_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        translation_builder=FULL_VARIANT_TRANSLATION_BUILDER,
-        output_dir=output_dir,
-        solutions=solutions,
-        min_length=min_length,
-        max_length=max_length,
-        summary_top_tools=summary_top_tools,
-        progress_callback=progress_callback,
-    )
-
 
 def run_translate_only_lazy(
     config_path: str | Path,
@@ -892,17 +854,6 @@ def run_once(
             ),
             horizon_record_callback=csv_writers.step_writer.log_horizon,
         )
-    elif mode == "single-shot-opt":
-        solve_output = solve_single_shot_opt(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
     elif mode == "single-shot-lazy":
         solve_output = solve_single_shot_lazy(
             config,
@@ -916,17 +867,6 @@ def run_once(
         )
     elif mode == "multi-shot":
         solve_output = solve_multi_shot(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
-    elif mode == "multi-shot-opt":
-        solve_output = solve_multi_shot_grounding_opt(
             config,
             fact_bundle,
             progress_callback=progress_callback,
@@ -1117,18 +1057,6 @@ def run_ground_only(
             ),
             horizon_record_callback=csv_writers.step_writer.log_horizon,
         )
-    elif mode == "multi-shot-opt":
-        grounding_output = ground_multi_shot_grounding_opt(
-            config,
-            fact_bundle,
-            stage=stage,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
     elif mode == "multi-shot-lazy":
         grounding_output = ground_multi_shot_lazy(
             config,
@@ -1142,7 +1070,7 @@ def run_ground_only(
             horizon_record_callback=csv_writers.step_writer.log_horizon,
         )
     else:
-        raise ValueError("Ground-only runs support only multi-shot, multi-shot-opt, and multi-shot-lazy modes.")
+        raise ValueError("Ground-only runs support only multi-shot and multi-shot-lazy modes.")
 
     _report(
         progress_callback,

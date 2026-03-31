@@ -6,7 +6,6 @@ from .runner import (
     run_ground_only,
     run_once,
     run_translate_only,
-    run_translate_only_full_variants,
     run_translate_only_lazy,
 )
 
@@ -16,6 +15,5 @@ __all__ = [
     "run_ground_only",
     "run_once",
     "run_translate_only",
-    "run_translate_only_full_variants",
     "run_translate_only_lazy",
 ]
