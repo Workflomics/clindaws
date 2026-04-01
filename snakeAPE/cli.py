@@ -178,7 +178,8 @@ def main(argv: list[str] | None = None) -> int:
                 summary_top_tools=args.summary_top_tools,
                 progress_callback=_progress,
             )
-            print(f"Translation written to: {grounding_result.translation_path}")
+            if grounding_result.translation_path is not None:
+                print(f"Translation written to: {grounding_result.translation_path}")
             print(f"Translation summary written to: {grounding_result.translation_summary_path}")
             print(f"Grounding summary written to: {grounding_result.grounding_summary_path}")
             if grounding_result.run_log_path is not None:
@@ -210,7 +211,8 @@ def main(argv: list[str] | None = None) -> int:
                 summary_top_tools=args.summary_top_tools,
                 progress_callback=_progress,
             )
-            print(f"Translation written to: {translation_result.translation_path}")
+            if translation_result.translation_path is not None:
+                print(f"Translation written to: {translation_result.translation_path}")
             print(f"Translation summary written to: {translation_result.translation_summary_path}")
             if translation_result.run_log_path is not None:
                 print(f"Run log written to: {translation_result.run_log_path}")
@@ -235,7 +237,8 @@ def main(argv: list[str] | None = None) -> int:
                 summary_top_tools=args.summary_top_tools,
                 progress_callback=_progress,
             )
-            print(f"Translation written to: {translation_result.translation_path}")
+            if translation_result.translation_path is not None:
+                print(f"Translation written to: {translation_result.translation_path}")
             print(f"Translation summary written to: {translation_result.translation_summary_path}")
             if translation_result.run_log_path is not None:
                 print(f"Run log written to: {translation_result.run_log_path}")
@@ -260,7 +263,8 @@ def main(argv: list[str] | None = None) -> int:
             render_graphs=not args.no_graphs,
             progress_callback=_progress,
         )
-        print(f"Translation written to: {run_result.translation_path}")
+        if run_result.translation_path is not None:
+            print(f"Translation written to: {run_result.translation_path}")
         print(f"Answer sets written to: {run_result.answer_set_path}")
         print(f"Solutions written to: {run_result.solution_summary_path}")
         if run_result.run_log_path is not None:

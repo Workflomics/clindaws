@@ -1150,23 +1150,6 @@ def build_fact_bundle_grounding_opt_lazy(
             if goal_distance <= remaining_steps:
                 allowed_candidates_by_step[step_index].add(candidate_id)
                 allowed_tools_by_step[step_index].add(tool_id)
-    query_support_signatures_by_producer_port: dict[tuple[str, int], set[int]] = defaultdict(set)
-    for producer_candidate, producer_port, consumer_candidate, consumer_port in bindable_pairs:
-        if (
-            producer_candidate not in relevant_candidates
-            or consumer_candidate not in query_goal_candidates
-        ):
-            continue
-        consumer_record = relevant_records_by_candidate[consumer_candidate]
-        consumer_input_port = next(
-            input_port
-            for input_port in tuple(consumer_record["input_ports"])
-            if int(input_port["port_idx"]) == consumer_port
-        )
-        query_support_signatures_by_producer_port[(producer_candidate, producer_port)].add(
-            int(consumer_input_port["signature_id"])
-        )
-
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
     _emit_lazy_constraints(writer, config, ontology, relevant_tools)
@@ -1202,8 +1185,13 @@ def build_fact_bundle_grounding_opt_lazy(
                 bindable_pairs_by_step[step_index].append(
                     (producer_candidate, producer_port, consumer_candidate, consumer_port)
                 )
-    step_support_signatures_by_producer_port: dict[tuple[str, int, int], set[int]] = defaultdict(set)
-    for step_index, step_pairs in bindable_pairs_by_step.items():
+    # Collapse per-step signature sets into a single step-independent union.
+    # The step filter (consumer allowed at step t) is already enforced in step.lp
+    # via occurs(t, use_lazy_candidate(...)) / lazy_candidate_allowed_at_step, so
+    # emitting a per-step copy of each (producer, port, sig_id, value, dim) tuple
+    # is redundant — one entry per unique combination is sufficient.
+    support_signatures_by_producer_port: dict[tuple[str, int], set[int]] = defaultdict(set)
+    for step_pairs in bindable_pairs_by_step.values():
         for producer_candidate, producer_port, consumer_candidate, consumer_port in step_pairs:
             consumer_record = relevant_records_by_candidate[consumer_candidate]
             consumer_input_port = next(
@@ -1211,8 +1199,8 @@ def build_fact_bundle_grounding_opt_lazy(
                 for input_port in tuple(consumer_record["input_ports"])
                 if int(input_port["port_idx"]) == consumer_port
             )
-            step_support_signatures_by_producer_port[
-                (producer_candidate, producer_port, step_index)
+            support_signatures_by_producer_port[
+                (producer_candidate, producer_port)
             ].add(int(consumer_input_port["signature_id"]))
 
     _t5 = perf_counter()
@@ -1298,55 +1286,28 @@ def build_fact_bundle_grounding_opt_lazy(
                             _quote(dim),
                         )
 
-            # Collect all sig_ids this producer supports (query + all steps).
             output_fset_for_port = output_port["port_values_fset"]
-            all_sig_ids = set(
-                query_support_signatures_by_producer_port.get((candidate_id, port_idx), set())
-            )
-            for _s in range(1, config.solution_length_max + 1):
-                all_sig_ids.update(
-                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, _s), set())
-                )
+            sig_ids = support_signatures_by_producer_port.get((candidate_id, port_idx), set())
             # Pre-compute matching output values per (sig_id, dim) using set intersection.
-            # compat_by_sig_dim[(sig_id, dim)] is the union of ancestors_of(req) for all
-            # required values, so intersecting with output values gives exactly the facts
-            # we would emit in the original O(values × required_values) loop.
             matching_by_sig_dim: dict[tuple[int, str], frozenset[str]] = {}
-            for sig_id in all_sig_ids:
+            for sig_id in sig_ids:
                 for dim, out_fset in output_fset_for_port.items():
                     if dim in signature_requirements_by_id[sig_id]:
                         matches = out_fset & compat_by_sig_dim.get((sig_id, dim), frozenset())
                         if matches:
                             matching_by_sig_dim[(sig_id, dim)] = matches
 
-            for signature_id in sorted(
-                query_support_signatures_by_producer_port.get((candidate_id, port_idx), set())
-            ):
+            for signature_id in sorted(support_signatures_by_producer_port.get((candidate_id, port_idx), set())):
                 for dim in sorted(output_fset_for_port):
                     for value in sorted(matching_by_sig_dim.get((signature_id, dim), frozenset())):
                         writer.emit_fact(
-                            "lazy_query_bound_output_support",
+                            "lazy_bound_output_support",
                             _quote(candidate_id),
                             str(port_idx),
                             str(signature_id),
                             _quote(value),
                             _quote(dim),
                         )
-            for step_index in range(1, config.solution_length_max + 1):
-                for signature_id in sorted(
-                    step_support_signatures_by_producer_port.get((candidate_id, port_idx, step_index), set())
-                ):
-                    for dim in sorted(output_fset_for_port):
-                        for value in sorted(matching_by_sig_dim.get((signature_id, dim), frozenset())):
-                            writer.emit_fact(
-                                "lazy_step_bound_output_support",
-                                _quote(candidate_id),
-                                str(port_idx),
-                                str(signature_id),
-                                _quote(value),
-                                _quote(dim),
-                                str(step_index),
-                            )
 
     for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
@@ -1358,17 +1319,6 @@ def build_fact_bundle_grounding_opt_lazy(
             _quote(consumer_candidate),
             str(consumer_port),
         )
-    for step_index, step_pairs in sorted(bindable_pairs_by_step.items()):
-        for producer_candidate, producer_port, consumer_candidate, consumer_port in step_pairs:
-            writer.emit_fact(
-                "lazy_candidate_port_bindable_at_step",
-                _quote(producer_candidate),
-                str(producer_port),
-                _quote(consumer_candidate),
-                str(consumer_port),
-                str(step_index),
-            )
-
     _t6 = perf_counter()
     print(
         f"  lazy builder phases: "

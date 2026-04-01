@@ -20,7 +20,7 @@ occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))) :
         occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
         TPrev < t,
-        lazy_candidate_port_bindable_at_step(ProducerCandidate, ProducerPort, Candidate, Port, t)
+        lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port)
 } 1 :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_input_port(Candidate, Port).
@@ -31,7 +31,7 @@ bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, Produ
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
     artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
-    lazy_step_bound_output_support(ProducerCandidate, ProducerPort, SignatureId, ActualV, Category, t).
+    lazy_bound_output_support(ProducerCandidate, ProducerPort, SignatureId, ActualV, Category).
 
 :- occurs(t, use_lazy_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),

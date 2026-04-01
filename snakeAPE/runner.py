@@ -145,6 +145,7 @@ class _RunLogWriter:
 
     fieldnames = [
         "test",
+        "mode",
         "horizon",
         "setup_grounding_ms",
         "solving_ms",
@@ -170,6 +171,7 @@ class _RunLogWriter:
         self.cumulative_unique_solutions = 0
         self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
         self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
+        self.mode = mode
         self.base_grounding_ms = 0
         self.base_grounding_peak_rss_mb = 0.0
         _ensure_csv_header(self.csv_path, self.fieldnames)
@@ -196,6 +198,7 @@ class _RunLogWriter:
         self._write_row(
             {
                 "test": self.test_name,
+                "mode": self.mode,
                 "horizon": record.horizon,
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
@@ -489,7 +492,7 @@ def _translation_summary_payload(
     translation_builder: TranslationBuilder,
     effective_translation_strategy: str,
     fact_bundle,
-    translation_path: Path,
+    translation_path: Path | None,
     translation_sec: float,
     summary_top_tools: int,
 ) -> dict[str, object]:
@@ -518,7 +521,7 @@ def _translation_summary_payload(
         "tool_count": len(fact_bundle.tool_stats),
         "goal_count": fact_bundle.goal_count,
         "workflow_input_count": len(fact_bundle.workflow_input_ids),
-        "translation_path": str(translation_path),
+        "translation_path": str(translation_path) if translation_path else None,
         "translation_sec": translation_sec,
         "predicate_counts": dict(sorted(fact_bundle.predicate_counts.items())),
         "translation_cache_stats": dict(sorted(fact_bundle.cache_stats.items())),
@@ -560,7 +563,7 @@ def _write_translation_summary(
     translation_builder: TranslationBuilder,
     effective_translation_strategy: str,
     fact_bundle,
-    translation_path: Path,
+    translation_path: Path | None,
     translation_sec: float,
     summary_top_tools: int,
 ) -> tuple[Path, dict[str, object]]:
@@ -571,7 +574,7 @@ def _write_translation_summary(
         translation_builder=translation_builder,
         effective_translation_strategy=effective_translation_strategy,
         fact_bundle=fact_bundle,
-        translation_path=translation_path,
+        translation_path=None,
         translation_sec=translation_sec,
         summary_top_tools=summary_top_tools,
     )
@@ -714,8 +717,6 @@ def run_translate_only(
         translation_peak_rss_mb=translation_peak_rss_mb,
     )
 
-    translation_path = solution_dir / "translation.lp"
-    translation_path.write_text(fact_bundle.facts, encoding="utf-8")
     translation_summary_path, _ = _write_translation_summary(
         solution_dir=solution_dir,
         mode=mode,
@@ -723,7 +724,7 @@ def run_translate_only(
         translation_builder=resolved_translation_builder,
         effective_translation_strategy=effective_translation_strategy,
         fact_bundle=fact_bundle,
-        translation_path=translation_path,
+        translation_path=None,
         translation_sec=translation_sec,
         summary_top_tools=summary_top_tools,
     )
@@ -759,7 +760,7 @@ def run_translate_only(
             rendering_sec=0.0,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
-        translation_path=translation_path,
+        translation_path=None,
         translation_summary_path=translation_summary_path,
         run_log_path=run_log_path,
         run_summary_path=run_summary_path,
@@ -897,8 +898,6 @@ def run_once(
 
     _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
     render_start = perf_counter()
-    translation_path = solution_dir / "translation.lp"
-    translation_path.write_text(fact_bundle.facts, encoding="utf-8")
     answer_set_path = solution_dir / "answer_sets.txt"
     if solve_output.raw_solutions:
         answer_set_path.write_text(
@@ -972,7 +971,7 @@ def run_once(
         base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
         base_grounding_sec=solve_output.base_grounding_sec,
         horizon_records=solve_output.horizon_records,
-        translation_path=translation_path,
+        translation_path=None,
         answer_set_path=answer_set_path,
         solution_summary_path=summary_path,
         graph_paths=tuple(graph_paths),
@@ -1031,8 +1030,6 @@ def run_ground_only(
         translation_peak_rss_mb=translation_peak_rss_mb,
     )
 
-    translation_path = solution_dir / "translation.lp"
-    translation_path.write_text(fact_bundle.facts, encoding="utf-8")
     translation_summary_path, translation_summary = _write_translation_summary(
         solution_dir=solution_dir,
         mode=mode,
@@ -1040,7 +1037,7 @@ def run_ground_only(
         translation_builder=translation_builder,
         effective_translation_strategy=effective_translation_strategy,
         fact_bundle=fact_bundle,
-        translation_path=translation_path,
+        translation_path=None,
         translation_sec=translation_sec,
         summary_top_tools=summary_top_tools,
     )
@@ -1085,7 +1082,7 @@ def run_ground_only(
                 "grounding_strategy": grounding_strategy,
                 "stage": stage,
                 "fact_count": fact_bundle.fact_count,
-                "translation_path": str(translation_path),
+        "translation_path": None,
                 "translation_summary_path": str(translation_summary_path),
                 "grounded_horizons": list(grounding_output.grounded_horizons),
                 "translation_peak_rss_mb": translation_peak_rss_mb,
@@ -1137,7 +1134,7 @@ def run_ground_only(
         base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
         base_grounding_sec=grounding_output.base_grounding_sec,
         horizon_records=grounding_output.horizon_records,
-        translation_path=translation_path,
+        translation_path=None,
         translation_summary_path=translation_summary_path,
         grounding_summary_path=grounding_summary_path,
         grounded_horizons=grounding_output.grounded_horizons,

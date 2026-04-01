@@ -207,7 +207,7 @@ class RunResult:
     base_grounding_peak_rss_mb: float
     base_grounding_sec: float
     horizon_records: tuple[HorizonRecord, ...]
-    translation_path: Path
+    translation_path: Path | None
     answer_set_path: Path
     solution_summary_path: Path
     graph_paths: tuple[Path, ...]
@@ -231,7 +231,7 @@ class GroundingRunResult:
     base_grounding_peak_rss_mb: float
     base_grounding_sec: float
     horizon_records: tuple[HorizonRecord, ...]
-    translation_path: Path
+    translation_path: Path | None
     translation_summary_path: Path
     grounding_summary_path: Path
     grounded_horizons: tuple[int, ...]
@@ -251,7 +251,7 @@ class TranslationRunResult:
     fact_bundle: FactBundle
     timings: TimingBreakdown
     translation_peak_rss_mb: float
-    translation_path: Path
+    translation_path: Path | None
     translation_summary_path: Path
     run_log_path: Path | None = None
     run_summary_path: Path | None = None
