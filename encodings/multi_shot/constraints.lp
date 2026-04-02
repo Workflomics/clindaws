@@ -13,6 +13,9 @@
 %   constraint_used_iff_used(SelA_ID, SelB_ID)
 %   constraint_mutex(SelA_ID, SelB_ID)
 %   constraint_connected(SelA_ID, SelB_ID)
+%   constraint_data_selector(DataSelID, DataSelectorValue)
+%   constraint_use_data(DataSelID)
+%   constraint_operation_input(ModuleSelID, DataSelID)
 %   must_use(Selector)      -- handled by tool_inclusion.lp
 %   must_not_use(Selector)  -- handled by tool_inclusion.lp
 
@@ -34,6 +37,26 @@ constraint_selected_tool(t, Sel, Tool) :-
 
 constraint_selected_time(t, Sel) :-
     constraint_selected_tool(t, Sel, _).
+
+constraint_artifact_dim(WF, V, Cat) :-
+    holds(0, avail(WF)),
+    holds(0, dim(WF, V, Cat)).
+
+constraint_artifact_dim(out(t, Tool, Port), V, Cat) :-
+    occurs(t, output(Tool, _, Port)),
+    holds(t, dim(out(t, Tool, Port), V, Cat)).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Actual),
+    constraint_artifact_dim(WF, Actual, _).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Wanted),
+    constraint_artifact_dim(WF, Actual, _),
+    ancestor(Actual, Wanted).
+
+constraint_used_data(Sel) :-
+    constraint_artifact_matches_selector(_, Sel).
 
 % Integrity constraints checked at each horizon.
 % All rules are guarded by query(t) so they only fire when the solver
@@ -131,3 +154,19 @@ constraint_selected_time(t, Sel) :-
    occurs(T, bind(Tool, P1, WF)),
    occurs(T, bind(Tool, P2, WF)),
    P1 != P2.
+
+% use_t: some artifact in the workflow must carry the selected data value.
+:- query(t),
+   constraint_use_data(Sel),
+   not constraint_used_data(Sel).
+
+% operation_input: a matching tool run must bind an artifact carrying the
+% selected data value.
+:- query(t),
+   constraint_operation_input(ModuleSel, DataSel),
+   #count {
+       T, Tool, WF :
+           constraint_selected_tool(T, ModuleSel, Tool),
+           occurs(T, bind(Tool, _, WF)),
+           constraint_artifact_matches_selector(WF, DataSel)
+   } = 0.

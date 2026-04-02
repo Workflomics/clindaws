@@ -208,11 +208,13 @@ class RunResult:
     base_grounding_sec: float
     horizon_records: tuple[HorizonRecord, ...]
     translation_path: Path | None
-    answer_set_path: Path
-    solution_summary_path: Path
+    answer_set_path: Path | None
+    solution_summary_path: Path | None
     graph_paths: tuple[Path, ...]
     raw_answer_sets_found: int = 0
     unique_solutions_found: int = 0
+    timed_out: bool = False
+    completed_stage: str = "run"
     run_log_path: Path | None = None
     run_summary_path: Path | None = None
 
@@ -271,6 +273,7 @@ class BenchmarkRecord:
     fact_count: int
     solutions_found: int
     raw_solutions_found: int
+    timed_out: bool
     lengths: tuple[int, ...]
     repetition: int
 

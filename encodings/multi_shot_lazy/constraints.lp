@@ -13,8 +13,29 @@
 %   constraint_used_iff_used(SelA_ID, SelB_ID)
 %   constraint_mutex(SelA_ID, SelB_ID)
 %   constraint_connected(SelA_ID, SelB_ID)
+%   constraint_data_selector(DataSelID, DataSelectorValue)
+%   constraint_use_data(DataSelID)
+%   constraint_operation_input(ModuleSelID, DataSelID)
 %   must_use(Selector)      -- handled by tool_inclusion.lp
 %   must_not_use(Selector)  -- handled by tool_inclusion.lp
+
+% Data-selector helpers are global: artifact_dim/3 already accumulates across
+% steps, so these heads must live in the base program rather than an
+% incremental block.
+constraint_artifact_dim(WF, V, Cat) :-
+    artifact_dim(WF, V, Cat).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Actual),
+    constraint_artifact_dim(WF, Actual, _).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Wanted),
+    constraint_artifact_dim(WF, Actual, _),
+    ancestor(Actual, Wanted).
+
+constraint_used_data(Sel) :-
+    constraint_artifact_matches_selector(_, Sel).
 
 % Per-step selector resolution.
 % Grounded once per horizon; constraint_selected_tool(T, Sel, Tool) and
@@ -131,3 +152,19 @@ constraint_selected_time(t, Sel) :-
    occurs(T, bind(Tool, P1, WF)),
    occurs(T, bind(Tool, P2, WF)),
    P1 != P2.
+
+% use_t: some artifact in the workflow must carry the selected data value.
+:- query(t),
+   constraint_use_data(Sel),
+   not constraint_used_data(Sel).
+
+% operation_input: a matching tool run must bind an artifact carrying the
+% selected data value.
+:- query(t),
+   constraint_operation_input(ModuleSel, DataSel),
+   #count {
+       T, Tool, WF :
+           constraint_selected_tool(T, ModuleSel, Tool),
+           occurs(T, bind(Tool, _, WF)),
+           constraint_artifact_matches_selector(WF, DataSel)
+   } = 0.

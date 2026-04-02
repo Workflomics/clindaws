@@ -481,6 +481,8 @@ def _solve_multi_shot_with_programs(
                 if unique_collected and not solve_all_horizons and stop_on_solution:
                     break
                 horizon += 1
+    except KeyboardInterrupt:
+        _report(progress_callback, "Interrupted/timeout: returning partial results.")
     finally:
         control.cleanup()
 
@@ -531,6 +533,7 @@ def _solve_single_shot_with_programs(
         control.add("base", [], f"time(1..{horizon}).\n")
         control.add("base", [], _single_shot_overlay(horizon))
 
+        _horizon_interrupted = False
         try:
             with _interrupt_guard(control) as is_interrupted:
                 if horizon == config.solution_length_min:
@@ -612,9 +615,14 @@ def _solve_single_shot_with_programs(
                     f"unique workflows stored={unique_workflows_stored}, "
                     f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
                 )
+        except KeyboardInterrupt:
+            _report(progress_callback, "Interrupted/timeout: returning partial results.")
+            _horizon_interrupted = True
         finally:
             control.cleanup()
 
+        if _horizon_interrupted:
+            break
         if unique_solutions and not solve_all_horizons:
             break
         horizon += 1
@@ -630,6 +638,128 @@ def _solve_single_shot_with_programs(
     )
 
 
+def _solve_single_shot_once(
+    config: SnakeConfig,
+    facts: FactBundle,
+    program_paths: tuple[Path, ...],
+    *,
+    progress_callback: ProgressCallback = None,
+    base_grounding_callback: BaseGroundingCallback = None,
+    horizon_record_callback: HorizonRecordCallback = None,
+) -> SolveOutput:
+    """Ground once with time(1..max_length) and solve in a single shot."""
+
+    raw_solutions: list[tuple[clingo.Symbol, ...]] = []
+    unique_solutions: list[tuple[clingo.Symbol, ...]] = []
+    stored_unique_keys: set[tuple[object, ...]] = set()
+    tool_labels = dict(facts.tool_labels)
+    tool_input_signatures = dict(facts.tool_input_signatures)
+    horizon = config.solution_length_max
+
+    static_overlay = (
+        SINGLE_SHOT_OVERLAY_PREFIX
+        + ":- time(T), 2 { occurs(T, run(_)) }.\n"
+    )
+
+    control = clingo.Control(["0", "--warn=none"])
+    for program_path in program_paths:
+        control.load(str(program_path))
+    control.add("base", [], facts.facts)
+    control.add("base", [], f"time(1..{horizon}).\n")
+    control.add("base", [], static_overlay)
+
+    ground_elapsed = 0.0
+    solve_elapsed = 0.0
+    base_grounding_peak_rss_mb = 0.0
+    models_seen = 0
+    models_stored = 0
+    unique_workflows_seen = 0
+    unique_workflows_stored = 0
+
+    try:
+        with _interrupt_guard(control) as is_interrupted:
+            _report(progress_callback, "Step 2: grounding started.")
+            _report(progress_callback, f"Grounding: single-shot (time 1..{horizon})...")
+            start = perf_counter()
+            _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
+            ground_elapsed = perf_counter() - start
+            base_grounding_peak_rss_mb = current_peak_rss_mb()
+            if base_grounding_callback is not None:
+                base_grounding_callback(ground_elapsed, base_grounding_peak_rss_mb)
+            _report(
+                progress_callback,
+                f"Grounding progress: single-shot finished after {ground_elapsed:.3f}s.",
+            )
+
+            _report(progress_callback, "Step 3: solving started.")
+            _report(progress_callback, "Solving: single-shot...")
+            seen_unique_keys: set[tuple[object, ...]] = set()
+            start = perf_counter()
+
+            def _solve() -> None:
+                nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
+                with control.solve(yield_=True) as handle:
+                    for model in handle:
+                        models_seen += 1
+                        shown = canonicalize_shown_symbols(
+                            model.symbols(shown=True),
+                            tool_input_signatures,
+                        )
+                        solution = reconstruct_solution(0, shown, tool_labels)
+                        canonical_key = solution.canonical_key
+                        if canonical_key not in seen_unique_keys:
+                            seen_unique_keys.add(canonical_key)
+                            unique_workflows_seen += 1
+                        if len(raw_solutions) < config.solutions:
+                            raw_solutions.append(shown)
+                            models_stored += 1
+                        if canonical_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
+                            stored_unique_keys.add(canonical_key)
+                            unique_solutions.append(shown)
+                            unique_workflows_stored += 1
+                        if len(unique_solutions) >= config.solutions:
+                            break
+
+            _run_interruptible(_solve, is_interrupted)
+            solve_elapsed = perf_counter() - start
+            _report(
+                progress_callback,
+                f"Solving progress: single-shot finished after {solve_elapsed:.3f}s, "
+                f"raw models seen={models_seen}, raw models stored={models_stored}, "
+                f"unique workflows seen={unique_workflows_seen}, "
+                f"unique workflows stored={unique_workflows_stored}, "
+                f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
+            )
+    except KeyboardInterrupt:
+        _report(progress_callback, "Interrupted/timeout: returning partial results.")
+    finally:
+        control.cleanup()
+
+    record = HorizonRecord(
+        horizon=horizon,
+        grounding_sec=ground_elapsed,
+        solving_sec=solve_elapsed,
+        peak_rss_mb=base_grounding_peak_rss_mb,
+        satisfiable=models_seen > 0,
+        models_seen=models_seen,
+        models_stored=models_stored,
+        unique_workflows_seen=unique_workflows_seen,
+        unique_workflows_stored=unique_workflows_stored,
+    )
+    if horizon_record_callback is not None:
+        horizon_record_callback(record)
+
+    return SolveOutput(
+        raw_solutions=tuple(raw_solutions),
+        solutions=tuple(unique_solutions),
+        base_grounding_peak_rss_mb=base_grounding_peak_rss_mb,
+        base_grounding_sec=ground_elapsed,
+        grounding_sec=ground_elapsed,
+        solving_sec=solve_elapsed,
+        horizon_records=(record,),
+    )
+
+
 def solve_single_shot(
     config: SnakeConfig,
     facts: FactBundle,
@@ -638,18 +768,16 @@ def solve_single_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
 ) -> SolveOutput:
-    """Solve using the legacy single-shot encoding by iterating horizons."""
+    """Solve using the single-shot encoding: ground once for max horizon, solve once."""
 
-    return _solve_single_shot_with_programs(
+    return _solve_single_shot_once(
         config,
         facts,
         _single_shot_program_paths(),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=True,
     )
-
 
 
 def solve_single_shot_lazy(
@@ -660,16 +788,15 @@ def solve_single_shot_lazy(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
 ) -> SolveOutput:
-    """Solve using the lazy candidate single-shot encoding."""
+    """Solve using the lazy candidate single-shot encoding: ground once, solve once."""
 
-    return _solve_single_shot_with_programs(
+    return _solve_single_shot_once(
         config,
         facts,
         _single_shot_lazy_program_paths(),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=True,
     )
 
 

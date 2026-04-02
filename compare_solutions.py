@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -147,7 +148,15 @@ def load_tool_catalog(config_path: Path | None) -> dict[str, str]:
     if config_path is None or not config_path.exists():
         return {}
 
-    config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    try:
+        config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"WARNING: Failed to load comparison config {config_path}: {exc}. "
+            "Continuing without tool catalog canonicalization.",
+            file=sys.stderr,
+        )
+        return {}
     raw_tool_path = config_data.get("tool_annotations_path")
     if not raw_tool_path:
         return {}
@@ -156,7 +165,15 @@ def load_tool_catalog(config_path: Path | None) -> dict[str, str]:
     if not tool_path.exists():
         return {}
 
-    tool_data = json.loads(tool_path.read_text(encoding="utf-8"))
+    try:
+        tool_data = json.loads(tool_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"WARNING: Failed to load tool annotations {tool_path}: {exc}. "
+            "Continuing without tool catalog canonicalization.",
+            file=sys.stderr,
+        )
+        return {}
     catalog: dict[str, str] = {}
     for function in tool_data.get("functions", []):
         label = str(function.get("label") or function.get("id") or "").strip()
@@ -467,9 +484,13 @@ def detect_parser_kind(path: Path) -> str:
     head = path.read_text(encoding="utf-8")[:20000]
     if "Answer Set 1" in head or "tool_at_time(" in head or "ape_bind(" in head:
         return "snake-answer-sets"
+    if "No answer sets found." in head:
+        return "snake-answer-sets"
     if "memRef(" in head:
         return "sat-complete"
     if "Workflow" in head or "Tools:" in head or "Solution 1:" in head or "Solution 1\n" in head:
+        return "summary"
+    if "No solutions found." in head:
         return "summary"
     raise ValueError(f"Unable to detect solution format for {path}")
 
@@ -489,6 +510,55 @@ def parse_any(path: Path, config_path: Path | None = None) -> ParsedSolutions:
 
 def format_sequence(sequence: tuple[str, ...]) -> str:
     return " -> ".join(sequence) if sequence else "<empty>"
+
+
+def count_matching_candidates(
+    left_tool_counter: Counter[tuple[str, ...]],
+    right_tool_counter: Counter[tuple[str, ...]],
+) -> int:
+    return sum(
+        min(left_tool_counter[key], right_tool_counter[key])
+        for key in set(left_tool_counter) & set(right_tool_counter)
+    )
+
+
+def build_tool_sequence_differences(
+    left_tool_counter: Counter[tuple[str, ...]],
+    right_tool_counter: Counter[tuple[str, ...]],
+    *,
+    left_name: str,
+    right_name: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    count_differences = []
+    left_only_sequences = []
+    right_only_sequences = []
+
+    for tool_sequence in set(left_tool_counter) | set(right_tool_counter):
+        left_count = left_tool_counter.get(tool_sequence, 0)
+        right_count = right_tool_counter.get(tool_sequence, 0)
+        entry = {
+            "tool_sequence": list(tool_sequence),
+            "tool_sequence_text": format_sequence(tool_sequence),
+        }
+        if left_count and right_count:
+            if left_count != right_count:
+                count_differences.append(
+                    {
+                        **entry,
+                        "delta": abs(left_count - right_count),
+                        left_name: left_count,
+                        right_name: right_count,
+                    }
+                )
+        elif left_count:
+            left_only_sequences.append({**entry, "count": left_count})
+        else:
+            right_only_sequences.append({**entry, "count": right_count})
+
+    count_differences.sort(key=lambda item: (-item["delta"], item["tool_sequence_text"]))
+    left_only_sequences.sort(key=lambda item: (-item["count"], item["tool_sequence_text"]))
+    right_only_sequences.sort(key=lambda item: (-item["count"], item["tool_sequence_text"]))
+    return count_differences, left_only_sequences, right_only_sequences
 
 
 def describe_length_filter(length: int | None) -> str:
@@ -588,26 +658,18 @@ def print_single_summary(parsed: ParsedSolutions, sample_limit: int) -> None:
     print(f"Format: {parsed.parser_kind}")
     print(f"Solutions parsed: {len(parsed.solutions)}")
     print(f"Unique tool sequences: {len(parsed.tool_counter)}")
-    print(f"Unique workflow signatures: {len(parsed.workflow_counter)}")
 
     if not parsed.solutions:
         return
 
     print("\n--- Interpretation ---")
-    if parsed.parser_kind == "summary":
-        print("This file only carries workflow skeletons, so bindings and outputs are not available for strict comparison.")
-    else:
-        print("This file contains enough detail for strict workflow comparison, including bindings and produced outputs.")
+    print("This script compares normalized tool sequences only.")
+    if parsed.parser_kind != "summary":
+        print("Bindings and outputs were parsed, but they are ignored for APE-vs-ASP matching.")
 
     print("\nTop tool sequences:")
     for tool_sequence, count in parsed.tool_counter.most_common(sample_limit):
         print(f"  {count:>6}  {format_sequence(tool_sequence)}")
-
-    if parsed.parser_kind != "summary":
-        print("\nSample normalized workflows:")
-        for solution in parsed.solutions[:sample_limit]:
-            print(f"  Solution {solution.index}: {format_sequence(solution.tool_sequence)}")
-            print(f"    bindings={len(solution.bindings)} outputs={len(solution.outputs)}")
 
 
 def sample_workflow_key(key: tuple[object, ...]) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
@@ -652,8 +714,8 @@ def build_single_summary_report(
         "format": parsed.parser_kind,
         "scope": describe_scope(length, tool_sequence),
         "solutions_parsed": len(parsed.solutions),
+        "comparison_mode": "tool-sequence",
         "unique_tool_sequences": len(parsed.tool_counter),
-        "unique_workflow_signatures": len(parsed.workflow_counter),
         "top_tool_sequences": [
             {
                 "count": count,
@@ -663,11 +725,6 @@ def build_single_summary_report(
             for sequence, count in parsed.tool_counter.most_common(sample_limit)
         ],
     }
-    if parsed.parser_kind != "summary":
-        report["sample_workflows"] = [
-            serialize_solution(solution)
-            for solution in parsed.solutions[:sample_limit]
-        ]
     return report
 
 
@@ -683,90 +740,21 @@ def build_comparison_report(
 ) -> dict[str, object]:
     left_tool_counter = left.tool_counter
     right_tool_counter = right.tool_counter
-    left_workflow_counter = left.workflow_counter
-    right_workflow_counter = right.workflow_counter
-
-    common_workflow_keys = set(left_workflow_counter) & set(right_workflow_counter)
-    exact_matches = sum(min(left_workflow_counter[key], right_workflow_counter[key]) for key in common_workflow_keys)
-    left_only = left_workflow_counter - right_workflow_counter
-    right_only = right_workflow_counter - left_workflow_counter
-
-    left_only_same_tool = sum(
-        count for key, count in left_only.items() if key[0] in right_tool_counter
+    matching_candidates = count_matching_candidates(left_tool_counter, right_tool_counter)
+    count_differences, left_only_sequences, right_only_sequences = build_tool_sequence_differences(
+        left_tool_counter,
+        right_tool_counter,
+        left_name=left_name,
+        right_name=right_name,
     )
-    right_only_same_tool = sum(
-        count for key, count in right_only.items() if key[0] in left_tool_counter
+    left_unmatched_candidates = sum(
+        max(left_tool_counter[key] - right_tool_counter.get(key, 0), 0)
+        for key in left_tool_counter
     )
-    left_only_new_tools = sum(
-        count for key, count in left_only.items() if key[0] not in right_tool_counter
+    right_unmatched_candidates = sum(
+        max(right_tool_counter[key] - left_tool_counter.get(key, 0), 0)
+        for key in right_tool_counter
     )
-    right_only_new_tools = sum(
-        count for key, count in right_only.items() if key[0] not in left_tool_counter
-    )
-
-    differences = []
-    for tool_sequence_key in set(left_tool_counter) | set(right_tool_counter):
-        left_count = left_tool_counter.get(tool_sequence_key, 0)
-        right_count = right_tool_counter.get(tool_sequence_key, 0)
-        if left_count != right_count:
-            differences.append(
-                {
-                    "delta": abs(left_count - right_count),
-                    "tool_sequence": list(tool_sequence_key),
-                    "tool_sequence_text": format_sequence(tool_sequence_key),
-                    left_name: left_count,
-                    right_name: right_count,
-                }
-            )
-    differences.sort(
-        key=lambda item: (item["delta"], item["tool_sequence_text"]),
-        reverse=True,
-    )
-
-    mismatch_groups: dict[tuple[str, ...], dict[str, list[tuple[tuple[object, ...], int]]]] = defaultdict(
-        lambda: {"left": [], "right": []}
-    )
-    for key, count in left_only.items():
-        if key[0] in right_tool_counter:
-            mismatch_groups[key[0]]["left"].append((key, count))
-    for key, count in right_only.items():
-        if key[0] in left_tool_counter:
-            mismatch_groups[key[0]]["right"].append((key, count))
-
-    strict_signature_mismatches = []
-    ranked_groups = sorted(
-        mismatch_groups.items(),
-        key=lambda item: (
-            sum(count for _, count in item[1]["left"]) + sum(count for _, count in item[1]["right"]),
-            format_sequence(item[0]),
-        ),
-        reverse=True,
-    )
-    for tool_sequence_key, bucket in ranked_groups[:sample_limit]:
-        entry: dict[str, object] = {
-            "tool_sequence": list(tool_sequence_key),
-            "tool_sequence_text": format_sequence(tool_sequence_key),
-            f"{left_name}_only_total": sum(count for _, count in bucket["left"]),
-            f"{right_name}_only_total": sum(count for _, count in bucket["right"]),
-        }
-        if bucket["left"]:
-            key, count = bucket["left"][0]
-            entry[f"{left_name}_sample"] = serialize_workflow_key(key, count=count)
-        if bucket["right"]:
-            key, count = bucket["right"][0]
-            entry[f"{right_name}_sample"] = serialize_workflow_key(key, count=count)
-        if bucket["left"] and bucket["right"]:
-            left_key, _ = bucket["left"][0]
-            right_key, _ = bucket["right"][0]
-            _, left_bindings, left_outputs = sample_workflow_key(left_key)
-            _, right_bindings, right_outputs = sample_workflow_key(right_key)
-            entry["explanation"] = describe_workflow_difference(
-                left_bindings,
-                right_bindings,
-                left_outputs,
-                right_outputs,
-            )
-        strict_signature_mismatches.append(entry)
 
     return {
         "left": {
@@ -780,27 +768,20 @@ def build_comparison_report(
             "format": right.parser_kind,
         },
         "scope": describe_scope(length, tool_sequence),
+        "comparison_mode": "tool-sequence",
+        "matches": left_tool_counter == right_tool_counter,
         "counts": {
             f"{left_name}_total_solutions": len(left.solutions),
             f"{right_name}_total_solutions": len(right.solutions),
             f"{left_name}_unique_tool_sequences": len(left_tool_counter),
             f"{right_name}_unique_tool_sequences": len(right_tool_counter),
-            f"{left_name}_unique_workflow_signatures": len(left_workflow_counter),
-            f"{right_name}_unique_workflow_signatures": len(right_workflow_counter),
+            "matching_candidates": matching_candidates,
+            f"{left_name}_unmatched_candidates": left_unmatched_candidates,
+            f"{right_name}_unmatched_candidates": right_unmatched_candidates,
         },
-        "workflow_level": {
-            "exact_workflow_matches": exact_matches,
-            "strict_signature_mismatch": {
-                left_name: left_only_same_tool,
-                right_name: right_only_same_tool,
-            },
-            "tool_sequence_only_mismatch": {
-                left_name: left_only_new_tools,
-                right_name: right_only_new_tools,
-            },
-        },
-        "tool_sequence_count_differences": differences[:sample_limit],
-        "strict_signature_mismatches": strict_signature_mismatches,
+        "count_differences": count_differences[:sample_limit],
+        "left_only_sequences": left_only_sequences[:sample_limit],
+        "right_only_sequences": right_only_sequences[:sample_limit],
     }
 
 
@@ -815,124 +796,68 @@ def print_comparison(
 ) -> None:
     left_tool_counter = left.tool_counter
     right_tool_counter = right.tool_counter
-    left_workflow_counter = left.workflow_counter
-    right_workflow_counter = right.workflow_counter
-
-    common_workflow_keys = set(left_workflow_counter) & set(right_workflow_counter)
-    exact_matches = sum(min(left_workflow_counter[key], right_workflow_counter[key]) for key in common_workflow_keys)
-    left_only = left_workflow_counter - right_workflow_counter
-    right_only = right_workflow_counter - left_workflow_counter
-
-    left_only_same_tool = sum(
-        count for key, count in left_only.items() if key[0] in right_tool_counter
+    matching_candidates = count_matching_candidates(left_tool_counter, right_tool_counter)
+    count_differences, left_only_sequences, right_only_sequences = build_tool_sequence_differences(
+        left_tool_counter,
+        right_tool_counter,
+        left_name=left_name,
+        right_name=right_name,
     )
-    right_only_same_tool = sum(
-        count for key, count in right_only.items() if key[0] in left_tool_counter
+    left_unmatched_candidates = sum(
+        max(left_tool_counter[key] - right_tool_counter.get(key, 0), 0)
+        for key in left_tool_counter
     )
-    left_only_new_tools = sum(
-        count for key, count in left_only.items() if key[0] not in right_tool_counter
+    right_unmatched_candidates = sum(
+        max(right_tool_counter[key] - left_tool_counter.get(key, 0), 0)
+        for key in right_tool_counter
     )
-    right_only_new_tools = sum(
-        count for key, count in right_only.items() if key[0] not in left_tool_counter
-    )
+    matches = left_tool_counter == right_tool_counter
 
     print(f"{left_name}: {left.path} [{left.parser_kind}]")
     print(f"{right_name}: {right.path} [{right.parser_kind}]")
     print(f"Scope: {describe_scope(length, tool_sequence)}")
+    print("Comparison mode: normalized tool sequences")
     print("\n--- Counts ---")
     print(f"{left_name} total solutions: {len(left.solutions)}")
     print(f"{right_name} total solutions: {len(right.solutions)}")
     print(f"{left_name} unique tool sequences: {len(left_tool_counter)}")
     print(f"{right_name} unique tool sequences: {len(right_tool_counter)}")
-    print(f"{left_name} unique workflow signatures: {len(left_workflow_counter)}")
-    print(f"{right_name} unique workflow signatures: {len(right_workflow_counter)}")
+    print("\n--- Match Result ---")
+    print(f"Exact normalized tool-sequence multiset match: {'yes' if matches else 'no'}")
+    print(f"Matching candidates across both files: {matching_candidates}")
+    print(f"{left_name} unmatched candidates: {left_unmatched_candidates}")
+    print(f"{right_name} unmatched candidates: {right_unmatched_candidates}")
 
-    print("\n--- Workflow-Level Comparison ---")
-    print(f"Exact workflow matches in both files: {exact_matches}")
-    print(
-        "Same tool sequence but different strict signature: "
-        f"{left_name} only={left_only_same_tool}, {right_name} only={right_only_same_tool}"
-    )
-    print(f"{left_name}-only workflows with no matching tool sequence: {left_only_new_tools}")
-    print(f"{right_name}-only workflows with no matching tool sequence: {right_only_new_tools}")
-    print_bucket_interpretation(
-        left_name,
-        right_name,
-        exact_matches,
-        left_only_same_tool,
-        right_only_same_tool,
-        left_only_new_tools,
-        right_only_new_tools,
-    )
+    print("\n--- Interpretation ---")
+    if matches:
+        print("The APE workflow candidates and ASP answer sets match exactly by ordered tool sequence.")
+    else:
+        print("The APE workflow candidates and ASP answer sets do not match by ordered tool sequence.")
+        print("Bindings and produced outputs are ignored; only the normalized tool sequence counts matter here.")
 
-    print("\n--- Tool Sequence Count Differences ---")
-    differences = []
-    for tool_sequence in set(left_tool_counter) | set(right_tool_counter):
-        left_count = left_tool_counter.get(tool_sequence, 0)
-        right_count = right_tool_counter.get(tool_sequence, 0)
-        if left_count != right_count:
-            differences.append((abs(left_count - right_count), tool_sequence, left_count, right_count))
-    for _, tool_sequence, left_count, right_count in sorted(
-        differences,
-        key=lambda item: (item[0], format_sequence(item[1])),
-        reverse=True,
-    )[:sample_limit]:
-        print(f"  {left_count:>6} vs {right_count:>6}  {format_sequence(tool_sequence)}")
-    if not differences:
-        print("  None. Both files contain the same tool-sequence multiset in this scope.")
+    print("\n--- Shared Sequences With Different Counts ---")
+    if count_differences:
+        for entry in count_differences[:sample_limit]:
+            print(
+                f"  {entry[left_name]:>6} vs {entry[right_name]:>6}  "
+                f"{entry['tool_sequence_text']}"
+            )
+    else:
+        print("  None.")
 
-    mismatch_groups: dict[tuple[str, ...], dict[str, list[tuple[tuple[object, ...], int]]]] = defaultdict(
-        lambda: {"left": [], "right": []}
-    )
-    for key, count in left_only.items():
-        if key[0] in right_tool_counter:
-            mismatch_groups[key[0]]["left"].append((key, count))
-    for key, count in right_only.items():
-        if key[0] in left_tool_counter:
-            mismatch_groups[key[0]]["right"].append((key, count))
+    print(f"\n--- {left_name}-Only Sequences ---")
+    if left_only_sequences:
+        for entry in left_only_sequences[:sample_limit]:
+            print(f"  {entry['count']:>6}  {entry['tool_sequence_text']}")
+    else:
+        print("  None.")
 
-    if mismatch_groups:
-        print("\n--- Sample Strict-Signature Mismatches ---")
-        ranked_groups = sorted(
-            mismatch_groups.items(),
-            key=lambda item: (
-                sum(count for _, count in item[1]["left"]) + sum(count for _, count in item[1]["right"]),
-                format_sequence(item[0]),
-            ),
-            reverse=True,
-        )
-        for tool_sequence, bucket in ranked_groups[:sample_limit]:
-            print(f"Tool sequence: {format_sequence(tool_sequence)}")
-            left_total = sum(count for _, count in bucket["left"])
-            right_total = sum(count for _, count in bucket["right"])
-            print(f"  {left_name} only: {left_total}")
-            print(f"  {right_name} only: {right_total}")
-            if bucket["left"]:
-                key, count = bucket["left"][0]
-                _, bindings, outputs = sample_workflow_key(key)
-                print(f"  {left_name} sample count={count}")
-                print(f"    bindings: {format_bindings(bindings)}")
-                print(f"    outputs: {format_outputs(outputs)}")
-            if bucket["right"]:
-                key, count = bucket["right"][0]
-                _, bindings, outputs = sample_workflow_key(key)
-                print(f"  {right_name} sample count={count}")
-                print(f"    bindings: {format_bindings(bindings)}")
-                print(f"    outputs: {format_outputs(outputs)}")
-            if bucket["left"] and bucket["right"]:
-                left_key, _ = bucket["left"][0]
-                right_key, _ = bucket["right"][0]
-                _, left_bindings, left_outputs = sample_workflow_key(left_key)
-                _, right_bindings, right_outputs = sample_workflow_key(right_key)
-                print(
-                    "  explanation: "
-                    + describe_workflow_difference(
-                        left_bindings,
-                        right_bindings,
-                        left_outputs,
-                        right_outputs,
-                    )
-                )
+    print(f"\n--- {right_name}-Only Sequences ---")
+    if right_only_sequences:
+        for entry in right_only_sequences[:sample_limit]:
+            print(f"  {entry['count']:>6}  {entry['tool_sequence_text']}")
+    else:
+        print("  None.")
 
 
 def build_parser() -> argparse.ArgumentParser:

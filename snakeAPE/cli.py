@@ -161,7 +161,8 @@ def main(argv: list[str] | None = None) -> int:
                     f"solving={record.solving_sec:.3f}s "
                     f"total={record.total_sec:.3f}s "
                     f"raw_solutions={record.raw_solutions_found} "
-                    f"unique_solutions={record.solutions_found}"
+                    f"unique_solutions={record.solutions_found} "
+                    f"timed_out={'yes' if record.timed_out else 'no'}"
                 )
             return 0
 
@@ -195,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"Ground-only run complete: mode={grounding_result.mode} "
                 f"strategy={grounding_result.grounding_strategy} stage={grounding_result.stage} "
                 f"translation={grounding_result.timings.translation_sec:.3f}s "
-                f"grounding={grounding_result.timings.grounding_sec:.3f}s"
+                f"grounding={grounding_result.timings.grounding_sec:.3f}s "
+                f"total={grounding_result.timings.total_sec:.3f}s"
             )
             return 0
 
@@ -221,7 +223,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Translate-only run complete: mode={translation_result.mode} "
                 f"strategy={translation_result.grounding_strategy} "
-                f"translation={translation_result.timings.translation_sec:.3f}s"
+                f"translation={translation_result.timings.translation_sec:.3f}s "
+                f"total={translation_result.timings.total_sec:.3f}s"
             )
             return 0
 
@@ -247,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Translate-only lazy run complete: mode={translation_result.mode} "
                 f"strategy={translation_result.grounding_strategy} "
-                f"translation={translation_result.timings.translation_sec:.3f}s"
+                f"translation={translation_result.timings.translation_sec:.3f}s "
+                f"total={translation_result.timings.total_sec:.3f}s"
             )
             return 0
 
@@ -265,18 +269,29 @@ def main(argv: list[str] | None = None) -> int:
         )
         if run_result.translation_path is not None:
             print(f"Translation written to: {run_result.translation_path}")
-        print(f"Answer sets written to: {run_result.answer_set_path}")
-        print(f"Solutions written to: {run_result.solution_summary_path}")
         if run_result.run_log_path is not None:
             print(f"Run log written to: {run_result.run_log_path}")
         if run_result.run_summary_path is not None:
             print(f"Run summary written to: {run_result.run_summary_path}")
+        if run_result.timed_out:
+            print(
+                f"Run timed out after configured limit during {run_result.completed_stage}.",
+                file=sys.stderr,
+                flush=True,
+            )
+            return 124
+        if run_result.answer_set_path is not None:
+            print(f"Answer sets written to: {run_result.answer_set_path}")
+        if run_result.solution_summary_path is not None:
+            print(f"Solutions written to: {run_result.solution_summary_path}")
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "
             f"raw_solutions={run_result.raw_answer_sets_found} "
             f"unique_solutions={run_result.unique_solutions_found} "
             f"translation={run_result.timings.translation_sec:.3f}s "
-            f"grounding={run_result.timings.grounding_sec:.3f}s solving={run_result.timings.solving_sec:.3f}s"
+            f"grounding={run_result.timings.grounding_sec:.3f}s "
+            f"solving={run_result.timings.solving_sec:.3f}s "
+            f"total={run_result.timings.total_sec:.3f}s"
         )
         for path in run_result.graph_paths:
             print(f"Graph artifact: {Path(path)}")

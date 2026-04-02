@@ -19,6 +19,26 @@ constraint_selected_time(T, Sel) :-
 constraint_used(Sel) :-
     constraint_selected_time(_, Sel).
 
+constraint_artifact_dim(WF, V, Cat) :-
+    holds(0, avail(WF)),
+    holds(0, dim(WF, V, Cat)).
+
+constraint_artifact_dim(out(T, Tool, Port), V, Cat) :-
+    occurs(T, output(Tool, _, Port)),
+    holds(T, dim(out(T, Tool, Port), V, Cat)).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Actual),
+    constraint_artifact_dim(WF, Actual, _).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_data_selector(Sel, Wanted),
+    constraint_artifact_dim(WF, Actual, _),
+    ancestor(Actual, Wanted).
+
+constraint_used_data(Sel) :-
+    constraint_artifact_matches_selector(_, Sel).
+
 constraint_connected_pair(SelA, SelB, T1, T2) :-
     constraint_connected(SelA, SelB),
     constraint_selected_tool(T1, SelA, ToolA),
@@ -95,3 +115,17 @@ constraint_connected_pair(SelA, SelB, T1, T2) :-
    occurs(T, bind(Tool, P1, WF)),
    occurs(T, bind(Tool, P2, WF)),
    P1 != P2.
+
+% use_t: some artifact in the workflow must carry the selected data value.
+:- constraint_use_data(Sel),
+   not constraint_used_data(Sel).
+
+% operation_input: a matching tool run must bind an artifact carrying the
+% selected data value.
+:- constraint_operation_input(ModuleSel, DataSel),
+   #count {
+       T, Tool, WF :
+           constraint_selected_tool(T, ModuleSel, Tool),
+           occurs(T, bind(Tool, _, WF)),
+           constraint_artifact_matches_selector(WF, DataSel)
+   } = 0.

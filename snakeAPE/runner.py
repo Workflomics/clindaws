@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import csv
 import json
+import multiprocessing
+import os
+import queue
+import signal
+import threading
+import traceback
 from datetime import datetime, timezone
 from dataclasses import asdict, replace
 from pathlib import Path
 from time import perf_counter
 from typing import Callable
 from uuid import uuid4
+
+import clingo
 
 from .config import load_config
 from .models import (
@@ -85,6 +93,219 @@ def _report(progress_callback: ProgressCallback, message: str) -> None:
         progress_callback(message)
 
 
+def _serialize_symbol_collection(
+    collection: tuple[tuple[object, ...], ...],
+) -> tuple[tuple[str, ...], ...]:
+    return tuple(tuple(str(symbol) for symbol in symbols) for symbols in collection)
+
+
+def _deserialize_symbol_collection(
+    collection: tuple[tuple[str, ...], ...],
+) -> tuple[tuple[clingo.Symbol, ...], ...]:
+    return tuple(
+        tuple(clingo.parse_term(symbol_text) for symbol_text in symbols)
+        for symbols in collection
+    )
+
+
+def _serialize_solve_output(solve_output) -> dict[str, object]:
+    return {
+        "raw_solutions": _serialize_symbol_collection(solve_output.raw_solutions),
+        "solutions": _serialize_symbol_collection(solve_output.solutions),
+        "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
+        "base_grounding_sec": solve_output.base_grounding_sec,
+        "grounding_sec": solve_output.grounding_sec,
+        "solving_sec": solve_output.solving_sec,
+        "horizon_records": solve_output.horizon_records,
+    }
+
+
+def _deserialize_solve_output(payload: dict[str, object]):
+    from .solver import SolveOutput
+
+    return SolveOutput(
+        raw_solutions=_deserialize_symbol_collection(payload["raw_solutions"]),
+        solutions=_deserialize_symbol_collection(payload["solutions"]),
+        base_grounding_peak_rss_mb=float(payload["base_grounding_peak_rss_mb"]),
+        base_grounding_sec=float(payload["base_grounding_sec"]),
+        grounding_sec=float(payload["grounding_sec"]),
+        solving_sec=float(payload["solving_sec"]),
+        horizon_records=tuple(payload["horizon_records"]),
+    )
+
+
+def _empty_solve_output():
+    from .solver import SolveOutput
+
+    return SolveOutput(
+        raw_solutions=(),
+        solutions=(),
+        base_grounding_peak_rss_mb=0.0,
+        base_grounding_sec=0.0,
+        grounding_sec=0.0,
+        solving_sec=0.0,
+        horizon_records=(),
+    )
+
+
+def _drain_progress_queue(
+    progress_queue: multiprocessing.queues.Queue | None,
+    progress_callback: ProgressCallback,
+) -> None:
+    if progress_queue is None:
+        return
+    while True:
+        try:
+            message = progress_queue.get_nowait()
+        except queue.Empty:
+            return
+        if message is None:
+            return
+        _report(progress_callback, str(message))
+
+
+def _solve_worker_entrypoint(
+    *,
+    mode: str,
+    config,
+    fact_bundle,
+    result_queue: multiprocessing.queues.Queue,
+    progress_queue: multiprocessing.queues.Queue,
+) -> None:
+    from .solver import (
+        solve_multi_shot,
+        solve_multi_shot_lazy,
+        solve_single_shot,
+        solve_single_shot_lazy,
+    )
+
+    def _worker_progress(message: str) -> None:
+        progress_queue.put(message)
+
+    try:
+        if mode == "single-shot":
+            solve_output = solve_single_shot(
+                config,
+                fact_bundle,
+                progress_callback=_worker_progress,
+            )
+        elif mode == "single-shot-lazy":
+            solve_output = solve_single_shot_lazy(
+                config,
+                fact_bundle,
+                progress_callback=_worker_progress,
+            )
+        elif mode == "multi-shot":
+            solve_output = solve_multi_shot(
+                config,
+                fact_bundle,
+                progress_callback=_worker_progress,
+            )
+        elif mode == "multi-shot-lazy":
+            solve_output = solve_multi_shot_lazy(
+                config,
+                fact_bundle,
+                progress_callback=_worker_progress,
+            )
+        else:
+            raise ValueError(f"Unsupported mode: {mode}")
+        result_queue.put(
+            {
+                "ok": True,
+                "solve_output": _serialize_solve_output(solve_output),
+            }
+        )
+    except BaseException as exc:
+        result_queue.put(
+            {
+                "ok": False,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+    finally:
+        progress_queue.put(None)
+
+
+def _run_solve_in_worker(
+    *,
+    mode: str,
+    config,
+    fact_bundle,
+    remaining_timeout: float,
+    progress_callback: ProgressCallback,
+) -> tuple[object, bool]:
+    ctx = multiprocessing.get_context("spawn")
+    result_queue = ctx.Queue()
+    progress_queue = ctx.Queue()
+    process = ctx.Process(
+        target=_solve_worker_entrypoint,
+        kwargs={
+            "mode": mode,
+            "config": config,
+            "fact_bundle": fact_bundle,
+            "result_queue": result_queue,
+            "progress_queue": progress_queue,
+        },
+    )
+    process.start()
+    deadline = perf_counter() + remaining_timeout
+    timed_out = False
+    payload: dict[str, object] | None = None
+
+    while True:
+        _drain_progress_queue(progress_queue, progress_callback)
+        if payload is None:
+            try:
+                payload = result_queue.get_nowait()
+            except queue.Empty:
+                payload = None
+        process_alive = process.is_alive()
+        if payload is not None and not process_alive:
+            break
+        if payload is None:
+            remaining = deadline - perf_counter()
+            if remaining <= 0:
+                timed_out = True
+                break
+            process.join(min(0.1, remaining))
+        else:
+            process.join(0.1)
+
+    if timed_out:
+        _report(
+            progress_callback,
+            f"Timeout of {config.timeout_sec}s reached, terminating solver worker...",
+        )
+        process.terminate()
+        process.join(1.0)
+        if process.is_alive():
+            _report(progress_callback, "Solver worker did not exit after terminate; forcing kill.")
+            process.kill()
+            process.join()
+        _drain_progress_queue(progress_queue, progress_callback)
+        return _empty_solve_output(), True
+
+    process.join()
+    _drain_progress_queue(progress_queue, progress_callback)
+
+    if payload is None:
+        try:
+            payload = result_queue.get(timeout=1.0)
+        except queue.Empty as exc:
+            raise RuntimeError("Solver worker exited without returning a result.") from exc
+
+    if not payload.get("ok", False):
+        raise RuntimeError(
+            "Solver worker failed with "
+            f"{payload.get('error_type', 'unknown error')}: {payload.get('error_message', '')}\n"
+            f"{payload.get('traceback', '')}".rstrip()
+        )
+
+    return _deserialize_solve_output(payload["solve_output"]), False
+
+
 def _constraint_metadata(config) -> tuple[str | None, int]:
     if config.constraints_path is None:
         return None, 0
@@ -147,11 +368,13 @@ class _RunLogWriter:
         "test",
         "mode",
         "horizon",
+        "translation_ms",
         "setup_grounding_ms",
         "solving_ms",
         "memory_used_mb",
         "solutions_found",
         "constraints_used",
+        "timed_out",
     ]
 
     def __init__(
@@ -174,6 +397,7 @@ class _RunLogWriter:
         self.mode = mode
         self.base_grounding_ms = 0
         self.base_grounding_peak_rss_mb = 0.0
+        self._translation_ms = 0
         _ensure_csv_header(self.csv_path, self.fieldnames)
 
     def _write_row(self, row: dict[str, object]) -> None:
@@ -182,7 +406,7 @@ class _RunLogWriter:
             writer.writerow(row)
 
     def log_translation(self, *, translation_sec: float, translation_peak_rss_mb: float) -> None:
-        return None
+        self._translation_ms = round(translation_sec * 1000)
 
     def log_base_grounding(self, *, base_grounding_sec: float, base_grounding_peak_rss_mb: float) -> None:
         self.base_grounding_ms = round(base_grounding_sec * 1000)
@@ -200,11 +424,30 @@ class _RunLogWriter:
                 "test": self.test_name,
                 "mode": self.mode,
                 "horizon": record.horizon,
+                "translation_ms": self._translation_ms,
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
                 "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
                 "solutions_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
+                "timed_out": "false",
+            }
+        )
+
+    def log_timeout(self, *, elapsed_ms: int) -> None:
+        """Write a sentinel row marking the step that was interrupted by timeout."""
+        self._write_row(
+            {
+                "test": self.test_name,
+                "mode": self.mode,
+                "horizon": "timeout",
+                "translation_ms": self._translation_ms,
+                "setup_grounding_ms": elapsed_ms,
+                "solving_ms": "",
+                "memory_used_mb": "",
+                "solutions_found": self.cumulative_unique_solutions,
+                "constraints_used": self.constraints_used,
+                "timed_out": "true",
             }
         )
 
@@ -588,7 +831,7 @@ def _write_translation_summary(
 def _default_solution_dir(config: SnakeConfig) -> Path:
     """Return the default output directory when none is provided."""
 
-    return config.base_dir / "snakeAPE_results"
+    return config.solutions_dir_path
 
 
 def _prepare_run_context(
@@ -844,82 +1087,45 @@ def run_once(
         translation_peak_rss_mb=translation_peak_rss_mb,
     )
 
-    if mode == "single-shot":
-        solve_output = solve_single_shot(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
+    remaining_timeout = config.timeout_sec - translation_sec
+    _timed_out = False
+    _solve_start = perf_counter()
+    if remaining_timeout <= 0:
+        _timed_out = True
+        _report(
+            progress_callback,
+            f"Translation already exceeded timeout ({config.timeout_sec}s); skipping solve.",
         )
-    elif mode == "single-shot-lazy":
-        solve_output = solve_single_shot_lazy(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
-    elif mode == "multi-shot":
-        solve_output = solve_multi_shot(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
-    elif mode == "multi-shot-lazy":
-        solve_output = solve_multi_shot_lazy(
-            config,
-            fact_bundle,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
+
+    if remaining_timeout <= 0:
+        solve_output = _empty_solve_output()
     else:
-        raise ValueError(f"Unsupported mode: {mode}")
+        solve_output, _timed_out = _run_solve_in_worker(
+            mode=mode,
+            config=config,
+            fact_bundle=fact_bundle,
+            remaining_timeout=remaining_timeout,
+            progress_callback=progress_callback,
+        )
+
+    if solve_output.base_grounding_sec or solve_output.base_grounding_peak_rss_mb:
+        csv_writers.step_writer.log_base_grounding(
+            base_grounding_sec=solve_output.base_grounding_sec,
+            base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
+        )
+    for record in solve_output.horizon_records:
+        csv_writers.step_writer.log_horizon(record)
 
     solutions = tuple(
         reconstruct_solution(index + 1, symbols, dict(fact_bundle.tool_labels))
         for index, symbols in enumerate(solve_output.solutions)
     )
 
-    _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
-    render_start = perf_counter()
-    answer_set_path = solution_dir / "answer_sets.txt"
-    if solve_output.raw_solutions:
-        answer_set_path.write_text(
-            "".join(
-                f"Answer Set {index}\n"
-                + " ".join(sorted(str(symbol) for symbol in symbols))
-                + "\n\n"
-                for index, symbols in enumerate(solve_output.raw_solutions, start=1)
-            ),
-            encoding="utf-8",
-        )
-    else:
-        answer_set_path.write_text("No answer sets found.\n", encoding="utf-8")
-    summary_path = write_solution_summary(solution_dir / "solutions.txt", solutions)
-    graph_paths = []
-    if render_graphs:
-        figures_dir = solution_dir / "Figures"
-        max_graphs = config.number_of_generated_graphs or len(solutions)
-        for solution in solutions[:max_graphs]:
-            graph_paths.extend(render_solution_graphs(figures_dir, solution, graph_format))
-    rendering_sec = perf_counter() - render_start
-    _report(progress_callback, f"Step 4 complete: output writing/rendering finished after {rendering_sec:.3f}s.")
+    answer_set_path: Path | None = None
+    summary_path: Path | None = None
+    graph_paths: tuple[Path, ...] = ()
+    rendering_sec = 0.0
+
     horizon_summary_path = solution_dir / "horizon_summary.json"
     horizon_summary_path.write_text(
         json.dumps(
@@ -929,6 +1135,7 @@ def run_once(
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
                 "base_grounding_sec": solve_output.base_grounding_sec,
+                "timed_out": _timed_out,
                 "horizons": _horizon_record_payload(solve_output.horizon_records),
             },
             indent=2,
@@ -936,12 +1143,56 @@ def run_once(
         + "\n",
         encoding="utf-8",
     )
+
+    if not _timed_out:
+        _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
+        render_start = perf_counter()
+        answer_set_path = solution_dir / "answer_sets.txt"
+        if solve_output.raw_solutions:
+            _answer_set_content = "".join(
+                f"Answer Set {index}\n"
+                + " ".join(sorted(str(symbol) for symbol in symbols))
+                + "\n\n"
+                for index, symbols in enumerate(solve_output.raw_solutions, start=1)
+            )
+            answer_set_path.write_text(_answer_set_content, encoding="utf-8")
+        else:
+            _answer_set_content = "No answer sets found.\n"
+            answer_set_path.write_text(_answer_set_content, encoding="utf-8")
+        _config_stem = config.config_path.stem
+        _named_asp_path = config.solutions_dir_path / f"solutions_{_config_stem}_ASP.txt"
+        config.solutions_dir_path.mkdir(parents=True, exist_ok=True)
+        _named_asp_path.write_text(_answer_set_content, encoding="utf-8")
+        summary_path = write_solution_summary(solution_dir / "solutions.txt", solutions)
+        graph_path_list: list[Path] = []
+        if render_graphs:
+            figures_dir = solution_dir / "Figures"
+            max_graphs = config.number_of_generated_graphs
+            for solution in solutions[:max_graphs]:
+                graph_path_list.extend(render_solution_graphs(figures_dir, solution, graph_format))
+        graph_paths = tuple(graph_path_list)
+        rendering_sec = perf_counter() - render_start
+        _report(progress_callback, f"Step 4 complete: output writing/rendering finished after {rendering_sec:.3f}s.")
+
+    if _timed_out:
+        _elapsed_since_solve_start_ms = round((perf_counter() - _solve_start) * 1000)
+        csv_writers.step_writer.log_timeout(elapsed_ms=_elapsed_since_solve_start_ms)
+    _timeout_solving_sec = (
+        max((perf_counter() - _solve_start), solve_output.solving_sec)
+        if _timed_out and remaining_timeout > 0
+        else solve_output.solving_sec
+    )
+    _completed_stage = (
+        "translation_timeout" if _timed_out and remaining_timeout <= 0
+        else "run_timeout" if _timed_out
+        else "run"
+    )
     csv_writers.summary_writer.log_summary(
-        completed_stage="run",
+        completed_stage=_completed_stage,
         timings=TimingBreakdown(
             translation_sec=translation_sec,
             grounding_sec=solve_output.grounding_sec,
-            solving_sec=solve_output.solving_sec,
+            solving_sec=_timeout_solving_sec,
             rendering_sec=rendering_sec,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
@@ -964,7 +1215,7 @@ def run_once(
         timings=TimingBreakdown(
             translation_sec=translation_sec,
             grounding_sec=solve_output.grounding_sec,
-            solving_sec=solve_output.solving_sec,
+            solving_sec=_timeout_solving_sec,
             rendering_sec=rendering_sec,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
@@ -974,9 +1225,11 @@ def run_once(
         translation_path=None,
         answer_set_path=answer_set_path,
         solution_summary_path=summary_path,
-        graph_paths=tuple(graph_paths),
+        graph_paths=graph_paths,
         raw_answer_sets_found=len(solve_output.raw_solutions),
         unique_solutions_found=len(solutions),
+        timed_out=_timed_out,
+        completed_stage=_completed_stage,
         run_log_path=run_log_path,
         run_summary_path=run_summary_path,
     )
@@ -1187,13 +1440,14 @@ def benchmark_grounding(
                     grounding_sec=result.timings.grounding_sec,
                     solving_sec=result.timings.solving_sec,
                     rendering_sec=result.timings.rendering_sec,
-                    total_sec=result.timings.total_sec,
-                    fact_count=result.fact_bundle.fact_count,
-                    solutions_found=len(result.solutions),
-                    raw_solutions_found=result.raw_answer_sets_found,
-                    lengths=tuple(solution.length for solution in result.solutions),
-                    repetition=repetition,
-                )
+                total_sec=result.timings.total_sec,
+                fact_count=result.fact_bundle.fact_count,
+                solutions_found=len(result.solutions),
+                raw_solutions_found=result.raw_answer_sets_found,
+                timed_out=result.timed_out,
+                lengths=tuple(solution.length for solution in result.solutions),
+                repetition=repetition,
+            )
             )
 
     output_path = benchmark_dir / "grounding_benchmark.csv"
@@ -1212,6 +1466,7 @@ def benchmark_grounding(
                 "fact_count",
                 "raw_solutions_found",
                 "solutions_found",
+                "timed_out",
                 "lengths",
             ]
         )
@@ -1229,6 +1484,7 @@ def benchmark_grounding(
                     record.fact_count,
                     record.raw_solutions_found,
                     record.solutions_found,
+                    str(record.timed_out).lower(),
                     ";".join(str(length) for length in record.lengths),
                 ]
             )

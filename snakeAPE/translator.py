@@ -214,6 +214,18 @@ def _build_common_facts(
                     f"({_quote(dimension_root)}, {_quote(child)}, {_quote(parent)})",
                 )
 
+    # Pre-compute compatible(V, Ancestor) for every terminal V in each dimension
+    # subtree. Python's cached BFS (ontology.ancestors_of) replaces the O(n²)
+    # recursive ancestor/2 transitive closure that clingo would otherwise derive
+    # at grounding time. ancestors_of(V) includes V itself, so compatible(V, V)
+    # is covered without a separate rule.
+    for dimension_root in config.data_dimensions_taxonomy_roots:
+        allowed = roots[dimension_root]
+        for terminal in ontology.terminal_descendants_of(dimension_root, within=allowed):
+            for anc in ontology.ancestors_of(terminal):
+                if anc in allowed:
+                    writer.emit_fact("compatible", _quote(terminal), _quote(anc))
+
     for child, parent in ontology.edges:
         if child in tool_taxonomy_nodes and parent in tool_taxonomy_nodes:
             writer.emit_fact(
@@ -235,18 +247,20 @@ def _build_common_facts(
         wf_id = f"wf_input_{index}"
         writer.emit_fact("holds", "0", f"avail({_quote(wf_id)})")
         for dim, values in sorted(item.items()):
+            allowed = roots.get(dim, frozenset())
             for value in values:
-                writer.emit_fact(
-                    "holds",
-                    "0",
-                    f"dim({_quote(wf_id)}, {_quote(value)}, {_quote(dim)})",
-                )
-                writer.emit_fact(
-                    "ape_holds_dim",
-                    _quote(wf_id),
-                    _quote(value),
-                    _quote(dim),
-                )
+                for tval in ontology.terminal_descendants_of(value, within=allowed):
+                    writer.emit_fact(
+                        "holds",
+                        "0",
+                        f"dim({_quote(wf_id)}, {_quote(tval)}, {_quote(dim)})",
+                    )
+                    writer.emit_fact(
+                        "ape_holds_dim",
+                        _quote(wf_id),
+                        _quote(tval),
+                        _quote(dim),
+                    )
 
     for goal_index, item in enumerate(config.outputs):
         for dim, values in sorted(item.items()):
@@ -283,9 +297,11 @@ _LAZY_SUPPORTED_CONSTRAINTS = {
     "depend_m",
     "itn_m",
     "next_m",
+    "use_t",
     "unique_inputs",
     "first_m",
     "connected_op",
+    "operationInput",
 }
 
 _LAZY_NATIVE_CONSTRAINTS = _LAZY_SUPPORTED_CONSTRAINTS | {
@@ -294,6 +310,7 @@ _LAZY_NATIVE_CONSTRAINTS = _LAZY_SUPPORTED_CONSTRAINTS | {
     "max_uses",
     "mutex_tools",
     "not_consecutive",
+    "operation_input",
 }
 
 _CONSTRAINT_ATOM_PATTERN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\((.*)\)\s*$")
@@ -389,6 +406,45 @@ def _lazy_allowed_selectors(
     return allowed_selectors
 
 
+def _lazy_allowed_data_selectors(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> set[str]:
+    allowed_values = set(ontology.nodes)
+
+    def _add_value(raw_value: str) -> None:
+        value = str(raw_value).strip()
+        if not value:
+            return
+        allowed_values.add(value)
+        allowed_values.add(_strip_constraint_value(value, config.ontology_prefix))
+
+    for item in config.inputs:
+        for values in item.values():
+            for value in values:
+                _add_value(value)
+    for item in config.outputs:
+        for values in item.values():
+            for value in values:
+                _add_value(value)
+    for tool in tools:
+        for port in (*tool.inputs, *tool.outputs):
+            for values in port.dimensions.values():
+                for value in values:
+                    _add_value(value)
+
+    return allowed_values
+
+
+def _data_selector_aliases(value: str, *, prefix: str) -> tuple[str, ...]:
+    aliases = [value.strip()]
+    stripped = _strip_constraint_value(value.strip(), prefix)
+    if stripped and stripped not in aliases:
+        aliases.append(stripped)
+    return tuple(alias for alias in aliases if alias)
+
+
 def _emit_lazy_constraint(
     writer: _FactWriter,
     *,
@@ -396,7 +452,9 @@ def _emit_lazy_constraint(
     constraint_name: str,
     args: tuple[str | int, ...],
     allowed_selectors: set[str],
+    allowed_data_selectors: set[str],
     selector_ids: dict[str, str],
+    data_selector_ids: dict[str, str],
     source_name: str,
     index: int,
 ) -> None:
@@ -409,6 +467,15 @@ def _emit_lazy_constraint(
             selector_id = f"constraint_selector_{len(selector_ids)}"
             selector_ids[selector] = selector_id
             writer.emit_fact("constraint_selector", _quote(selector_id), _quote(selector))
+        return selector_id
+
+    def _data_selector_id_for(raw_selector: str) -> str:
+        selector_id = data_selector_ids.get(raw_selector)
+        if selector_id is None:
+            selector_id = f"constraint_data_selector_{len(data_selector_ids)}"
+            data_selector_ids[raw_selector] = selector_id
+            for alias in _data_selector_aliases(raw_selector, prefix=config.ontology_prefix):
+                writer.emit_fact("constraint_data_selector", _quote(selector_id), _quote(alias))
         return selector_id
 
     def _selector_arg(position: int) -> str | None:
@@ -425,6 +492,24 @@ def _emit_lazy_constraint(
             return None
         if selector not in allowed_selectors:
             _skip(f"unknown selector {selector}")
+            return None
+        return selector
+
+    def _data_selector_arg(position: int) -> str | None:
+        if position >= len(args):
+            _skip(f"{constraint_name} is missing data selector argument {position + 1}")
+            return None
+        raw_value = args[position]
+        if not isinstance(raw_value, str):
+            _skip(f"{constraint_name} expects data selector argument {position + 1}")
+            return None
+        selector = raw_value.strip()
+        if not selector:
+            _skip(f"{constraint_name} has an empty data selector argument")
+            return None
+        aliases = _data_selector_aliases(selector, prefix=config.ontology_prefix)
+        if not any(alias in allowed_data_selectors for alias in aliases):
+            _skip(f"unknown data selector {selector}")
             return None
         return selector
 
@@ -497,6 +582,18 @@ def _emit_lazy_constraint(
             )
         return
 
+    if constraint_name == "use_t":
+        if len(args) != 1:
+            _skip("use_t expects 1 data selector")
+            return
+        selector = _data_selector_arg(0)
+        if selector is not None:
+            writer.emit_fact(
+                "constraint_use_data",
+                _quote(_data_selector_id_for(selector)),
+            )
+        return
+
     if constraint_name == "at_step":
         if len(args) != 2:
             _skip("at_step expects selector and step")
@@ -522,6 +619,20 @@ def _emit_lazy_constraint(
                 "constraint_max_uses",
                 _quote(_selector_id_for(selector)),
                 str(limit),
+            )
+        return
+
+    if constraint_name in {"operation_input", "operationInput"}:
+        if len(args) != 2:
+            _skip(f"{constraint_name} expects module selector and data selector")
+            return
+        selector = _selector_arg(0)
+        data_selector = _data_selector_arg(1)
+        if selector is not None and data_selector is not None:
+            writer.emit_fact(
+                "constraint_operation_input",
+                _quote(_selector_id_for(selector)),
+                _quote(_data_selector_id_for(data_selector)),
             )
         return
 
@@ -561,7 +672,9 @@ def _emit_lazy_template_constraints(
     constraints_path,
     constraints: list[Mapping[str, Any]],
     allowed_selectors: set[str],
+    allowed_data_selectors: set[str],
     selector_ids: dict[str, str],
+    data_selector_ids: dict[str, str],
 ) -> None:
     writer.emit_comment(
         f"lazy constraint translation from {constraints_path.name}"
@@ -603,7 +716,9 @@ def _emit_lazy_template_constraints(
             constraint_name=constraint_id,
             args=selectors,
             allowed_selectors=allowed_selectors,
+            allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
+            data_selector_ids=data_selector_ids,
             source_name=constraints_path.name,
             index=index,
         )
@@ -616,7 +731,9 @@ def _emit_lazy_native_constraints(
     constraints_path,
     constraints: list[str],
     allowed_selectors: set[str],
+    allowed_data_selectors: set[str],
     selector_ids: dict[str, str],
+    data_selector_ids: dict[str, str],
 ) -> None:
     writer.emit_comment(
         f"lazy native constraint translation from {constraints_path.name}"
@@ -646,7 +763,9 @@ def _emit_lazy_native_constraints(
             constraint_name=constraint_name,
             args=args,
             allowed_selectors=allowed_selectors,
+            allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
+            data_selector_ids=data_selector_ids,
             source_name=constraints_path.name,
             index=index,
         )
@@ -694,7 +813,9 @@ def _emit_lazy_constraints(
     tools: tuple[ToolMode, ...],
 ) -> None:
     allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    allowed_data_selectors = _lazy_allowed_data_selectors(config, ontology, tools)
     selector_ids: dict[str, str] = {}
+    data_selector_ids: dict[str, str] = {}
     loaded_constraints = _load_lazy_constraints(config)
     if loaded_constraints is None:
         return
@@ -707,7 +828,9 @@ def _emit_lazy_constraints(
             constraints_path=constraints_path,
             constraints=constraints,
             allowed_selectors=allowed_selectors,
+            allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
+            data_selector_ids=data_selector_ids,
         )
     else:
         _emit_lazy_native_constraints(
@@ -716,7 +839,9 @@ def _emit_lazy_constraints(
             constraints_path=constraints_path,
             constraints=constraints,
             allowed_selectors=allowed_selectors,
+            allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
+            data_selector_ids=data_selector_ids,
         )
 
 
@@ -1377,17 +1502,8 @@ def build_fact_bundle(
             )
             for port in tool.inputs
         )
-        output_port_variants = tuple(
-            tuple(
-                resolver.iter_dimension_maps(
-                    _normalize_dim_map(port.dimensions),
-                    expand_outputs=True,
-                )
-            )
-            for port in tool.outputs
-        )
         input_variant_count = _product(len(variants) for variants in input_port_variants) if input_port_variants else 1
-        output_variant_count = sum(len(expanded_ports) for expanded_ports in output_port_variants)
+        output_variant_count = len(tool.outputs)
         tool_stats.append(
             ToolExpansionStat(
                 tool_id=tool.mode_id,
@@ -1415,19 +1531,19 @@ def build_fact_bundle(
             _variant_offset[tool.mode_id] += input_variant_count
 
         o_base = _output_offset[tool.mode_id]
-        for output_index, expanded_ports in enumerate(output_port_variants):
-            for variant_index, dims in enumerate(expanded_ports):
-                output_id = f"{tool.mode_id}_out_{o_base + output_index}_{variant_index}"
-                port_id = f"{output_id}_port_0"
-                writer.emit_fact("tool_output", _quote(tool.mode_id), _quote(output_id))
-                writer.emit_fact("output_port", _quote(output_id), _quote(port_id))
-                for dim, value in sorted(dims.items()):
+        for output_index, port in enumerate(tool.outputs):
+            output_id = f"{tool.mode_id}_out_{o_base + output_index}"
+            port_id = f"{output_id}_port_0"
+            writer.emit_fact("tool_output", _quote(tool.mode_id), _quote(output_id))
+            writer.emit_fact("output_port", _quote(output_id), _quote(port_id))
+            for dim, values in sorted(_normalize_dim_map(port.dimensions).items()):
+                for value in values:
                     writer.emit_fact(
                         "dimension",
                         _quote(port_id),
                         f"({_quote(value)}, {_quote(dim)})",
                     )
-        _output_offset[tool.mode_id] += len(output_port_variants)
+        _output_offset[tool.mode_id] += output_variant_count
 
     workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
     _emit_lazy_constraints(writer, config, ontology, tools)

@@ -43,6 +43,13 @@ def _resolve_path(base_dir: Path, value: str, *, must_exist: bool) -> Path:
     return candidates[0]
 
 
+def _resolve_solution_dir_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return path.resolve()
+
+
 def _normalize_io(items: Iterable[Mapping[str, Iterable[str]]]) -> tuple[Mapping[str, tuple[str, ...]], ...]:
     normalized = []
     for item in items:
@@ -75,7 +82,7 @@ def load_config(config_path: str | Path) -> SnakeConfig:
             if raw.get("constraints_path")
             else None
         ),
-        solutions_dir_path=_resolve_path(base_dir, raw["solutions_dir_path"], must_exist=False),
+        solutions_dir_path=_resolve_solution_dir_path(raw["solutions_dir_path"]),
         ontology_prefix=str(raw["ontologyPrefixIRI"]),
         tools_taxonomy_root=str(raw["toolsTaxonomyRoot"]),
         data_dimensions_taxonomy_roots=tuple(
