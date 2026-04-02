@@ -147,6 +147,9 @@ class WorkflowSolution:
     steps: tuple[WorkflowStep, ...]
     artifacts: Mapping[str, ArtifactRef]
     goal_outputs: Mapping[int, str]
+    signature_bindings: tuple[str, ...]
+    goal_bindings: tuple[str, ...]
+    workflow_signature_key: tuple[object, ...]
     canonical_key: tuple[object, ...]
 
     @property
@@ -210,6 +213,7 @@ class RunResult:
     translation_path: Path | None
     answer_set_path: Path | None
     solution_summary_path: Path | None
+    workflow_signature_path: Path | None
     graph_paths: tuple[Path, ...]
     raw_answer_sets_found: int = 0
     unique_solutions_found: int = 0

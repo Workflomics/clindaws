@@ -287,6 +287,40 @@ def _canonical_solution_key(
     return ("steps", step_key, "artifacts", artifact_key, "goals", goal_key)
 
 
+def _normalize_artifact_ref(ref_id: str) -> str:
+    if ref_id.startswith('"wf_input_') and ref_id.endswith('"'):
+        return ref_id.strip('"')
+    if ref_id.startswith("out(") and ref_id.endswith(")"):
+        inner = ref_id[4:-1]
+        parts = [part.strip() for part in inner.split(",", 2)]
+        time = int(parts[0])
+        port_id = parts[2].strip().strip('"')
+        port_index = _port_index(port_id)
+        if port_index is not None:
+            return f"t{time}:out{port_index}"
+        return f"t{time}:out[{port_id}]"
+    return ref_id.strip('"')
+
+
+def _binding_signature(time: int, binding: Binding) -> str:
+    port_index = _port_index(binding.port_id)
+    if port_index is not None:
+        port_text = f"in{port_index}"
+    else:
+        port_text = f"in[{binding.port_id}]"
+    return f"t{time}:{port_text}<-{_normalize_artifact_ref(binding.artifact_id)}"
+
+
+def _goal_signature(goal_index: int, artifact_id: str) -> str:
+    return f"g{goal_index}<-{_normalize_artifact_ref(artifact_id)}"
+
+
+def _workflow_signature_key(
+    steps: tuple[WorkflowStep, ...],
+) -> tuple[object, ...]:
+    return ("steps", tuple(step.tool_id for step in steps))
+
+
 def reconstruct_solution(
     index: int,
     symbols: Iterable[clingo.Symbol],
@@ -389,11 +423,24 @@ def reconstruct_solution(
         )
         for ref_id, artifact in artifacts.items()
     }
+    signature_bindings = tuple(
+        _binding_signature(step.time, binding)
+        for step in steps
+        for binding in step.bindings
+    )
+    goal_bindings = tuple(
+        _goal_signature(goal_index, artifact_id)
+        for goal_index, artifact_id in sorted(goal_outputs.items())
+    )
+    steps_tuple = tuple(steps)
 
     return WorkflowSolution(
         index=index,
-        steps=tuple(steps),
+        steps=steps_tuple,
         artifacts=frozen_artifacts,
         goal_outputs=goal_outputs,
-        canonical_key=_canonical_solution_key(tuple(steps), frozen_artifacts, goal_outputs),
+        signature_bindings=signature_bindings,
+        goal_bindings=goal_bindings,
+        workflow_signature_key=_workflow_signature_key(steps_tuple),
+        canonical_key=_canonical_solution_key(steps_tuple, frozen_artifacts, goal_outputs),
     )

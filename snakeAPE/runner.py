@@ -31,7 +31,11 @@ from .models import (
     TranslationRunResult,
 )
 from .ontology import Ontology
-from .rendering import render_solution_graphs, write_solution_summary
+from .rendering import (
+    render_solution_graphs,
+    write_solution_summary,
+    write_workflow_signatures,
+)
 from .runtime_stats import current_peak_rss_mb
 from .solver import (
     ground_multi_shot,
@@ -1050,6 +1054,7 @@ def run_once(
     max_length: int | None = None,
     graph_format: str = "png",
     render_graphs: bool = True,
+    write_raw_answer_sets: bool = False,
     progress_callback: ProgressCallback = None,
 ) -> RunResult:
     """Run one snakeAPE execution."""
@@ -1123,6 +1128,7 @@ def run_once(
 
     answer_set_path: Path | None = None
     summary_path: Path | None = None
+    workflow_signature_path: Path | None = None
     graph_paths: tuple[Path, ...] = ()
     rendering_sec = 0.0
 
@@ -1147,23 +1153,28 @@ def run_once(
     if not _timed_out:
         _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
         render_start = perf_counter()
-        answer_set_path = solution_dir / "answer_sets.txt"
-        if solve_output.raw_solutions:
-            _answer_set_content = "".join(
-                f"Answer Set {index}\n"
-                + " ".join(sorted(str(symbol) for symbol in symbols))
-                + "\n\n"
-                for index, symbols in enumerate(solve_output.raw_solutions, start=1)
-            )
-            answer_set_path.write_text(_answer_set_content, encoding="utf-8")
-        else:
-            _answer_set_content = "No answer sets found.\n"
-            answer_set_path.write_text(_answer_set_content, encoding="utf-8")
-        _config_stem = config.config_path.stem
-        _named_asp_path = config.solutions_dir_path / f"solutions_{_config_stem}_ASP.txt"
-        config.solutions_dir_path.mkdir(parents=True, exist_ok=True)
-        _named_asp_path.write_text(_answer_set_content, encoding="utf-8")
+        if write_raw_answer_sets or config.debug_mode:
+            answer_set_path = solution_dir / "answer_sets.txt"
+            if solve_output.raw_solutions:
+                _answer_set_content = "".join(
+                    f"Answer Set {index}\n"
+                    + " ".join(sorted(str(symbol) for symbol in symbols))
+                    + "\n\n"
+                    for index, symbols in enumerate(solve_output.raw_solutions, start=1)
+                )
+                answer_set_path.write_text(_answer_set_content, encoding="utf-8")
+            else:
+                _answer_set_content = "No answer sets found.\n"
+                answer_set_path.write_text(_answer_set_content, encoding="utf-8")
+            _config_stem = config.config_path.stem
+            _named_asp_path = config.solutions_dir_path / f"solutions_{_config_stem}_ASP.txt"
+            config.solutions_dir_path.mkdir(parents=True, exist_ok=True)
+            _named_asp_path.write_text(_answer_set_content, encoding="utf-8")
         summary_path = write_solution_summary(solution_dir / "solutions.txt", solutions)
+        workflow_signature_path = write_workflow_signatures(
+            solution_dir / "workflow_signatures.json",
+            solutions,
+        )
         graph_path_list: list[Path] = []
         if render_graphs:
             figures_dir = solution_dir / "Figures"
@@ -1225,6 +1236,7 @@ def run_once(
         translation_path=None,
         answer_set_path=answer_set_path,
         solution_summary_path=summary_path,
+        workflow_signature_path=workflow_signature_path,
         graph_paths=graph_paths,
         raw_answer_sets_found=len(solve_output.raw_solutions),
         unique_solutions_found=len(solutions),

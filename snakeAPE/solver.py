@@ -429,15 +429,15 @@ def _solve_multi_shot_with_programs(
                                     tool_input_signatures,
                                 )
                                 solution = reconstruct_solution(0, shown, tool_labels)
-                                canonical_key = solution.canonical_key
-                                if canonical_key not in seen_unique_keys:
-                                    seen_unique_keys.add(canonical_key)
+                                workflow_key = solution.workflow_signature_key
+                                if workflow_key not in seen_unique_keys:
+                                    seen_unique_keys.add(workflow_key)
                                     unique_workflows_seen += 1
                                 if len(raw_collected) < config.solutions:
                                     raw_collected.append(shown)
                                     models_stored += 1
-                                if canonical_key not in stored_unique_keys and len(unique_collected) < config.solutions:
-                                    stored_unique_keys.add(canonical_key)
+                                if workflow_key not in stored_unique_keys and len(unique_collected) < config.solutions:
+                                    stored_unique_keys.add(workflow_key)
                                     unique_collected.append(shown)
                                     unique_workflows_stored += 1
                                 elif solve_all_horizons and len(raw_collected) >= config.solutions and len(unique_collected) >= config.solutions:
@@ -574,15 +574,15 @@ def _solve_single_shot_with_programs(
                                 tool_input_signatures,
                             )
                             solution = reconstruct_solution(0, shown, tool_labels)
-                            canonical_key = solution.canonical_key
-                            if canonical_key not in seen_unique_keys:
-                                seen_unique_keys.add(canonical_key)
+                            workflow_key = solution.workflow_signature_key
+                            if workflow_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_key)
                                 unique_workflows_seen += 1
                             if len(raw_solutions) < config.solutions:
                                 raw_solutions.append(shown)
                                 models_stored += 1
-                            if canonical_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
-                                stored_unique_keys.add(canonical_key)
+                            if workflow_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
+                                stored_unique_keys.add(workflow_key)
                                 unique_solutions.append(shown)
                                 unique_workflows_stored += 1
                             elif solve_all_horizons and len(raw_solutions) >= config.solutions and len(unique_solutions) >= config.solutions:
@@ -706,15 +706,15 @@ def _solve_single_shot_once(
                             tool_input_signatures,
                         )
                         solution = reconstruct_solution(0, shown, tool_labels)
-                        canonical_key = solution.canonical_key
-                        if canonical_key not in seen_unique_keys:
-                            seen_unique_keys.add(canonical_key)
+                        workflow_key = solution.workflow_signature_key
+                        if workflow_key not in seen_unique_keys:
+                            seen_unique_keys.add(workflow_key)
                             unique_workflows_seen += 1
                         if len(raw_solutions) < config.solutions:
                             raw_solutions.append(shown)
                             models_stored += 1
-                        if canonical_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
-                            stored_unique_keys.add(canonical_key)
+                        if workflow_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
+                            stored_unique_keys.add(workflow_key)
                             unique_solutions.append(shown)
                             unique_workflows_stored += 1
                         if len(unique_solutions) >= config.solutions:

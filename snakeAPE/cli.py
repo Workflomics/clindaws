@@ -72,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip graph rendering.",
     )
     parser.add_argument(
+        "--write-raw-answer-sets",
+        action="store_true",
+        help="Write raw witness-level answer sets for debugging.",
+    )
+    parser.add_argument(
         "--benchmark-grounding",
         action="store_true",
         help="Run python, hybrid, and clingo grounding strategies and write a benchmark CSV.",
@@ -160,8 +165,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"grounding={record.grounding_sec:.3f}s "
                     f"solving={record.solving_sec:.3f}s "
                     f"total={record.total_sec:.3f}s "
-                    f"raw_solutions={record.raw_solutions_found} "
-                    f"unique_solutions={record.solutions_found} "
+                    f"workflows={record.solutions_found} "
                     f"timed_out={'yes' if record.timed_out else 'no'}"
                 )
             return 0
@@ -265,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
             max_length=args.max_length,
             graph_format=args.graph_format,
             render_graphs=not args.no_graphs,
+            write_raw_answer_sets=args.write_raw_answer_sets,
             progress_callback=_progress,
         )
         if run_result.translation_path is not None:
@@ -284,10 +289,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Answer sets written to: {run_result.answer_set_path}")
         if run_result.solution_summary_path is not None:
             print(f"Solutions written to: {run_result.solution_summary_path}")
+        if run_result.workflow_signature_path is not None:
+            print(f"Workflow signatures written to: {run_result.workflow_signature_path}")
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "
-            f"raw_solutions={run_result.raw_answer_sets_found} "
-            f"unique_solutions={run_result.unique_solutions_found} "
+            f"workflows={run_result.unique_solutions_found} "
             f"translation={run_result.timings.translation_sec:.3f}s "
             f"grounding={run_result.timings.grounding_sec:.3f}s "
             f"solving={run_result.timings.solving_sec:.3f}s "
