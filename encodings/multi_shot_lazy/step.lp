@@ -79,6 +79,20 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
 :- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2),
    artifact_ancestor(t, WF1, WF2).
 
+repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port) :-
+    TPrev < t,
+    occurs(TPrev, use_lazy_candidate(PrevTool, Candidate)),
+    occurs(t, use_lazy_candidate(Tool, Candidate)),
+    occurs(t, bind(Tool, _, out(TPrev, PrevTool, _))),
+    occurs(TPrev, bind(PrevTool, PortPrev, PrevWF)),
+    occurs(t, bind(Tool, Port, WF)),
+    holds(0, avail(PrevWF)),
+    holds(0, avail(WF)),
+    same_candidate_input_signature(Candidate, PortPrev, Candidate, Port).
+
+:- repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port),
+   WF < PrevWF.
+
 occurs(t, output(Tool, Candidate, Port)) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_output_port(Candidate, Port).
@@ -143,9 +157,13 @@ goal_satisfied_by(t, GoalID, WF) :-
     goal_dim_match(t, GoalID, WF, _, _),
     not goal_dim_missing(t, GoalID, WF).
 
+goal_satisfied_by_output(t, GoalID, WF) :-
+    goal_satisfied_by(t, GoalID, WF),
+    not holds(0, avail(WF)).
+
 goal_satisfied(t, GoalID) :-
     goal_output(GoalID, _, _),
-    goal_satisfied_by(t, GoalID, WF).
+    goal_satisfied_by_output(t, GoalID, WF).
 
 holds(t, goal) :-
     goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).

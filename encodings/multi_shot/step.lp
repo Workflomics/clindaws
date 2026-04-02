@@ -257,9 +257,13 @@ goal_satisfied_by(t, GoalID, WF) :-
     goal_dim_match(t, GoalID, WF, _, _),
     not goal_dim_missing(t, GoalID, WF).
 
+goal_satisfied_by_output(t, GoalID, WF) :-
+    goal_satisfied_by(t, GoalID, WF),
+    not holds(0, avail(WF)).
+
 goal_satisfied(t, GoalID) :-
     goal_output(GoalID, _, _),
-    goal_satisfied_by(t, GoalID, WF).
+    goal_satisfied_by_output(t, GoalID, WF).
 
 holds(t, goal) :-
     goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).

@@ -28,6 +28,16 @@ def _to_int(value: Any, default: int) -> int:
     return int(value)
 
 
+def _strip_prefix(value: str, prefix: str) -> str:
+    if prefix and value.startswith(prefix):
+        return value[len(prefix):]
+    if "#" in value:
+        return value.rsplit("#", 1)[1]
+    if "/" in value:
+        return value.rsplit("/", 1)[1]
+    return value
+
+
 def _resolve_path(base_dir: Path, value: str, *, must_exist: bool) -> Path:
     path = Path(value)
     if path.is_absolute():
@@ -50,12 +60,16 @@ def _resolve_solution_dir_path(value: str) -> Path:
     return path.resolve()
 
 
-def _normalize_io(items: Iterable[Mapping[str, Iterable[str]]]) -> tuple[Mapping[str, tuple[str, ...]], ...]:
+def _normalize_io(
+    items: Iterable[Mapping[str, Iterable[str]]],
+    *,
+    prefix: str,
+) -> tuple[Mapping[str, tuple[str, ...]], ...]:
     normalized = []
     for item in items:
         normalized.append(
             {
-                str(dim): tuple(str(value) for value in values)
+                str(dim): tuple(_strip_prefix(str(value), prefix) for value in values)
                 for dim, values in item.items()
             }
         )
@@ -71,6 +85,7 @@ def load_config(config_path: str | Path) -> SnakeConfig:
 
     base_dir = config_file.parent
     solution_length = raw.get("solution_length", {})
+    ontology_prefix = str(raw["ontologyPrefixIRI"])
 
     return SnakeConfig(
         config_path=config_file,
@@ -83,10 +98,11 @@ def load_config(config_path: str | Path) -> SnakeConfig:
             else None
         ),
         solutions_dir_path=_resolve_solution_dir_path(raw["solutions_dir_path"]),
-        ontology_prefix=str(raw["ontologyPrefixIRI"]),
-        tools_taxonomy_root=str(raw["toolsTaxonomyRoot"]),
+        ontology_prefix=ontology_prefix,
+        tools_taxonomy_root=_strip_prefix(str(raw["toolsTaxonomyRoot"]), ontology_prefix),
         data_dimensions_taxonomy_roots=tuple(
-            str(value) for value in raw.get("dataDimensionsTaxonomyRoots", [])
+            _strip_prefix(str(value), ontology_prefix)
+            for value in raw.get("dataDimensionsTaxonomyRoots", [])
         ),
         strict_tool_annotations=_to_bool(raw.get("strict_tool_annotations"), False),
         solution_length_min=_to_int(solution_length.get("min"), 1),
@@ -94,8 +110,8 @@ def load_config(config_path: str | Path) -> SnakeConfig:
         solutions=_to_int(raw.get("solutions"), 1),
         timeout_sec=_to_int(raw.get("timeout_sec"), 300),
         number_of_generated_graphs=_to_int(raw.get("number_of_generated_graphs"), 0),
-        inputs=_normalize_io(raw.get("inputs", [])),
-        outputs=_normalize_io(raw.get("outputs", [])),
+        inputs=_normalize_io(raw.get("inputs", []), prefix=ontology_prefix),
+        outputs=_normalize_io(raw.get("outputs", []), prefix=ontology_prefix),
         use_workflow_input=str(raw.get("use_workflow_input", "none")).upper(),
         use_all_generated_data=str(raw.get("use_all_generated_data", "none")).upper(),
         tool_seq_repeat=_to_bool(raw.get("tool_seq_repeat"), False),

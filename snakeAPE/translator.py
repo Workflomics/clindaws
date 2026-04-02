@@ -932,6 +932,8 @@ def _compress_lazy_output_choice_values(
     bindable_input_ports: tuple[Mapping[str, object], ...],
     goal_port_values: tuple[Mapping[str, tuple[str, ...]], ...],
     goal_fsets: tuple[Mapping[str, frozenset[str]], ...],
+    *,
+    preserve_goal_profiles: bool,
 ) -> dict[str, tuple[str, ...]]:
     globally_bindable_input_ports = tuple(
         input_port
@@ -996,7 +998,11 @@ def _compress_lazy_output_choice_values(
                     | goal_ids_by_dimension_value[dim].get(value, set())
                 )
             )
-            representatives.setdefault((consumer_profile, goal_profile), value)
+            profile_key = (
+                consumer_profile,
+                goal_profile if preserve_goal_profiles else (),
+            )
+            representatives.setdefault(profile_key, value)
 
         compressed[dim] = tuple(representatives.values())
 
@@ -1198,6 +1204,7 @@ def build_fact_bundle_grounding_opt_lazy(
                 relevant_input_ports,
                 goal_port_values_tuple,
                 goal_fsets,
+                preserve_goal_profiles=str(record["candidate_id"]) in direct_goal_candidates,
             )
             compressed_fset = {dim: frozenset(vals) for dim, vals in compressed_vals.items()}
             compressed_output_ports.append(

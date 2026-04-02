@@ -95,6 +95,7 @@ holds(t, avail(out(t, Tool, Port))) :-
 
 1 { occurs(t, output_dim(Tool, Port, V, Category)) :
     lazy_initial_goal_output_value(Candidate, Port, V, Category) } 1 :-
+    initial_goal_filter_active(t),
     occurs(t, output(Tool, Candidate, Port)),
     lazy_initial_goal_output_value(Candidate, Port, _, Category).
 
@@ -102,7 +103,6 @@ holds(t, avail(out(t, Tool, Port))) :-
     lazy_candidate_output_choice_value(Candidate, Port, V, Category) } 1 :-
     occurs(t, output(Tool, Candidate, Port)),
     lazy_candidate_output_choice_value(Candidate, Port, _, Category),
-    not lazy_initial_goal_output_value(Candidate, Port, _, Category),
     not initial_goal_filter_active(t).
 
 artifact_dim(out(t, Tool, Port), V, Category) :-
@@ -143,9 +143,13 @@ goal_satisfied_by(t, GoalID, WF) :-
     goal_dim_match(t, GoalID, WF, _, _),
     not goal_dim_missing(t, GoalID, WF).
 
+goal_satisfied_by_output(t, GoalID, WF) :-
+    goal_satisfied_by(t, GoalID, WF),
+    not holds(0, avail(WF)).
+
 goal_satisfied(t, GoalID) :-
     goal_output(GoalID, _, _),
-    goal_satisfied_by(t, GoalID, WF).
+    goal_satisfied_by_output(t, GoalID, WF).
 
 holds(t, goal) :-
     goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).
