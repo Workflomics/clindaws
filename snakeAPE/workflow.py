@@ -321,6 +321,27 @@ def _workflow_signature_key(
     return ("steps", tuple(step.tool_id for step in steps))
 
 
+def extract_workflow_signature_key(
+    symbols: Iterable[clingo.Symbol],
+) -> tuple[object, ...]:
+    """Extract the default workflow key directly from shown atoms.
+
+    The current workflow identity is the ordered tool sequence, so the hot
+    solve path only needs ``tool_at_time/2`` atoms and can avoid full
+    canonicalization/reconstruction for non-stored models.
+    """
+
+    step_tools: list[tuple[int, str]] = []
+    for symbol in symbols:
+        if symbol.type != clingo.SymbolType.Function or symbol.name != "tool_at_time":
+            continue
+        time = int(str(symbol.arguments[0]))
+        tool_id = _symbol_text(symbol.arguments[1])
+        step_tools.append((time, tool_id))
+    step_tools.sort()
+    return ("steps", tuple(tool_id for _, tool_id in step_tools))
+
+
 def reconstruct_solution(
     index: int,
     symbols: Iterable[clingo.Symbol],

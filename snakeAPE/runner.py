@@ -227,6 +227,7 @@ def _solve_worker_entrypoint(
     mode: str,
     config,
     fact_bundle,
+    capture_raw_models: bool,
     result_queue: multiprocessing.queues.Queue,
     progress_queue: multiprocessing.queues.Queue,
 ) -> None:
@@ -238,6 +239,7 @@ def _solve_worker_entrypoint(
             config,
             fact_bundle,
             progress_callback=_worker_progress,
+            capture_raw_models=capture_raw_models,
         )
         result_queue.put(
             {
@@ -272,6 +274,7 @@ def _run_solve_in_worker(
     mode: str,
     config,
     fact_bundle,
+    capture_raw_models: bool,
     remaining_timeout: float,
     progress_callback: ProgressCallback,
 ) -> tuple[object, bool]:
@@ -284,6 +287,7 @@ def _run_solve_in_worker(
             "mode": mode,
             "config": config,
             "fact_bundle": fact_bundle,
+            "capture_raw_models": capture_raw_models,
             "result_queue": result_queue,
             "progress_queue": progress_queue,
         },
@@ -1110,6 +1114,7 @@ def run_once(
             mode=mode,
             config=config,
             fact_bundle=fact_bundle,
+            capture_raw_models=write_raw_answer_sets or config.debug_mode,
             remaining_timeout=remaining_timeout,
             progress_callback=progress_callback,
         )

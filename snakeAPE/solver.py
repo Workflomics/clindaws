@@ -14,7 +14,7 @@ import clingo
 
 from .models import FactBundle, HorizonRecord, SnakeConfig
 from .runtime_stats import current_peak_rss_mb
-from .workflow import canonicalize_shown_symbols, reconstruct_solution
+from .workflow import canonicalize_shown_symbols, extract_workflow_signature_key
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -318,6 +318,7 @@ def _solve_multi_shot_with_programs(
     solve_all_horizons: bool = False,
     stop_on_solution: bool = True,
     horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     control = clingo.Control(["0", "--warn=none"])
     for program_path in program_paths:
@@ -333,7 +334,6 @@ def _solve_multi_shot_with_programs(
     stored_unique_keys: set[tuple[object, ...]] = set()
     horizon_records: list[HorizonRecord] = []
     solving_started = False
-    tool_labels = dict(facts.tool_labels)
     tool_input_signatures = dict(facts.tool_input_signatures)
 
     try:
@@ -400,23 +400,33 @@ def _solve_multi_shot_with_programs(
                             for model in handle:
                                 nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                                 models_seen += 1
-                                shown = canonicalize_shown_symbols(
-                                    model.symbols(shown=True),
-                                    tool_input_signatures,
-                                )
-                                solution = reconstruct_solution(0, shown, tool_labels)
-                                workflow_key = solution.workflow_signature_key
+                                shown_symbols = tuple(model.symbols(shown=True))
+                                workflow_key = extract_workflow_signature_key(shown_symbols)
                                 if workflow_key not in seen_unique_keys:
                                     seen_unique_keys.add(workflow_key)
                                     unique_workflows_seen += 1
-                                if len(raw_collected) < config.solutions:
+                                store_raw = capture_raw_models and len(raw_collected) < config.solutions
+                                store_unique = (
+                                    workflow_key not in stored_unique_keys
+                                    and len(unique_collected) < config.solutions
+                                )
+                                if store_raw or store_unique:
+                                    shown = canonicalize_shown_symbols(
+                                        shown_symbols,
+                                        tool_input_signatures,
+                                    )
+                                if store_raw:
                                     raw_collected.append(shown)
                                     models_stored += 1
-                                if workflow_key not in stored_unique_keys and len(unique_collected) < config.solutions:
+                                if store_unique:
                                     stored_unique_keys.add(workflow_key)
                                     unique_collected.append(shown)
                                     unique_workflows_stored += 1
-                                elif solve_all_horizons and len(raw_collected) >= config.solutions and len(unique_collected) >= config.solutions:
+                                elif (
+                                    solve_all_horizons
+                                    and (not capture_raw_models or len(raw_collected) >= config.solutions)
+                                    and len(unique_collected) >= config.solutions
+                                ):
                                     break
                                 if not solve_all_horizons and len(unique_collected) >= config.solutions:
                                     break
@@ -482,6 +492,7 @@ def _solve_single_shot_with_programs(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     solve_all_horizons: bool = False,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     """Solve using the single-shot encoding by iterating horizons."""
 
@@ -494,7 +505,6 @@ def _solve_single_shot_with_programs(
     base_grounding_sec = 0.0
     horizon_records: list[HorizonRecord] = []
     solving_started = False
-    tool_labels = dict(facts.tool_labels)
     tool_input_signatures = dict(facts.tool_input_signatures)
 
     horizon = config.solution_length_min
@@ -545,23 +555,33 @@ def _solve_single_shot_with_programs(
                         for model in handle:
                             nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                             models_seen += 1
-                            shown = canonicalize_shown_symbols(
-                                model.symbols(shown=True),
-                                tool_input_signatures,
-                            )
-                            solution = reconstruct_solution(0, shown, tool_labels)
-                            workflow_key = solution.workflow_signature_key
+                            shown_symbols = tuple(model.symbols(shown=True))
+                            workflow_key = extract_workflow_signature_key(shown_symbols)
                             if workflow_key not in seen_unique_keys:
                                 seen_unique_keys.add(workflow_key)
                                 unique_workflows_seen += 1
-                            if len(raw_solutions) < config.solutions:
+                            store_raw = capture_raw_models and len(raw_solutions) < config.solutions
+                            store_unique = (
+                                workflow_key not in stored_unique_keys
+                                and len(unique_solutions) < config.solutions
+                            )
+                            if store_raw or store_unique:
+                                shown = canonicalize_shown_symbols(
+                                    shown_symbols,
+                                    tool_input_signatures,
+                                )
+                            if store_raw:
                                 raw_solutions.append(shown)
                                 models_stored += 1
-                            if workflow_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
+                            if store_unique:
                                 stored_unique_keys.add(workflow_key)
                                 unique_solutions.append(shown)
                                 unique_workflows_stored += 1
-                            elif solve_all_horizons and len(raw_solutions) >= config.solutions and len(unique_solutions) >= config.solutions:
+                            elif (
+                                solve_all_horizons
+                                and (not capture_raw_models or len(raw_solutions) >= config.solutions)
+                                and len(unique_solutions) >= config.solutions
+                            ):
                                 break
                             if not solve_all_horizons and len(unique_solutions) >= config.solutions:
                                 break
@@ -622,13 +642,13 @@ def _solve_single_shot_once(
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     """Ground once with time(1..max_length) and solve in a single shot."""
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
     stored_unique_keys: set[tuple[object, ...]] = set()
-    tool_labels = dict(facts.tool_labels)
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_max
 
@@ -677,19 +697,25 @@ def _solve_single_shot_once(
                 with control.solve(yield_=True) as handle:
                     for model in handle:
                         models_seen += 1
-                        shown = canonicalize_shown_symbols(
-                            model.symbols(shown=True),
-                            tool_input_signatures,
-                        )
-                        solution = reconstruct_solution(0, shown, tool_labels)
-                        workflow_key = solution.workflow_signature_key
+                        shown_symbols = tuple(model.symbols(shown=True))
+                        workflow_key = extract_workflow_signature_key(shown_symbols)
                         if workflow_key not in seen_unique_keys:
                             seen_unique_keys.add(workflow_key)
                             unique_workflows_seen += 1
-                        if len(raw_solutions) < config.solutions:
+                        store_raw = capture_raw_models and len(raw_solutions) < config.solutions
+                        store_unique = (
+                            workflow_key not in stored_unique_keys
+                            and len(unique_solutions) < config.solutions
+                        )
+                        if store_raw or store_unique:
+                            shown = canonicalize_shown_symbols(
+                                shown_symbols,
+                                tool_input_signatures,
+                            )
+                        if store_raw:
                             raw_solutions.append(shown)
                             models_stored += 1
-                        if workflow_key not in stored_unique_keys and len(unique_solutions) < config.solutions:
+                        if store_unique:
                             stored_unique_keys.add(workflow_key)
                             unique_solutions.append(shown)
                             unique_workflows_stored += 1
@@ -743,6 +769,7 @@ def solve_single_shot(
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     """Solve using the single-shot encoding: ground once for max horizon, solve once."""
 
@@ -753,6 +780,7 @@ def solve_single_shot(
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
+        capture_raw_models=capture_raw_models,
     )
 
 
@@ -848,6 +876,7 @@ def solve_multi_shot(
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     """Solve using the multi-shot encoding."""
     return _solve_multi_shot_with_programs(
@@ -859,6 +888,7 @@ def solve_multi_shot(
         horizon_record_callback=horizon_record_callback,
         solve_all_horizons=False,
         stop_on_solution=False,
+        capture_raw_models=capture_raw_models,
     )
 
 
@@ -901,6 +931,7 @@ def solve_multi_shot_lazy(
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
 ) -> SolveOutput:
     """Solve using the lazy multi-shot encoding."""
 
@@ -919,6 +950,7 @@ def solve_multi_shot_lazy(
             initial_step_program="step_initial",
             initial_seed_program=None,
         ),
+        capture_raw_models=capture_raw_models,
     )
 
 
