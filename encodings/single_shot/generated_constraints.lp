@@ -3,14 +3,8 @@
 
 % Resolve translated selectors to concrete tool runs.
 constraint_selected_tool(T, Sel, Tool) :-
-    constraint_selector(Sel, Tool),
-    occurs(T, run(Tool)).
-
-constraint_selected_tool(T, Sel, Tool) :-
-    constraint_selector(Sel, Class),
-    tool_abstract_class(Class),
     occurs(T, run(Tool)),
-    tool_is_a(Tool, Class).
+    constraint_selector_matches_tool(Sel, Tool).
 
 constraint_selected_time(T, Sel) :-
     constraint_selected_tool(T, Sel, _).

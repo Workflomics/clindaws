@@ -176,6 +176,18 @@ tool_is_a(Tool, Class)     :- tool(Tool), tool_ancestor(Tool, Class).
 tool_is_a(Class, Ancestor) :- tool_abstract_class(Class), tool_ancestor(Class, Ancestor).
 tool_is_a(Class, Class)    :- tool_abstract_class(Class).
 tools_in_class(Class, Tool):- tool_is_a(Tool, Class), tool(Tool).
+tool_direct_selector(Tool, Tool) :- tool(Tool).
+tool_direct_selector(Tool, Selector) :-
+    tool(Tool),
+    tool_taxonomy(_, (Tool, Selector)).
+constraint_selector_matches_tool(Sel, Tool) :-
+    constraint_selector(Sel, Selector),
+    constraint_selector_mode(Sel, "transitive"),
+    tool_is_a(Tool, Selector).
+constraint_selector_matches_tool(Sel, Tool) :-
+    constraint_selector(Sel, Selector),
+    constraint_selector_mode(Sel, "exact"),
+    tool_direct_selector(Tool, Selector).
 
 requirement_filtering_active :- target_capability(_, _).
 

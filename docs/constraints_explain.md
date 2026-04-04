@@ -28,7 +28,16 @@ Constraint selectors refer to tools or tool classes from the ontology and tool a
   - `connected_op(CreateStructureBulk, RunDFT)`
   - `mutex_tools(RunVasp, RunSphinx)`
 
-Selectors are matched against the taxonomy-aware `constraint_selected_tool/3` relation in the lazy ASP layer, so a class selector can match any concrete tool implementation below it.
+Selectors are matched against `constraint_selected_tool/3` through an explicit
+selector-mode layer.
+
+Today the default mode is still taxonomy-aware `transitive` matching, so a
+class selector can match any concrete tool implementation below it. The
+translator now also emits selector metadata (`constraint_selector_mode/2`,
+`constraint_selector_kind/2`) and the ASP layer exposes an exact/direct tool
+surface via `tool_direct_selector/2`. That keeps the ontology closure intact
+while making template-specific selector narrowing possible when SAT evidence
+shows it is required.
 
 ## APE-Style Templates From `constraints.json`
 
@@ -97,6 +106,8 @@ Implemented in the current benchmark-targeted paths:
 - APE-style templates listed above
 - Native atoms listed above
 - Taxonomy-aware selector matching for concrete tools and abstract tool classes
+- Explicit selector metadata so exact/direct matching can be enabled per
+  template without weakening the ontology hierarchy
 - Data-selector constraints over workflow artifacts, including non-ontology labels such as `APE_label`
 - Native `connected_op` with actual data-flow semantics, not just ordering
 

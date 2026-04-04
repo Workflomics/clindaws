@@ -48,6 +48,20 @@ def _dedupe_stable(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _prefer_less_specific_value(
+    ontology: Ontology,
+    current: str,
+    candidate: str,
+) -> str:
+    current_depth = len(ontology.ancestors_of(current))
+    candidate_depth = len(ontology.ancestors_of(candidate))
+    if candidate_depth < current_depth:
+        return candidate
+    if candidate_depth > current_depth:
+        return current
+    return candidate if candidate < current else current
+
+
 def _reduce_requirement_values(
     ontology: Ontology,
     values: Iterable[str],
@@ -461,6 +475,25 @@ _LAZY_NATIVE_CONSTRAINTS = _LAZY_SUPPORTED_CONSTRAINTS | {
 
 _CONSTRAINT_ATOM_PATTERN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\((.*)\)\s*$")
 
+_CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE: dict[str, str] = {
+    "use_m": "transitive",
+    "nuse_m": "transitive",
+    "unique_inputs": "transitive",
+    "first_m": "transitive",
+    "not_consecutive": "transitive",
+    "at_step": "transitive",
+    "ite_m": "transitive",
+    "depend_m": "transitive",
+    "itn_m": "transitive",
+    "next_m": "transitive",
+    "used_iff_used": "transitive",
+    "max_uses": "transitive",
+    "mutex_tools": "transitive",
+    "connected_op": "transitive",
+    "operationInput": "transitive",
+    "operation_input": "transitive",
+}
+
 
 def _strip_constraint_value(value: str, prefix: str) -> str:
     if prefix and value.startswith(prefix):
@@ -486,6 +519,30 @@ def _extract_constraint_selector(
                 return _strip_constraint_value(str(raw_value), prefix)
         break
     raise ValueError("parameter did not contain a selector value")
+
+
+def _constraint_selector_kind(
+    selector: str,
+    *,
+    tool_ids: set[str],
+    operation_ids: set[str],
+) -> str:
+    if selector in tool_ids:
+        return "tool"
+    if selector in operation_ids or selector.startswith("operation_"):
+        return "operation"
+    return "class"
+
+
+def _constraint_selector_mode(
+    constraint_name: str,
+    *,
+    selector_kind: str,
+) -> str:
+    mode = _CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE.get(constraint_name, "transitive")
+    if mode == "exact" and selector_kind == "class":
+        return "transitive"
+    return mode
 
 
 def _parse_constraint_atom(text: str) -> tuple[str, tuple[str | int, ...]]:
@@ -599,8 +656,10 @@ def _emit_lazy_constraint(
     args: tuple[str | int, ...],
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
-    selector_ids: dict[str, str],
+    selector_ids: dict[tuple[str, str], str],
     data_selector_ids: dict[str, str],
+    tool_ids: set[str],
+    operation_ids: set[str],
     source_name: str,
     index: int,
 ) -> None:
@@ -608,11 +667,31 @@ def _emit_lazy_constraint(
         writer.emit_comment(f"skipping {source_name} constraint {index}: {reason}")
 
     def _selector_id_for(selector: str) -> str:
-        selector_id = selector_ids.get(selector)
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_mode = _constraint_selector_mode(
+            constraint_name,
+            selector_kind=selector_kind,
+        )
+        selector_key = (selector, selector_mode)
+        selector_id = selector_ids.get(selector_key)
         if selector_id is None:
             selector_id = f"constraint_selector_{len(selector_ids)}"
-            selector_ids[selector] = selector_id
+            selector_ids[selector_key] = selector_id
             writer.emit_fact("constraint_selector", _quote(selector_id), _quote(selector))
+            writer.emit_fact(
+                "constraint_selector_kind",
+                _quote(selector_id),
+                _quote(selector_kind),
+            )
+            writer.emit_fact(
+                "constraint_selector_mode",
+                _quote(selector_id),
+                _quote(selector_mode),
+            )
         return selector_id
 
     def _data_selector_id_for(raw_selector: str) -> str:
@@ -680,7 +759,7 @@ def _emit_lazy_constraint(
             return
         selector = _selector_arg(0)
         if selector is not None:
-            writer.emit_fact("must_use", _quote(selector))
+            writer.emit_fact("constraint_must_use", _quote(_selector_id_for(selector)))
         return
 
     if constraint_name == "nuse_m":
@@ -689,7 +768,7 @@ def _emit_lazy_constraint(
             return
         selector = _selector_arg(0)
         if selector is not None:
-            writer.emit_fact("must_not_use", _quote(selector))
+            writer.emit_fact("constraint_must_not_use", _quote(_selector_id_for(selector)))
         return
 
     if constraint_name == "unique_inputs":
@@ -819,8 +898,10 @@ def _emit_lazy_template_constraints(
     constraints: list[Mapping[str, Any]],
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
-    selector_ids: dict[str, str],
+    selector_ids: dict[tuple[str, str], str],
     data_selector_ids: dict[str, str],
+    tool_ids: set[str],
+    operation_ids: set[str],
 ) -> None:
     writer.emit_comment(
         f"lazy constraint translation from {constraints_path.name}"
@@ -865,6 +946,8 @@ def _emit_lazy_template_constraints(
             allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
             data_selector_ids=data_selector_ids,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
             source_name=constraints_path.name,
             index=index,
         )
@@ -878,8 +961,10 @@ def _emit_lazy_native_constraints(
     constraints: list[str],
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
-    selector_ids: dict[str, str],
+    selector_ids: dict[tuple[str, str], str],
     data_selector_ids: dict[str, str],
+    tool_ids: set[str],
+    operation_ids: set[str],
 ) -> None:
     writer.emit_comment(
         f"lazy native constraint translation from {constraints_path.name}"
@@ -912,6 +997,8 @@ def _emit_lazy_native_constraints(
             allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
             data_selector_ids=data_selector_ids,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
             source_name=constraints_path.name,
             index=index,
         )
@@ -960,8 +1047,10 @@ def _emit_lazy_constraints(
 ) -> None:
     allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
     allowed_data_selectors = _lazy_allowed_data_selectors(config, ontology, tools)
-    selector_ids: dict[str, str] = {}
+    selector_ids: dict[tuple[str, str], str] = {}
     data_selector_ids: dict[str, str] = {}
+    tool_ids = {tool.mode_id for tool in tools}
+    operation_ids = {tax_op for tool in tools for tax_op in tool.taxonomy_operations}
     loaded_constraints = _load_lazy_constraints(config)
     if loaded_constraints is None:
         return
@@ -977,6 +1066,8 @@ def _emit_lazy_constraints(
             allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
             data_selector_ids=data_selector_ids,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
         )
     else:
         _emit_lazy_native_constraints(
@@ -988,6 +1079,8 @@ def _emit_lazy_constraints(
             allowed_data_selectors=allowed_data_selectors,
             selector_ids=selector_ids,
             data_selector_ids=data_selector_ids,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
         )
 
 
@@ -1073,6 +1166,7 @@ def _lazy_output_matches_lazy_input_fset(
 
 
 def _compress_lazy_output_choice_values(
+    ontology: Ontology,
     output_values_by_dimension: Mapping[str, tuple[str, ...]],
     output_fsets: Mapping[str, frozenset[str]],
     bindable_input_ports: tuple[Mapping[str, object], ...],
@@ -1149,7 +1243,14 @@ def _compress_lazy_output_choice_values(
                 consumer_profile,
                 goal_profile if preserve_goal_profiles else (),
             )
-            representatives.setdefault(profile_key, value)
+            if profile_key in representatives:
+                representatives[profile_key] = _prefer_less_specific_value(
+                    ontology,
+                    representatives[profile_key],
+                    value,
+                )
+            else:
+                representatives[profile_key] = value
 
         compressed[dim] = tuple(representatives.values())
 
@@ -1338,6 +1439,7 @@ def build_lazy_fact_bundle(
         compressed_output_ports: list[dict[str, object]] = []
         for output_port in tuple(record["output_ports"]):
             compressed_vals = _compress_lazy_output_choice_values(
+                ontology,
                 output_port["port_values_by_dimension"],
                 output_port["port_values_fset"],
                 relevant_input_ports,

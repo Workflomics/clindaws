@@ -17,35 +17,14 @@
 % ----------------------------------------------------------------
 
 :- query(t),
-   must_use(Tool),
-   not tool_abstract_class(Tool),
-   #count { T : occurs(T, run(Tool)) } = 0.
+   constraint_must_use(Sel),
+   #count { T, Tool : occurs(T, run(Tool)), constraint_selector_matches_tool(Sel, Tool) } = 0.
 
 % ----------------------------------------------------------------
 % must_not_use(Tool) — concrete tool must not run at all
 % ----------------------------------------------------------------
 
 :- query(t),
-   must_not_use(Tool),
-   not tool_abstract_class(Tool),
-   occurs(_, run(Tool)).
-
-% ----------------------------------------------------------------
-% must_use(Class) — at least one member of the abstract class runs
-% ----------------------------------------------------------------
-
-:- query(t),
-   must_use(Class),
-   tool_abstract_class(Class),
-   #count { Tool : tool_is_a(Tool, Class), occurs(_, run(Tool)) } = 0.
-
-% ----------------------------------------------------------------
-% must_not_use(Class) — no member of the abstract class runs
-% ----------------------------------------------------------------
-
-:- query(t),
-   must_not_use(Class),
-   tool_abstract_class(Class),
-   tool_is_a(Tool, Class),
-   tool(Tool),
-   occurs(_, run(Tool)).
+   constraint_must_not_use(Sel),
+   occurs(_, run(Tool)),
+   constraint_selector_matches_tool(Sel, Tool).

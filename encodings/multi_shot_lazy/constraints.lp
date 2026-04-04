@@ -1,6 +1,8 @@
 % LAZY CONSTRAINTS (multi-shot-lazy)
 % Constraint facts are emitted by the Python translator into the base facts:
 %   constraint_selector(SelID, SelectorName)
+%   constraint_selector_mode(SelID, Mode)
+%   constraint_selector_kind(SelID, Kind)
 %   constraint_first(SelID)
 %   constraint_not_consecutive(SelID)
 %   constraint_tool_at_step(Step, SelID)
@@ -16,8 +18,8 @@
 %   constraint_data_selector(DataSelID, DataSelectorValue)
 %   constraint_use_data(DataSelID)
 %   constraint_operation_input(ModuleSelID, DataSelID)
-%   must_use(Selector)      -- handled by tool_inclusion.lp
-%   must_not_use(Selector)  -- handled by tool_inclusion.lp
+%   constraint_must_use(SelID)      -- handled by tool_inclusion.lp
+%   constraint_must_not_use(SelID)  -- handled by tool_inclusion.lp
 
 % Data-selector helpers are global: artifact_dim/3 already accumulates across
 % steps, so these heads must live in the base program rather than an
@@ -44,14 +46,8 @@ constraint_used_data(Sel) :-
 #program constraint_step(t).
 
 constraint_selected_tool(t, Sel, Tool) :-
-    constraint_selector(Sel, Tool),
-    occurs(t, run(Tool)).
-
-constraint_selected_tool(t, Sel, Tool) :-
-    constraint_selector(Sel, Class),
-    tool_abstract_class(Class),
     occurs(t, run(Tool)),
-    tool_is_a(Tool, Class).
+    constraint_selector_matches_tool(Sel, Tool).
 
 constraint_selected_time(t, Sel) :-
     constraint_selected_tool(t, Sel, _).
@@ -60,7 +56,8 @@ constraint_selected_time(t, Sel) :-
 % All rules are guarded by query(t) so they only fire when the solver
 % tests whether the workflow of length t is a valid solution.
 % use_m / nuse_m are intentionally absent here — tool_inclusion.lp
-% already enforces must_use / must_not_use in its own check(t) block.
+% already enforces constraint_must_use / constraint_must_not_use in its own
+% check(t) block.
 #program check(t).
 
 % first_m: selector must appear at T=1 and nowhere else.
