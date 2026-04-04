@@ -86,6 +86,13 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
 :- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2),
    artifact_ancestor(t, WF1, WF2).
 
+:- occurs(t, use_lazy_candidate(Tool, Candidate)),
+   occurs(t, bind(Tool, Port1, WF1)),
+   occurs(t, bind(Tool, Port2, WF2)),
+   Port1 < Port2,
+   same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
+   equivalent_workflow_inputs(WF2, WF1).
+
 occurs(t, output(Tool, Candidate, Port)) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_output_port(Candidate, Port).

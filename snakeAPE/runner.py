@@ -66,7 +66,9 @@ SCHEMA_PREDICATES = (
     "lazy_initial_bindable",
     "lazy_candidate_input_port",
     "lazy_candidate_input_signature_id",
-    "lazy_candidate_input_value",
+    "lazy_signature_profile",
+    "lazy_profile_value",
+    "lazy_profile_accepts",
     "lazy_candidate_output_port",
     "lazy_candidate_output_singleton",
     "lazy_candidate_output_choice_value",
@@ -653,7 +655,8 @@ def _translation_schema(fact_bundle) -> str:
         fact_bundle.predicate_counts.get(name, 0)
         for name in (
             "lazy_tool_candidate",
-            "lazy_candidate_input_value",
+            "lazy_signature_profile",
+            "lazy_profile_value",
             "lazy_candidate_output_singleton",
             "lazy_candidate_output_choice_value",
         )
@@ -687,7 +690,8 @@ def _encoding_schema_summary(mode: str) -> dict[str, object]:
                 predicate_presence[name]
                 for name in (
                     "lazy_tool_candidate",
-                    "lazy_candidate_input_value",
+                    "lazy_signature_profile",
+                    "lazy_profile_value",
                     "lazy_candidate_output_singleton",
                     "lazy_candidate_output_choice_value",
                 )
@@ -733,7 +737,8 @@ def _translation_warnings(
         encoding_presence[name]
         for name in (
             "lazy_tool_candidate",
-            "lazy_candidate_input_value",
+            "lazy_signature_profile",
+            "lazy_profile_value",
             "lazy_candidate_output_singleton",
             "lazy_candidate_output_choice_value",
         )

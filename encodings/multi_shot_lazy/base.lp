@@ -11,6 +11,9 @@ compatible(V, Ancestor) :- is_terminal(V), ancestor(V, Ancestor).
 artifact_dim(WF, V, Category) :-
     holds(0, dim(WF, V, Category)).
 
+workflow_input(WF) :-
+    holds(0, avail(WF)).
+
 tool_has_input(Tool) :-
     lazy_tool_candidate(Candidate, Tool),
     lazy_candidate_input_port(Candidate, _).
@@ -27,8 +30,12 @@ candidate_single_input(Candidate) :-
     lazy_tool_candidate(Candidate, _),
     1 = #count { Port : lazy_candidate_input_port(Candidate, Port) }.
 
+lazy_signature_category(SignatureId, Category) :-
+    lazy_signature_profile(SignatureId, Category, _).
+
 lazy_candidate_input_category(Candidate, Port, Category) :-
-    lazy_candidate_input_value(Candidate, Port, _, Category).
+    lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
+    lazy_signature_category(SignatureId, Category).
 
 lazy_candidate_output_category(Candidate, Port, Category) :-
     lazy_candidate_output_singleton(Candidate, Port, _, Category).
@@ -201,6 +208,24 @@ port_env_compatible(Tool, Port) :-
 
 eligible(Candidate, Port, WF) :-
     lazy_initial_bindable(Candidate, Port, WF).
+
+workflow_input_profile_mismatch(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    artifact_dim(WF1, V, Category),
+    not artifact_dim(WF2, V, Category).
+
+equivalent_workflow_inputs(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    WF1 < WF2,
+    not workflow_input_profile_mismatch(WF1, WF2),
+    not workflow_input_profile_mismatch(WF2, WF1).
+
+smaller_equivalent_eligible_input(Candidate, Port, WF, SmallerWF) :-
+    eligible(Candidate, Port, WF),
+    eligible(Candidate, Port, SmallerWF),
+    equivalent_workflow_inputs(SmallerWF, WF).
 
 % Pre-computed helpers for paired_symmetric_producers to reduce per-step join cost.
 symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-

@@ -30,8 +30,9 @@ bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, Produ
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
+    lazy_signature_profile(SignatureId, Category, ProfileId),
     artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
-    lazy_bound_output_support(ProducerCandidate, ProducerPort, SignatureId, ActualV, Category).
+    lazy_profile_accepts(ProfileId, ActualV).
 
 :- occurs(t, use_lazy_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
@@ -79,6 +80,13 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
 :- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2),
    artifact_ancestor(t, WF1, WF2).
 
+:- occurs(t, use_lazy_candidate(Tool, Candidate)),
+   occurs(t, bind(Tool, Port1, WF1)),
+   occurs(t, bind(Tool, Port2, WF2)),
+   Port1 < Port2,
+   same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
+   equivalent_workflow_inputs(WF2, WF1).
+
 repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port) :-
     TPrev < t,
     occurs(TPrev, use_lazy_candidate(PrevTool, Candidate)),
@@ -92,6 +100,12 @@ repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, 
 
 :- repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port),
    WF < PrevWF.
+
+:- query(t),
+   occurs(t, use_lazy_candidate(Tool, Candidate)),
+   occurs(t, bind(Tool, Port, WF)),
+   smaller_equivalent_eligible_input(Candidate, Port, WF, _),
+   1 < #count { T2, Tool2, Port2 : occurs(T2, bind(Tool2, Port2, WF)) }.
 
 occurs(t, output(Tool, Candidate, Port)) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),

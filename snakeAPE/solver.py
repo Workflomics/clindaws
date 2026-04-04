@@ -331,6 +331,7 @@ def _solve_multi_shot_with_programs(
     base_grounding_sec = 0.0
     raw_collected: list[tuple[clingo.Symbol, ...]] = []
     unique_collected: list[tuple[clingo.Symbol, ...]] = []
+    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     horizon_records: list[HorizonRecord] = []
     solving_started = False
@@ -405,7 +406,11 @@ def _solve_multi_shot_with_programs(
                                 if workflow_key not in seen_unique_keys:
                                     seen_unique_keys.add(workflow_key)
                                     unique_workflows_seen += 1
-                                store_raw = capture_raw_models and len(raw_collected) < config.solutions
+                                store_raw = (
+                                    capture_raw_models
+                                    and workflow_key not in stored_raw_keys
+                                    and len(raw_collected) < config.solutions
+                                )
                                 store_unique = (
                                     workflow_key not in stored_unique_keys
                                     and len(unique_collected) < config.solutions
@@ -416,6 +421,7 @@ def _solve_multi_shot_with_programs(
                                         tool_input_signatures,
                                     )
                                 if store_raw:
+                                    stored_raw_keys.add(workflow_key)
                                     raw_collected.append(shown)
                                     models_stored += 1
                                 if store_unique:
@@ -498,6 +504,7 @@ def _solve_single_shot_with_programs(
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
+    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     total_grounding = 0.0
     total_solving = 0.0
@@ -560,7 +567,11 @@ def _solve_single_shot_with_programs(
                             if workflow_key not in seen_unique_keys:
                                 seen_unique_keys.add(workflow_key)
                                 unique_workflows_seen += 1
-                            store_raw = capture_raw_models and len(raw_solutions) < config.solutions
+                            store_raw = (
+                                capture_raw_models
+                                and workflow_key not in stored_raw_keys
+                                and len(raw_solutions) < config.solutions
+                            )
                             store_unique = (
                                 workflow_key not in stored_unique_keys
                                 and len(unique_solutions) < config.solutions
@@ -571,6 +582,7 @@ def _solve_single_shot_with_programs(
                                     tool_input_signatures,
                                 )
                             if store_raw:
+                                stored_raw_keys.add(workflow_key)
                                 raw_solutions.append(shown)
                                 models_stored += 1
                             if store_unique:
@@ -648,6 +660,7 @@ def _solve_single_shot_once(
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
+    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_max
@@ -702,7 +715,11 @@ def _solve_single_shot_once(
                         if workflow_key not in seen_unique_keys:
                             seen_unique_keys.add(workflow_key)
                             unique_workflows_seen += 1
-                        store_raw = capture_raw_models and len(raw_solutions) < config.solutions
+                        store_raw = (
+                            capture_raw_models
+                            and workflow_key not in stored_raw_keys
+                            and len(raw_solutions) < config.solutions
+                        )
                         store_unique = (
                             workflow_key not in stored_unique_keys
                             and len(unique_solutions) < config.solutions
@@ -713,6 +730,7 @@ def _solve_single_shot_once(
                                 tool_input_signatures,
                             )
                         if store_raw:
+                            stored_raw_keys.add(workflow_key)
                             raw_solutions.append(shown)
                             models_stored += 1
                         if store_unique:

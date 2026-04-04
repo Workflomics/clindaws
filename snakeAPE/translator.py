@@ -48,6 +48,118 @@ def _dedupe_stable(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _reduce_requirement_values(
+    ontology: Ontology,
+    values: Iterable[str],
+) -> tuple[str, ...]:
+    """Drop requirement values subsumed by a more general retained value."""
+
+    ordered_values = _dedupe_stable(values)
+    if len(ordered_values) <= 1:
+        return ordered_values
+    if all(not ontology.child_map.get(value, frozenset()) for value in ordered_values):
+        return ordered_values
+
+    reduced: list[str] = []
+    for value in ordered_values:
+        value_ancestors = ontology.ancestors_of(value)
+        if any(existing in value_ancestors for existing in reduced):
+            continue
+        reduced = [
+            existing
+            for existing in reduced
+            if value not in ontology.ancestors_of(existing)
+        ]
+        reduced.append(value)
+    return tuple(reduced)
+
+
+def _reduce_signature_requirements(
+    ontology: Ontology,
+    requirements: Mapping[str, tuple[str, ...]],
+) -> dict[str, tuple[str, ...]]:
+    reduced: dict[str, tuple[str, ...]] = {}
+    for dim, values in sorted(requirements.items()):
+        reduced_values = _reduce_requirement_values(ontology, values)
+        if reduced_values:
+            reduced[dim] = reduced_values
+    return reduced
+
+
+def _signature_key(
+    requirements: Mapping[str, tuple[str, ...]],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        (dim, tuple(values))
+        for dim, values in sorted(requirements.items())
+    )
+
+
+def _assign_lazy_signature_profiles(
+    ontology: Ontology,
+    roots: Mapping[str, frozenset[str]],
+    input_ports: Iterable[dict[str, object]],
+) -> tuple[
+    dict[int, dict[str, tuple[int, tuple[str, ...]]]],
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[str, ...]],
+    dict[str, int],
+]:
+    """Assign reduced signature/profile ids to lazy input ports."""
+
+    raw_requirement_count = 0
+    reduced_requirement_count = 0
+    signature_ids_by_key: dict[tuple[tuple[str, tuple[str, ...]], ...], int] = {}
+    profile_ids_by_key: dict[tuple[str, tuple[str, ...]], int] = {}
+    signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]] = {}
+    profile_values_by_id: dict[int, tuple[str, ...]] = {}
+    profile_accepts_by_id: dict[int, tuple[str, ...]] = {}
+
+    for input_port in input_ports:
+        port_requirements = input_port["port_values_by_dimension"]
+        assert isinstance(port_requirements, Mapping)
+        raw_requirement_count += sum(len(values) for values in port_requirements.values())
+        reduced_requirements = _reduce_signature_requirements(ontology, port_requirements)
+        reduced_requirement_count += sum(len(values) for values in reduced_requirements.values())
+        input_port["signature_requirements"] = reduced_requirements
+
+        signature_key = _signature_key(reduced_requirements)
+        signature_id = signature_ids_by_key.setdefault(signature_key, len(signature_ids_by_key))
+        input_port["signature_id"] = signature_id
+
+    for signature_key, signature_id in sorted(signature_ids_by_key.items(), key=lambda item: item[1]):
+        category_profiles: dict[str, tuple[int, tuple[str, ...]]] = {}
+        for category, values in signature_key:
+            profile_key = (category, values)
+            profile_id = profile_ids_by_key.setdefault(profile_key, len(profile_ids_by_key))
+            profile_values_by_id.setdefault(profile_id, values)
+            profile_accepts_by_id.setdefault(
+                profile_id,
+                _dedupe_stable(
+                    actual_value
+                    for required_value in values
+                    for actual_value in ontology.terminal_descendants_of(
+                        required_value,
+                        within=roots.get(category, frozenset()),
+                    )
+                ),
+            )
+            category_profiles[category] = (profile_id, values)
+        signature_profiles_by_id[signature_id] = category_profiles
+
+    return (
+        signature_profiles_by_id,
+        profile_values_by_id,
+        profile_accepts_by_id,
+        {
+            "lazy_raw_signature_requirement_count": raw_requirement_count,
+            "lazy_reduced_signature_requirement_count": reduced_requirement_count,
+            "lazy_signature_count": len(signature_profiles_by_id),
+            "lazy_profile_count": len(profile_values_by_id),
+        },
+    )
+
+
 def _port_signature(spec) -> tuple[tuple[str, tuple[str, ...]], ...]:
     return tuple(
         (str(dim), tuple(str(value) for value in values))
@@ -989,7 +1101,8 @@ def _compress_lazy_output_choice_values(
     )
     for input_port in globally_bindable_input_ports:
         signature_id = int(input_port["signature_id"])
-        input_dims = input_port["port_values_by_dimension"]
+        input_dims = input_port.get("signature_requirements", input_port["port_values_by_dimension"])
+        assert isinstance(input_dims, Mapping)
         for dim in output_values_by_dimension:
             required_values = input_dims.get(dim)
             if required_values is None:
@@ -1056,7 +1169,6 @@ def build_lazy_fact_bundle(
     candidate_records: list[dict[str, object]] = []
 
     lazy_offset: dict[str, int] = defaultdict(int)
-    _input_sig_to_id: dict[frozenset, int] = {}
 
     for tool in tools:
         candidate_index = lazy_offset[tool.mode_id]
@@ -1079,9 +1191,6 @@ def build_lazy_fact_bundle(
                 expand_outputs=False,
             )
             port_values_by_dimension = _group_port_values_by_dimension(port_values)
-            sig = frozenset(port_values)
-            if sig not in _input_sig_to_id:
-                _input_sig_to_id[sig] = len(_input_sig_to_id)
             workflow_input_matches = [
                 wf_index
                 for wf_index, workflow_input in enumerate(config.inputs)
@@ -1093,7 +1202,6 @@ def build_lazy_fact_bundle(
                     "port_values": port_values,
                     "port_values_by_dimension": port_values_by_dimension,
                     "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
-                    "signature_id": _input_sig_to_id[sig],
                     "workflow_input_matches": workflow_input_matches,
                 }
             )
@@ -1221,12 +1329,11 @@ def build_lazy_fact_bundle(
         for record in relevant_records
         for input_port in tuple(record["input_ports"])
     )
-    signature_requirements_by_id: dict[int, Mapping[str, tuple[str, ...]]] = {}
-    for input_port in relevant_input_ports:
-        signature_requirements_by_id.setdefault(
-            int(input_port["signature_id"]),
-            input_port["port_values_by_dimension"],
-        )
+    signature_profiles_by_id, profile_values_by_id, profile_accepts_by_id, lazy_schema_stats = _assign_lazy_signature_profiles(
+        ontology,
+        roots,
+        relevant_input_ports,
+    )
     for record in relevant_records:
         compressed_output_ports: list[dict[str, object]] = []
         for output_port in tuple(record["output_ports"]):
@@ -1338,46 +1445,7 @@ def build_lazy_fact_bundle(
                 _quote(tool_id),
                 str(step_index),
             )
-    bindable_pairs_by_step: dict[int, list[tuple[str, int, str, int]]] = defaultdict(list)
-    for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
-        if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
-            continue
-        for step_index, candidate_ids in allowed_candidates_by_step.items():
-            if consumer_candidate in candidate_ids:
-                bindable_pairs_by_step[step_index].append(
-                    (producer_candidate, producer_port, consumer_candidate, consumer_port)
-                )
-    # Collapse per-step signature sets into a single step-independent union.
-    # The step filter (consumer allowed at step t) is already enforced in step.lp
-    # via occurs(t, use_lazy_candidate(...)) / lazy_candidate_allowed_at_step, so
-    # emitting a per-step copy of each (producer, port, sig_id, value, dim) tuple
-    # is redundant — one entry per unique combination is sufficient.
-    support_signatures_by_producer_port: dict[tuple[str, int], set[int]] = defaultdict(set)
-    for step_pairs in bindable_pairs_by_step.values():
-        for producer_candidate, producer_port, consumer_candidate, consumer_port in step_pairs:
-            consumer_record = relevant_records_by_candidate[consumer_candidate]
-            consumer_input_port = next(
-                input_port
-                for input_port in tuple(consumer_record["input_ports"])
-                if int(input_port["port_idx"]) == consumer_port
-            )
-            support_signatures_by_producer_port[
-                (producer_candidate, producer_port)
-            ].add(int(consumer_input_port["signature_id"]))
-
     _t5 = perf_counter()
-
-    # Pre-compute: for each (sig_id, dim), the frozenset of output values compatible
-    # with any required value in that signature+dim. Compatible means value is in
-    # ancestors_of(required_value), i.e., value is at least as general as required.
-    # This avoids the O(|values| × |required_values|) inner loop per emitted fact.
-    compat_by_sig_dim: dict[tuple[int, str], frozenset[str]] = {}
-    for sig_id, requirements in signature_requirements_by_id.items():
-        for dim, required_values in requirements.items():
-            ancestor_union: set[str] = set()
-            for req_val in required_values:
-                ancestor_union.update(ontology.ancestors_of(req_val))
-            compat_by_sig_dim[(sig_id, dim)] = frozenset(ancestor_union)
 
     for record in relevant_records:
         tool = record["tool"]
@@ -1391,14 +1459,6 @@ def build_lazy_fact_bundle(
                 _quote(candidate_id),
                 str(port_idx),
             )
-            for dim, value in input_port["port_values"]:
-                writer.emit_fact(
-                    "lazy_candidate_input_value",
-                    _quote(candidate_id),
-                    str(port_idx),
-                    _quote(value),
-                    _quote(dim),
-                )
             writer.emit_fact(
                 "lazy_candidate_input_signature_id",
                 _quote(candidate_id),
@@ -1448,29 +1508,6 @@ def build_lazy_fact_bundle(
                             _quote(dim),
                         )
 
-            output_fset_for_port = output_port["port_values_fset"]
-            sig_ids = support_signatures_by_producer_port.get((candidate_id, port_idx), set())
-            # Pre-compute matching output values per (sig_id, dim) using set intersection.
-            matching_by_sig_dim: dict[tuple[int, str], frozenset[str]] = {}
-            for sig_id in sig_ids:
-                for dim, out_fset in output_fset_for_port.items():
-                    if dim in signature_requirements_by_id[sig_id]:
-                        matches = out_fset & compat_by_sig_dim.get((sig_id, dim), frozenset())
-                        if matches:
-                            matching_by_sig_dim[(sig_id, dim)] = matches
-
-            for signature_id in sorted(support_signatures_by_producer_port.get((candidate_id, port_idx), set())):
-                for dim in sorted(output_fset_for_port):
-                    for value in sorted(matching_by_sig_dim.get((signature_id, dim), frozenset())):
-                        writer.emit_fact(
-                            "lazy_bound_output_support",
-                            _quote(candidate_id),
-                            str(port_idx),
-                            str(signature_id),
-                            _quote(value),
-                            _quote(dim),
-                        )
-
     for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
             continue
@@ -1481,6 +1518,28 @@ def build_lazy_fact_bundle(
             _quote(consumer_candidate),
             str(consumer_port),
         )
+    for signature_id, category_profiles in sorted(signature_profiles_by_id.items()):
+        for dim, (profile_id, _values) in sorted(category_profiles.items()):
+            writer.emit_fact(
+                "lazy_signature_profile",
+                str(signature_id),
+                _quote(dim),
+                str(profile_id),
+            )
+    for profile_id, values in sorted(profile_values_by_id.items()):
+        for value in values:
+            writer.emit_fact(
+                "lazy_profile_value",
+                str(profile_id),
+                _quote(value),
+            )
+    for profile_id, values in sorted(profile_accepts_by_id.items()):
+        for value in values:
+            writer.emit_fact(
+                "lazy_profile_accepts",
+                str(profile_id),
+                _quote(value),
+            )
     _t6 = perf_counter()
     print(
         f"  lazy builder phases: "
@@ -1497,7 +1556,7 @@ def build_lazy_fact_bundle(
         config=config,
         tools=relevant_tools,
         tool_stats=tool_stats,
-        cache_stats={**ontology.cache_stats(), **resolver.stats()},
+        cache_stats={**ontology.cache_stats(), **resolver.stats(), **lazy_schema_stats},
     )
 
 
