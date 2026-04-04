@@ -34,20 +34,17 @@ PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/
 
 ## Modes
 
-The CLI supports 6 runtime modes:
+The CLI supports 3 runtime modes:
 
 - `single-shot`
-- `single-shot-opt`
-- `single-shot-lazy`
 - `multi-shot`
-- `multi-shot-opt`
 - `multi-shot-lazy`
 
 Meaning:
 
-- `single-shot` / `multi-shot`: legacy runtime schema
-- `*-opt`: candidate/full-variant runtime schema
-- `*-lazy`: lazy candidate runtime schema
+- `single-shot`: legacy single-shot runtime schema
+- `multi-shot`: APE-style incremental runtime schema
+- `multi-shot-lazy`: lazy candidate incremental runtime schema
 
 All runtime ASP encodings are vendored under `snakeAPE/encodings`.
 
@@ -89,34 +86,10 @@ Translation only:
 PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
 ```
 
-Translation only with candidate full variants:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-opt --translate-only-full-variants --output-dir /tmp/snakeape-opt-translate
-```
-
 Translation only with lazy candidates:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-lazy --translate-only-lazy --output-dir /tmp/snakeape-lazy-translate
-```
-
-Single-shot optimized:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-opt --solutions 1 --no-graphs --output-dir /tmp/snakeape-single-opt
-```
-
-Single-shot lazy:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-lazy --solutions 1 --no-graphs --output-dir /tmp/snakeape-single-lazy
-```
-
-Multi-shot optimized:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-opt --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi-opt
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --translate-only --output-dir /tmp/snakeape-lazy-translate
 ```
 
 Multi-shot lazy:
@@ -163,7 +136,8 @@ Important files:
 - `translation.lp`
 - `translation_summary.json`
 - `grounding_summary.json` for `--ground-only`
-- `answer_sets.txt` and `solutions.txt` for normal runs
+- `solutions.txt` and `workflow_signatures.json` for normal runs
+- `answer_sets.txt` only when `--write-raw-answer-sets` is enabled
 - `snakeAPE/run_log.csv`
 - `snakeAPE/run_summary.csv`
 
@@ -203,5 +177,4 @@ If a run is interrupted, `snakeAPE/run_log.csv` still contains all stages that w
 - `--ground-only`
 - `--ground-only-stage base|full`
 - `--translate-only`
-- `--translate-only-full-variants`
-- `--translate-only-lazy`
+- `--write-raw-answer-sets`

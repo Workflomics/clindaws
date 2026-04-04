@@ -11,7 +11,7 @@ import signal
 import threading
 import traceback
 from datetime import datetime, timezone
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from time import perf_counter
 from typing import Callable
@@ -44,13 +44,12 @@ from .solver import (
     solve_multi_shot,
     solve_multi_shot_lazy,
     solve_single_shot,
-    solve_single_shot_lazy,
 )
 from .tool_annotations import load_tool_annotations
 from .translator import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
-    build_fact_bundle_grounding_opt_lazy,
+    build_lazy_fact_bundle,
 )
 from .workflow import reconstruct_solution
 
@@ -76,20 +75,75 @@ SCHEMA_PREDICATES = (
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 LAZY_TRANSLATION_BUILDER = "candidate_lazy"
 ProgressCallback = Callable[[str], None] | None
+
+
+@dataclass(frozen=True)
+class _ModeConfig:
+    solver_family: str
+    solver_approach: str
+    translation_pathway: str
+    translation_builder: TranslationBuilder
+    supports_ground_only: bool
+
+
+_MODE_CONFIGS = {
+    "single-shot": _ModeConfig(
+        solver_family="single-shot",
+        solver_approach="legacy",
+        translation_pathway="normal",
+        translation_builder=RUNTIME_TRANSLATION_BUILDER,
+        supports_ground_only=False,
+    ),
+    "multi-shot": _ModeConfig(
+        solver_family="multi-shot",
+        solver_approach="legacy",
+        translation_pathway="ape_multi_shot",
+        translation_builder=RUNTIME_TRANSLATION_BUILDER,
+        supports_ground_only=True,
+    ),
+    "multi-shot-lazy": _ModeConfig(
+        solver_family="multi-shot",
+        solver_approach="lazy",
+        translation_pathway="lazy",
+        translation_builder=LAZY_TRANSLATION_BUILDER,
+        supports_ground_only=True,
+    ),
+}
+
+_SOLVER_DISPATCH = {
+    "single-shot": solve_single_shot,
+    "multi-shot": solve_multi_shot,
+    "multi-shot-lazy": solve_multi_shot_lazy,
+}
+
+_GROUNDER_DISPATCH = {
+    "multi-shot": ground_multi_shot,
+    "multi-shot-lazy": ground_multi_shot_lazy,
+}
+
+
+def _mode_config(mode: str) -> _ModeConfig:
+    try:
+        return _MODE_CONFIGS[mode]
+    except KeyError:
+        raise ValueError(f"Unsupported mode: {mode}") from exc
+
+
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
-    if mode in {"single-shot-lazy", "multi-shot-lazy"}:
+    translation_pathway = _mode_config(mode).translation_pathway
+    if translation_pathway == "lazy":
         return "python"
+    if translation_pathway == "ape_multi_shot":
+        return "ape_clingo_legacy"
     return grounding_strategy
 
 
 def _solver_family(mode: str) -> str:
-    return "single-shot" if mode.startswith("single-shot") else "multi-shot"
+    return _mode_config(mode).solver_family
 
 
 def _solver_approach(mode: str) -> str:
-    if mode.endswith("-lazy"):
-        return "lazy"
-    return "legacy"
+    return _mode_config(mode).solver_approach
 
 
 def _report(progress_callback: ProgressCallback, message: str) -> None:
@@ -176,47 +230,28 @@ def _solve_worker_entrypoint(
     result_queue: multiprocessing.queues.Queue,
     progress_queue: multiprocessing.queues.Queue,
 ) -> None:
-    from .solver import (
-        solve_multi_shot,
-        solve_multi_shot_lazy,
-        solve_single_shot,
-        solve_single_shot_lazy,
-    )
-
     def _worker_progress(message: str) -> None:
         progress_queue.put(message)
 
     try:
-        if mode == "single-shot":
-            solve_output = solve_single_shot(
-                config,
-                fact_bundle,
-                progress_callback=_worker_progress,
-            )
-        elif mode == "single-shot-lazy":
-            solve_output = solve_single_shot_lazy(
-                config,
-                fact_bundle,
-                progress_callback=_worker_progress,
-            )
-        elif mode == "multi-shot":
-            solve_output = solve_multi_shot(
-                config,
-                fact_bundle,
-                progress_callback=_worker_progress,
-            )
-        elif mode == "multi-shot-lazy":
-            solve_output = solve_multi_shot_lazy(
-                config,
-                fact_bundle,
-                progress_callback=_worker_progress,
-            )
-        else:
-            raise ValueError(f"Unsupported mode: {mode}")
+        solve_output = _SOLVER_DISPATCH[mode](
+            config,
+            fact_bundle,
+            progress_callback=_worker_progress,
+        )
         result_queue.put(
             {
                 "ok": True,
                 "solve_output": _serialize_solve_output(solve_output),
+            }
+        )
+    except KeyError as exc:
+        result_queue.put(
+            {
+                "ok": False,
+                "error_type": "ValueError",
+                "error_message": f"Unsupported mode: {mode}",
+                "traceback": traceback.format_exc(),
             }
         )
     except BaseException as exc:
@@ -672,8 +707,9 @@ def _translation_warnings(
     warnings: list[str] = []
     translation_schema = _translation_schema(fact_bundle)
     encoding_presence = encoding_summary["predicate_presence"]
+    translation_pathway = _mode_config(mode).translation_pathway
 
-    if mode.endswith("-lazy") and translation_schema != "lazy_candidate":
+    if translation_pathway == "lazy" and translation_schema != "lazy_candidate":
         warnings.append(
             f"{mode} expects lazy candidate translation, but the emitted translation schema is {translation_schema}."
         )
@@ -838,12 +874,24 @@ def _default_solution_dir(config: SnakeConfig) -> Path:
     return config.solutions_dir_path
 
 
+def _validate_run_config(config: SnakeConfig) -> None:
+    """Validate derived run bounds before translation/solving."""
+
+    if config.solution_length_min < 1:
+        raise ValueError("solution_length.min must be at least 1.")
+    if config.solution_length_max < config.solution_length_min:
+        raise ValueError("solution_length.max must be greater than or equal to solution_length.min.")
+    if config.solutions < 1:
+        raise ValueError("solutions must be at least 1.")
+    if config.timeout_sec < 0:
+        raise ValueError("timeout_sec must be non-negative.")
+
+
 def _prepare_run_context(
     config_path: str | Path,
     *,
     mode: str,
     grounding_strategy: str,
-    translation_builder: TranslationBuilder = RUNTIME_TRANSLATION_BUILDER,
     output_dir: str | Path | None = None,
     solutions: int | None = None,
     min_length: int | None = None,
@@ -852,6 +900,7 @@ def _prepare_run_context(
 ) -> tuple:
     """Load config and build the fact bundle for a run."""
 
+    mode_config = _mode_config(mode)
     config = load_config(config_path)
     config = replace(
         config,
@@ -859,6 +908,7 @@ def _prepare_run_context(
         solution_length_min=min_length if min_length is not None else config.solution_length_min,
         solution_length_max=max_length if max_length is not None else config.solution_length_max,
     )
+    _validate_run_config(config)
     solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
     solution_dir.mkdir(parents=True, exist_ok=True)
 
@@ -869,38 +919,20 @@ def _prepare_run_context(
     ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
     tools = load_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
-    if translation_builder == LAZY_TRANSLATION_BUILDER:
-        if mode not in {"single-shot-lazy", "multi-shot-lazy"}:
-            raise ValueError(
-                "Lazy candidate translation is supported only for single-shot-lazy and multi-shot-lazy modes."
-            )
-        fact_bundle = build_fact_bundle_grounding_opt_lazy(
+    if mode_config.translation_pathway == "lazy":
+        fact_bundle = build_lazy_fact_bundle(
             config,
             ontology,
             tools,
-            mode=mode,
         )
-        effective_translation_strategy = "python"
-        resolved_translation_builder = LAZY_TRANSLATION_BUILDER
-    elif translation_builder == RUNTIME_TRANSLATION_BUILDER:
-        if mode.endswith("-lazy"):
-            fact_bundle = build_fact_bundle_grounding_opt_lazy(
-                config,
-                ontology,
-                tools,
-                mode=mode,
-            )
-            effective_translation_strategy = "python"
-            resolved_translation_builder = LAZY_TRANSLATION_BUILDER
-        elif mode == "multi-shot":
-            fact_bundle = build_fact_bundle_ape_multi_shot(config, ontology, tools)
-            effective_translation_strategy = "ape_clingo_legacy"
-            resolved_translation_builder = RUNTIME_TRANSLATION_BUILDER
-        else:
-            fact_bundle = build_fact_bundle(config, ontology, tools, effective_translation_strategy)
-            resolved_translation_builder = RUNTIME_TRANSLATION_BUILDER
+    elif mode_config.translation_pathway == "ape_multi_shot":
+        fact_bundle = build_fact_bundle_ape_multi_shot(config, ontology, tools)
+    elif mode_config.translation_pathway == "normal":
+        fact_bundle = build_fact_bundle(config, ontology, tools, effective_translation_strategy)
     else:
-        raise ValueError(f"Unsupported translation builder: {translation_builder}")
+        raise ValueError(
+            f"Unsupported translation pathway: {mode_config.translation_pathway}"
+        )
     translation_sec = perf_counter() - start
     _report(progress_callback, f"Step 1 complete: translation finished after {translation_sec:.3f}s.")
 
@@ -910,7 +942,7 @@ def _prepare_run_context(
         fact_bundle,
         translation_sec,
         effective_translation_strategy,
-        resolved_translation_builder,
+        mode_config.translation_builder,
         run_metadata,
     )
 
@@ -920,7 +952,6 @@ def run_translate_only(
     *,
     mode: str,
     grounding_strategy: str,
-    translation_builder: TranslationBuilder = RUNTIME_TRANSLATION_BUILDER,
     output_dir: str | Path | None = None,
     solutions: int | None = None,
     min_length: int | None = None,
@@ -942,7 +973,6 @@ def run_translate_only(
         config_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
-        translation_builder=translation_builder,
         output_dir=output_dir,
         solutions=solutions,
         min_length=min_length,
@@ -1011,35 +1041,6 @@ def run_translate_only(
         translation_summary_path=translation_summary_path,
         run_log_path=run_log_path,
         run_summary_path=run_summary_path,
-    )
-
-
-
-def run_translate_only_lazy(
-    config_path: str | Path,
-    *,
-    mode: str,
-    grounding_strategy: str,
-    output_dir: str | Path | None = None,
-    solutions: int | None = None,
-    min_length: int | None = None,
-    max_length: int | None = None,
-    summary_top_tools: int = 20,
-    progress_callback: ProgressCallback = None,
-) -> TranslationRunResult:
-    """Run translate-only using the lazy candidate expansion."""
-
-    return run_translate_only(
-        config_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        translation_builder=LAZY_TRANSLATION_BUILDER,
-        output_dir=output_dir,
-        solutions=solutions,
-        min_length=min_length,
-        max_length=max_length,
-        summary_top_tools=summary_top_tools,
-        progress_callback=progress_callback,
     )
 
 
@@ -1307,32 +1308,21 @@ def run_ground_only(
         summary_top_tools=summary_top_tools,
     )
 
-    if mode == "multi-shot":
-        grounding_output = ground_multi_shot(
-            config,
-            fact_bundle,
-            stage=stage,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
-    elif mode == "multi-shot-lazy":
-        grounding_output = ground_multi_shot_lazy(
-            config,
-            fact_bundle,
-            stage=stage,
-            progress_callback=progress_callback,
-            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-                base_grounding_sec=sec,
-                base_grounding_peak_rss_mb=peak,
-            ),
-            horizon_record_callback=csv_writers.step_writer.log_horizon,
-        )
-    else:
+    mode_config = _mode_config(mode)
+    if not mode_config.supports_ground_only:
         raise ValueError("Ground-only runs support only multi-shot and multi-shot-lazy modes.")
+
+    grounding_output = _GROUNDER_DISPATCH[mode](
+        config,
+        fact_bundle,
+        stage=stage,
+        progress_callback=progress_callback,
+        base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
+            base_grounding_sec=sec,
+            base_grounding_peak_rss_mb=peak,
+        ),
+        horizon_record_callback=csv_writers.step_writer.log_horizon,
+    )
 
     _report(
         progress_callback,

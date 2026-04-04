@@ -7,7 +7,6 @@
 `constraints_path` is currently wired for the benchmark-targeted modes:
 
 - `single-shot`
-- `single-shot-lazy`
 - `multi-shot`
 - `multi-shot-lazy`
 
@@ -105,7 +104,7 @@ Not implemented:
 
 - General `SLTLx` parsing
 - Arbitrary raw ASP snippets inside JSON
-- Guaranteed support for `single-shot-opt` or `multi-shot-opt`
+- Additional removed legacy/experimental modes beyond `single-shot`, `multi-shot`, and `multi-shot-lazy`
 
 ## Defect Concentration Example
 
@@ -121,4 +120,4 @@ The important native entries are:
 - `used_iff_used(CreateAntisite, CalcChemicalPotentialB)`
 - `mutex_tools(RunVasp, RunSphinx)`
 
-This setup matches the APE SAT baseline for `defect_concentration` in `single-shot-lazy` at horizons 9 and 10.
+This setup matches the APE SAT baseline for `defect_concentration` in `multi-shot-lazy` on the benchmarked horizons.

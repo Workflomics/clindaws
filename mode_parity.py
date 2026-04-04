@@ -10,7 +10,7 @@ from compare_solutions import build_comparison_report, parse_any
 from snakeAPE.runner import run_once
 
 
-DEFAULT_MODES = ("multi-shot", "single-shot", "single-shot-lazy")
+DEFAULT_MODES = ("multi-shot", "single-shot", "multi-shot-lazy")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,6 +78,7 @@ def _run_mode(
         min_length=min_length,
         max_length=max_length,
         render_graphs=False,
+        write_raw_answer_sets=True,
         progress_callback=_progress,
     )
     return result.answer_set_path

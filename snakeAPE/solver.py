@@ -115,28 +115,6 @@ def _single_shot_program_paths() -> tuple[Path, ...]:
     )
 
 
-def _single_shot_lazy_program_paths() -> tuple[Path, ...]:
-    base = ENCODINGS_ROOT / "single_shot_lazy"
-    return (
-        base / "show.lp",
-        base / "pre_compute.lp",
-        base / "propagation.lp",
-        base / "tool_choice.lp",
-        base / "output_production.lp",
-        base / "reachability.lp",
-        base / "goal.lp",
-        base / "usefulness.lp",
-        base / "constraints.lp",
-        base / "tool_taxonomy_logic.lp",
-        base / "user_constraints.lp",
-        base / "generated_constraints.lp",
-        base / "plan_constraints.lp",
-        base / "temporal_constraint.lp",
-        base / "tool_inclusion_constraints.lp",
-        base / "input_usage_constraints.lp",
-    )
-
-
 def _multi_shot_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot"
     return (
@@ -154,7 +132,7 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
 
 
 
-def _lazy_program_paths() -> tuple[Path, ...]:
+def _multi_shot_lazy_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot_lazy"
     return (
         base / "base.lp",
@@ -175,12 +153,10 @@ def program_paths_for_mode(mode: str) -> tuple[Path, ...]:
 
     if mode == "single-shot":
         return _single_shot_program_paths()
-    if mode == "single-shot-lazy":
-        return _single_shot_lazy_program_paths()
     if mode == "multi-shot":
         return _multi_shot_program_paths()
     if mode == "multi-shot-lazy":
-        return _lazy_program_paths()
+        return _multi_shot_lazy_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")
 
 
@@ -780,26 +756,6 @@ def solve_single_shot(
     )
 
 
-def solve_single_shot_lazy(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> SolveOutput:
-    """Solve using the lazy candidate single-shot encoding: ground once, solve once."""
-
-    return _solve_single_shot_once(
-        config,
-        facts,
-        _single_shot_lazy_program_paths(),
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-    )
-
-
 def _ground_multi_shot_control(
     control: clingo.Control,
     config: SnakeConfig,
@@ -901,7 +857,8 @@ def solve_multi_shot(
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=True,
+        solve_all_horizons=False,
+        stop_on_solution=False,
     )
 
 
@@ -950,7 +907,7 @@ def solve_multi_shot_lazy(
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _lazy_program_paths(),
+        _multi_shot_lazy_program_paths(),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -978,7 +935,7 @@ def ground_multi_shot_lazy(
     """Ground the lazy multi-shot encoding without solving."""
 
     control = clingo.Control(["0", "--warn=none"])
-    for program_path in _lazy_program_paths():
+    for program_path in _multi_shot_lazy_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     return _ground_multi_shot_control(

@@ -62,6 +62,40 @@ def _tool_input_signatures(tools: tuple[ToolMode, ...]) -> dict[str, tuple[tuple
     return signatures
 
 
+def _bundle_metadata(
+    config: SnakeConfig,
+    tools: tuple[ToolMode, ...],
+) -> tuple[dict[str, str], dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]], tuple[str, ...]]:
+    return (
+        {tool.mode_id: tool.label for tool in tools},
+        _tool_input_signatures(tools),
+        tuple(f"wf_input_{i}" for i in range(len(config.inputs))),
+    )
+
+
+def _finalize_fact_bundle(
+    writer: "_FactWriter",
+    *,
+    config: SnakeConfig,
+    tools: tuple[ToolMode, ...],
+    tool_stats: list[ToolExpansionStat],
+    cache_stats: dict[str, int],
+) -> FactBundle:
+    tool_labels, tool_input_signatures, workflow_input_ids = _bundle_metadata(config, tools)
+    return FactBundle(
+        facts=writer.text(),
+        fact_count=writer.fact_count,
+        tool_labels=tool_labels,
+        tool_input_signatures=tool_input_signatures,
+        workflow_input_ids=workflow_input_ids,
+        goal_count=len(config.outputs),
+        predicate_counts=dict(writer.predicate_counts),
+        tool_stats=tuple(tool_stats),
+        cache_stats=cache_stats,
+        emit_stats=writer.stats(),
+    )
+
+
 @dataclass
 class _FactWriter:
     """Incrementally build fact text and counts."""
@@ -1010,12 +1044,10 @@ def _compress_lazy_output_choice_values(
 
 
 
-def build_fact_bundle_grounding_opt_lazy(
+def build_lazy_fact_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
-    *,
-    mode: str | None = None,
 ) -> FactBundle:
     """Build a diagnostic lazy candidate bundle without full variant expansion."""
     roots = _build_roots(config, ontology)
@@ -1285,8 +1317,6 @@ def build_fact_bundle_grounding_opt_lazy(
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
     _emit_lazy_constraints(writer, config, ontology, relevant_tools)
-    tool_labels = {tool.mode_id: tool.label for tool in relevant_tools}
-    tool_input_signatures = _tool_input_signatures(relevant_tools)
 
     for candidate_id in sorted(query_goal_candidates):
         writer.emit_fact("lazy_query_goal_candidate", _quote(candidate_id))
@@ -1462,20 +1492,12 @@ def build_fact_bundle_grounding_opt_lazy(
         f"fact_emission={_t6-_t5:.2f}s"
     )
 
-    workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
-    facts = writer.text()
-
-    return FactBundle(
-        facts=facts,
-        fact_count=writer.fact_count,
-        tool_labels=tool_labels,
-        tool_input_signatures=tool_input_signatures,
-        workflow_input_ids=tuple(workflow_input_ids),
-        goal_count=len(config.outputs),
-        predicate_counts=dict(writer.predicate_counts),
-        tool_stats=tuple(tool_stats),
+    return _finalize_fact_bundle(
+        writer,
+        config=config,
+        tools=relevant_tools,
+        tool_stats=tool_stats,
         cache_stats={**ontology.cache_stats(), **resolver.stats()},
-        emit_stats=writer.stats(),
     )
 
 
@@ -1490,8 +1512,6 @@ def build_fact_bundle(
     writer = _FactWriter()
     roots = _build_common_facts(writer, config, ontology, tools)
     resolver = _ExpansionResolver(ontology, roots, strategy)
-    tool_labels = {tool.mode_id: tool.label for tool in tools}
-    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     # Per-mode_id offsets to avoid ID collisions when multiple ToolMode objects
@@ -1552,21 +1572,13 @@ def build_fact_bundle(
                     )
         _output_offset[tool.mode_id] += output_variant_count
 
-    workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
     _emit_lazy_constraints(writer, config, ontology, tools)
-    facts = writer.text()
-
-    return FactBundle(
-        facts=facts,
-        fact_count=writer.fact_count,
-        tool_labels=tool_labels,
-        tool_input_signatures=tool_input_signatures,
-        workflow_input_ids=tuple(workflow_input_ids),
-        goal_count=len(config.outputs),
-        predicate_counts=dict(writer.predicate_counts),
-        tool_stats=tuple(tool_stats),
+    return _finalize_fact_bundle(
+        writer,
+        config=config,
+        tools=tools,
+        tool_stats=tool_stats,
         cache_stats={**ontology.cache_stats(), **resolver.stats()},
-        emit_stats=writer.stats(),
     )
 
 
@@ -1585,8 +1597,6 @@ def build_fact_bundle_ape_multi_shot(
 
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, tools)
-    tool_labels = {tool.mode_id: tool.label for tool in tools}
-    tool_input_signatures = _tool_input_signatures(tools)
     tool_stats: list[ToolExpansionStat] = []
 
     for tool in tools:
@@ -1628,19 +1638,11 @@ def build_fact_bundle_ape_multi_shot(
                         f"({_quote(value)}, {_quote(dim)})",
                     )
 
-    workflow_input_ids = [f"wf_input_{i}" for i in range(len(config.inputs))]
     _emit_lazy_constraints(writer, config, ontology, tools)
-    facts = writer.text()
-
-    return FactBundle(
-        facts=facts,
-        fact_count=writer.fact_count,
-        tool_labels=tool_labels,
-        tool_input_signatures=tool_input_signatures,
-        workflow_input_ids=tuple(workflow_input_ids),
-        goal_count=len(config.outputs),
-        predicate_counts=dict(writer.predicate_counts),
-        tool_stats=tuple(tool_stats),
+    return _finalize_fact_bundle(
+        writer,
+        config=config,
+        tools=tools,
+        tool_stats=tool_stats,
         cache_stats=dict(ontology.cache_stats()),
-        emit_stats=writer.stats(),
     )

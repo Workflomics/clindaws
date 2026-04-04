@@ -11,7 +11,6 @@ from .runner import (
     run_ground_only,
     run_once,
     run_translate_only,
-    run_translate_only_lazy,
 )
 
 
@@ -28,7 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=(
             "single-shot",
-            "single-shot-lazy",
             "multi-shot",
             "multi-shot-lazy",
         ),
@@ -92,11 +90,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run translation only and write a translation summary JSON.",
     )
     parser.add_argument(
-        "--translate-only-lazy",
-        action="store_true",
-        help="Run translate-only using the lazy candidate expansion.",
-    )
-    parser.add_argument(
         "--ground-only-stage",
         choices=("base", "full"),
         default="base",
@@ -127,22 +120,12 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--benchmark-grounding cannot be combined with --ground-only.")
         if args.benchmark_grounding and args.translate_only:
             parser.error("--benchmark-grounding cannot be combined with --translate-only.")
-        if args.benchmark_grounding and args.translate_only_lazy:
-            parser.error("--benchmark-grounding cannot be combined with --translate-only-lazy.")
         if args.ground_only and args.translate_only:
             parser.error("--ground-only cannot be combined with --translate-only.")
-        if args.ground_only and args.translate_only_lazy:
-            parser.error("--ground-only cannot be combined with --translate-only-lazy.")
-        if args.translate_only and args.translate_only_lazy:
-            parser.error("--translate-only cannot be combined with --translate-only-lazy.")
         if args.ground_only_stage != "base" and not args.ground_only:
             parser.error("--ground-only-stage requires --ground-only.")
         if args.summary_top_tools < 1:
             parser.error("--summary-top-tools must be at least 1.")
-        if args.translate_only_lazy and args.mode not in {"single-shot-lazy", "multi-shot-lazy"}:
-            parser.error(
-                "--translate-only-lazy requires --mode single-shot-lazy or multi-shot-lazy."
-            )
 
         if args.benchmark_grounding:
             result = benchmark_grounding(
@@ -226,33 +209,6 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Run summary written to: {translation_result.run_summary_path}")
             print(
                 f"Translate-only run complete: mode={translation_result.mode} "
-                f"strategy={translation_result.grounding_strategy} "
-                f"translation={translation_result.timings.translation_sec:.3f}s "
-                f"total={translation_result.timings.total_sec:.3f}s"
-            )
-            return 0
-
-        if args.translate_only_lazy:
-            translation_result = run_translate_only_lazy(
-                args.config,
-                mode=args.mode,
-                grounding_strategy=args.grounding,
-                output_dir=args.output_dir,
-                solutions=args.solutions,
-                min_length=args.min_length,
-                max_length=args.max_length,
-                summary_top_tools=args.summary_top_tools,
-                progress_callback=_progress,
-            )
-            if translation_result.translation_path is not None:
-                print(f"Translation written to: {translation_result.translation_path}")
-            print(f"Translation summary written to: {translation_result.translation_summary_path}")
-            if translation_result.run_log_path is not None:
-                print(f"Run log written to: {translation_result.run_log_path}")
-            if translation_result.run_summary_path is not None:
-                print(f"Run summary written to: {translation_result.run_summary_path}")
-            print(
-                f"Translate-only lazy run complete: mode={translation_result.mode} "
                 f"strategy={translation_result.grounding_strategy} "
                 f"translation={translation_result.timings.translation_sec:.3f}s "
                 f"total={translation_result.timings.total_sec:.3f}s"
