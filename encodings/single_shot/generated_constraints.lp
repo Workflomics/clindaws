@@ -21,13 +21,8 @@ constraint_artifact_dim(out(T, Tool, Port), V, Cat) :-
     holds(T, dim(out(T, Tool, Port), V, Cat)).
 
 constraint_artifact_matches_selector(WF, Sel) :-
-    constraint_data_selector(Sel, Actual),
-    constraint_artifact_dim(WF, Actual, _).
-
-constraint_artifact_matches_selector(WF, Sel) :-
-    constraint_data_selector(Sel, Wanted),
     constraint_artifact_dim(WF, Actual, _),
-    compatible(Actual, Wanted).
+    constraint_data_selector_matches_value(Sel, Actual).
 
 constraint_used_data(Sel) :-
     constraint_artifact_matches_selector(_, Sel).
@@ -76,7 +71,7 @@ constraint_connected_pair(SelA, SelB, T1, T2) :-
 % connected_op: some later matching consumer must bind an artifact produced by
 % an earlier matching producer.
 :- constraint_connected(SelA, SelB),
-   #count { T1, T2 : constraint_connected_pair(SelA, SelB, T1, T2) } = 0.
+   not constraint_connected_pair(SelA, SelB, _, _).
 
 % used_iff_used: both selectors either appear together or stay absent.
 :- constraint_used_iff_used(SelA, SelB),

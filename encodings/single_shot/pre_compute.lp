@@ -33,6 +33,10 @@ same_input_signature(PortA, PortB) :-
     not input_signature_diff(PortA, PortB),
     not input_signature_diff(PortB, PortA).
 
+constraint_data_selector_matches_value(Sel, Actual) :-
+    constraint_data_selector(Sel, Wanted),
+    compatible(Actual, Wanted).
+
 workflow_input(WF) :-
     holds(0, avail(WF)).
 

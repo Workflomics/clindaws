@@ -8,10 +8,6 @@
 % Hard goal constraint
 :- query(t), not holds(t, goal).
 
-% Exact-horizon mode: goal must be achieved for the FIRST TIME at step t.
-% Declare exact_horizon_mode. in your config to activate.
-:- query(t), exact_horizon_mode, t > 1, holds(t-1, goal).
-
 % ----------------------------------------------------------------
 % Output-dimension canonicalization
 % Keep the smallest terminal value that still satisfies all actual downstream
@@ -89,7 +85,10 @@ useful_check(t, T, Tool) :-
     not tool_has_output(Tool).
 
 % Constraint: every tool that runs must be useful
-:- query(t), occurs(T, run(Tool)), not useful_check(t, T, Tool).
+:- query(t),
+   enable_usefulness_pruning,
+   occurs(T, run(Tool)),
+   not useful_check(t, T, Tool).
 
 % SAT permits reusing outputs from earlier runs of the same tool, so do not
 % forbid these chains here.

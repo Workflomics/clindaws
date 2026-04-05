@@ -2,7 +2,7 @@
 % INPUT USAGE CONSTRAINTS (multi-shot)
 % #program check(t)
 %
-% Activation: enable_all_inputs_used. / enable_inputs_used_once.
+% Activation: enable_all_inputs_used. / enable_some_input_used.
 %             enable_inputs_consumed. in config / extra_lp
 % Docs: DOCS/multi_shot/constraints/input_usage.md
 %
@@ -25,13 +25,13 @@
    #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } = 0.
 
 % ----------------------------------------------------------------
-% enable_inputs_used_once — each ingredient bound at most once
+% enable_some_input_used — at least one initial ingredient is bound
 % ----------------------------------------------------------------
 
 :- query(t),
-   enable_inputs_used_once,
-   holds(0, avail(WF)),
-   #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } > 1.
+   enable_some_input_used,
+   #count { WF : holds(0, avail(WF)),
+                 occurs(T, bind(Tool, Port, WF)) } = 0.
 
 % ----------------------------------------------------------------
 % enable_inputs_consumed — synonym for used_once in multi-shot

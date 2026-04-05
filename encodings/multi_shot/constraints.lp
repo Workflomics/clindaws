@@ -50,18 +50,20 @@ constraint_artifact_dim_check(t, out(TSel, Tool, Port), V, Cat) :-
 
 constraint_artifact_matches_selector_check(t, WF, Sel) :-
     query(t),
-    constraint_data_selector(Sel, Actual),
-    constraint_artifact_dim_check(t, WF, Actual, _).
-
-constraint_artifact_matches_selector_check(t, WF, Sel) :-
-    query(t),
-    constraint_data_selector(Sel, Wanted),
     constraint_artifact_dim_check(t, WF, Actual, _),
-    ancestor(Actual, Wanted).
+    constraint_data_selector_matches_value(Sel, Actual).
 
 constraint_used_data_check(t, Sel) :-
     query(t),
     constraint_artifact_matches_selector_check(t, _, Sel).
+
+constraint_connected_edge_check(t, SelA, SelB) :-
+    query(t),
+    constraint_selected_tool_check(t, T1, SelA, ToolA),
+    constraint_selected_tool_check(t, T2, SelB, ToolB),
+    T1 < T2,
+    occurs(T1, output(ToolA, _, Port)),
+    occurs(T2, bind(ToolB, _, out(T1, ToolA, Port))).
 
 % first_m: selector must appear at T=1 and nowhere else.
 :- query(t),
@@ -106,14 +108,7 @@ constraint_used_data_check(t, Sel) :-
 % connected_op: some later B must bind an artifact produced by some earlier A.
 :- query(t),
    constraint_connected(SelA, SelB),
-   #count {
-       T1, T2 :
-           constraint_selected_tool_check(t, T1, SelA, ToolA),
-           constraint_selected_tool_check(t, T2, SelB, ToolB),
-           T1 < T2,
-           occurs(T1, output(ToolA, _, Port)),
-           occurs(T2, bind(ToolB, _, out(T1, ToolA, Port)))
-   } = 0.
+   not constraint_connected_edge_check(t, SelA, SelB).
 
 % used_iff_used: A appears iff B appears.
 :- query(t),

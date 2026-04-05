@@ -166,6 +166,4 @@ holds(t, goal) :- holds(t-1, goal).
 :- requirement_filtering_active, occurs(t, run(Tool)), not tool_req_compatible(Tool).
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
 
-:- occurs(t, run(_)), holds(t-1, goal).
-
 :- occurs(t, run(Tool)), not reachable(t, Tool).

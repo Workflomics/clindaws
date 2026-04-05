@@ -94,6 +94,10 @@ constraint_selector_matches_tool(Sel, Tool) :-
     constraint_selector_mode(Sel, "exact"),
     tool_direct_selector(Tool, Selector).
 
+constraint_data_selector_matches_value(Sel, Actual) :-
+    constraint_data_selector(Sel, Wanted),
+    compatible(Actual, Wanted).
+
 tools_in_class(Class, Tool) :-
     tool_is_a(Tool, Class),
     tool(Tool).

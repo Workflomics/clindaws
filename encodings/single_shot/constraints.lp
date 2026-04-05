@@ -35,28 +35,6 @@
 :- time(T), T > 1, occurs(T, run(_)), not occurs(T-1, run(_)).
 
 % ----------------------------------------------------------------
-% NO RUNS AFTER GOAL
-% ----------------------------------------------------------------
-%
-% Once the goal is reached, no further tool runs are permitted.
-% If holds(T-1, goal) is true, nothing may run at timestep T.
-%
-% PURPOSE: Prevents spurious tool executions after the plan is
-%          already complete. Without this constraint, tools could
-%          keep running after the goal is satisfied — each such
-%          run would be marked useful by Phase 7 if it produces
-%          output that also satisfies the goal, leading to
-%          redundant longer plans.
-%
-% INTERACTION WITH USEFULNESS: Phase 7 eliminates runs whose
-%          output does not contribute to the goal chain. This
-%          constraint eliminates runs that occur AFTER the goal
-%          is already achieved, which Phase 7 cannot prevent
-%          because those runs can still be causally valid.
-
-:- occurs(T, run(_)), holds(T-1, goal).
-
-% ----------------------------------------------------------------
 % NO REPEATED PORT BINDING FOR THE SAME TOOL INSTANCE
 % ----------------------------------------------------------------
 %

@@ -1,5 +1,5 @@
 % INPUT USAGE CONSTRAINTS
-% Activation: enable_all_inputs_used. / enable_inputs_used_once. / enable_inputs_consumed.
+% Activation: enable_all_inputs_used. / enable_some_input_used. / enable_inputs_consumed.
 % Docs: DOCS/constraints/05_input_usage.md
 
 input_used(WF) :-
@@ -10,9 +10,8 @@ input_used(WF) :-
    holds(0, avail(WF)),
    not input_used(WF).
 
-:- enable_inputs_used_once,
-   holds(0, avail(WF)),
-   #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } > 1.
+:- enable_some_input_used,
+   #count { WF : holds(0, avail(WF)), input_used(WF) } = 0.
 
 consumed(T, WF) :-
     enable_inputs_consumed,

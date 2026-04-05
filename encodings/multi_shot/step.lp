@@ -313,9 +313,6 @@ pipeline_has_at(t, Prop) :-
 % Contiguous execution: no gaps in the plan
 :- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
 
-% No runs after goal is reached
-:- occurs(t, run(_)), holds(t-1, goal).
-
 % SAT mode does not forbid repeated tool occurrences during synthesis. The
 % config-level tool_seq_repeat flag is handled later as a solution-distinction
 % policy, so repeated runs remain legal here.

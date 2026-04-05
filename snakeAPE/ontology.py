@@ -13,11 +13,89 @@ from typing import Iterable
 def _strip_prefix(value: str, prefix: str) -> str:
     if value.startswith(prefix):
         return value[len(prefix):]
+    if value.startswith("#"):
+        return value[1:]
     if "#" in value:
         return value.rsplit("#", 1)[1]
     if "/" in value:
         return value.rsplit("/", 1)[1]
     return value
+
+
+def _parse_rdf_xml_ontology(xml_text: str, prefix: str) -> tuple[set[tuple[str, str]], set[str]]:
+    edge_set: set[tuple[str, str]] = set()
+    nodes: set[str] = set()
+
+    class_pattern = re.compile(
+        r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*(?<!/)>(.*?)</(?:owl:Class|rdf:Description)>",
+        re.DOTALL,
+    )
+    direct_parent_pattern = re.compile(
+        r"<rdfs:subClassOf\b[^>]*rdf:resource=\"([^\"]+)\"\s*/?>",
+        re.DOTALL,
+    )
+    nested_parent_pattern = re.compile(
+        r"<rdfs:subClassOf\b[^>]*>.*?<rdf:Description\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/?>.*?</rdfs:subClassOf>",
+        re.DOTALL,
+    )
+
+    for about, body in class_pattern.findall(xml_text):
+        child = _strip_prefix(about, prefix)
+        nodes.add(child)
+        for parent_ref in direct_parent_pattern.findall(body):
+            parent = _strip_prefix(parent_ref, prefix)
+            edge_set.add((child, parent))
+            nodes.add(parent)
+        for parent_ref in nested_parent_pattern.findall(body):
+            parent = _strip_prefix(parent_ref, prefix)
+            edge_set.add((child, parent))
+            nodes.add(parent)
+
+    self_closing_pattern = re.compile(
+        r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/>"
+    )
+    for about in self_closing_pattern.findall(xml_text):
+        nodes.add(_strip_prefix(about, prefix))
+
+    return edge_set, nodes
+
+
+def _parse_owl_xml_ontology(xml_text: str, prefix: str) -> tuple[set[tuple[str, str]], set[str]]:
+    edge_set: set[tuple[str, str]] = set()
+    nodes: set[str] = set()
+
+    declaration_pattern = re.compile(
+        r"<Declaration>\s*<Class\s+IRI=\"([^\"]+)\"\s*/>\s*</Declaration>",
+        re.DOTALL,
+    )
+    subclass_pattern = re.compile(
+        r"<SubClassOf>\s*<Class\s+IRI=\"([^\"]+)\"\s*/>\s*<Class\s+IRI=\"([^\"]+)\"\s*/>\s*</SubClassOf>",
+        re.DOTALL,
+    )
+
+    for iri in declaration_pattern.findall(xml_text):
+        nodes.add(_strip_prefix(iri, prefix))
+
+    for child_ref, parent_ref in subclass_pattern.findall(xml_text):
+        child = _strip_prefix(child_ref, prefix)
+        parent = _strip_prefix(parent_ref, prefix)
+        edge_set.add((child, parent))
+        nodes.add(child)
+        nodes.add(parent)
+
+    return edge_set, nodes
+
+
+def _detect_ontology_format(xml_text: str) -> str:
+    if "<rdf:RDF" in xml_text or "<owl:Class" in xml_text or "<rdfs:subClassOf" in xml_text:
+        return "rdf_xml"
+    if "<Ontology" in xml_text and ("<Declaration>" in xml_text or "<SubClassOf>" in xml_text):
+        return "owl_xml"
+    snippet = " ".join(xml_text.splitlines()[:5]).strip()
+    raise ValueError(
+        "Unsupported ontology XML format. "
+        f"Expected RDF/XML or OWL/XML, got leading content: {snippet[:200]!r}"
+    )
 
 
 @dataclass(frozen=True)
@@ -54,39 +132,11 @@ class Ontology:
             text=True,
         )
         xml_text = result.stdout
-        edge_set: set[tuple[str, str]] = set()
-        nodes: set[str] = set()
-
-        class_pattern = re.compile(
-            r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*(?<!/)>(.*?)</(?:owl:Class|rdf:Description)>",
-            re.DOTALL,
-        )
-        direct_parent_pattern = re.compile(
-            r"<rdfs:subClassOf\b[^>]*rdf:resource=\"([^\"]+)\"\s*/?>",
-            re.DOTALL,
-        )
-        nested_parent_pattern = re.compile(
-            r"<rdfs:subClassOf\b[^>]*>.*?<rdf:Description\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/?>.*?</rdfs:subClassOf>",
-            re.DOTALL,
-        )
-
-        for about, body in class_pattern.findall(xml_text):
-            child = _strip_prefix(about, prefix)
-            nodes.add(child)
-            for parent_ref in direct_parent_pattern.findall(body):
-                parent = _strip_prefix(parent_ref, prefix)
-                edge_set.add((child, parent))
-                nodes.add(parent)
-            for parent_ref in nested_parent_pattern.findall(body):
-                parent = _strip_prefix(parent_ref, prefix)
-                edge_set.add((child, parent))
-                nodes.add(parent)
-
-        self_closing_pattern = re.compile(
-            r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/>"
-        )
-        for about in self_closing_pattern.findall(xml_text):
-            nodes.add(_strip_prefix(about, prefix))
+        ontology_format = _detect_ontology_format(xml_text)
+        if ontology_format == "rdf_xml":
+            edge_set, nodes = _parse_rdf_xml_ontology(xml_text, prefix)
+        else:
+            edge_set, nodes = _parse_owl_xml_ontology(xml_text, prefix)
 
         parent_map: dict[str, set[str]] = defaultdict(set)
         child_map: dict[str, set[str]] = defaultdict(set)

@@ -435,41 +435,87 @@ def _build_common_facts(
     if config.use_workflow_input == "ALL":
         writer.emit_atom("enable_all_inputs_used")
     elif config.use_workflow_input == "ONE":
-        writer.emit_atom("enable_inputs_used_once")
+        writer.emit_atom("enable_some_input_used")
 
     if config.use_all_generated_data == "ALL":
         writer.emit_atom("enable_all_outputs_consumed")
+        writer.emit_atom("enable_usefulness_pruning")
     elif config.use_all_generated_data == "ONE":
         writer.emit_atom("enable_primary_output_consumed")
+        writer.emit_atom("enable_usefulness_pruning")
 
     if config.tool_seq_repeat:
         writer.emit_rule("multi_run", "multi_run(Tool) :- tool(Tool).")
 
-    writer.emit_atom("exact_horizon_mode")
-
     return roots
 
 
-_LAZY_SUPPORTED_CONSTRAINTS = {
+_SELECTOR_SINGLE_ARG_CONSTRAINTS = {
     "use_m",
     "nuse_m",
+    "unique_inputs",
+    "first_m",
+    "not_consecutive",
+}
+
+_SELECTOR_SINGLE_ARG_WITH_INT_CONSTRAINTS = {
+    "at_step",
+    "max_uses",
+}
+
+_SELECTOR_DOUBLE_ARG_CONSTRAINTS = {
     "ite_m",
     "depend_m",
     "itn_m",
     "next_m",
-    "use_t",
-    "unique_inputs",
-    "first_m",
+    "used_iff_used",
+    "mutex_tools",
     "connected_op",
-    "operationInput",
 }
 
+_SELECTOR_TEMPLATE_ALIASES: dict[str, tuple[str, tuple[str, ...]]] = {}
+for _name in (
+    _SELECTOR_SINGLE_ARG_CONSTRAINTS
+    | _SELECTOR_SINGLE_ARG_WITH_INT_CONSTRAINTS
+    | _SELECTOR_DOUBLE_ARG_CONSTRAINTS
+):
+    _arg_count = 2 if _name in _SELECTOR_DOUBLE_ARG_CONSTRAINTS else 1
+    _auto = tuple("auto" for _ in range(_arg_count))
+    _class = tuple("class_transitive" for _ in range(_arg_count))
+    _tool = tuple("tool_exact" for _ in range(_arg_count))
+
+    _SELECTOR_TEMPLATE_ALIASES[_name] = (_name, _auto)
+    _SELECTOR_TEMPLATE_ALIASES[f"{_name}_c"] = (_name, _class)
+    _SELECTOR_TEMPLATE_ALIASES[f"{_name}_tool"] = (_name, _tool)
+    if _name.endswith("_m"):
+        _short = _name[:-2]
+        _SELECTOR_TEMPLATE_ALIASES[f"{_short}_c"] = (_name, _class)
+        _SELECTOR_TEMPLATE_ALIASES[f"{_short}_tool"] = (_name, _tool)
+    if _name in _SELECTOR_DOUBLE_ARG_CONSTRAINTS:
+        _left_class = ("class_transitive", "auto")
+        _right_class = ("auto", "class_transitive")
+        _left_tool = ("tool_exact", "auto")
+        _right_tool = ("auto", "tool_exact")
+        _SELECTOR_TEMPLATE_ALIASES[f"{_name}_left_c"] = (_name, _left_class)
+        _SELECTOR_TEMPLATE_ALIASES[f"{_name}_right_c"] = (_name, _right_class)
+        _SELECTOR_TEMPLATE_ALIASES[f"{_name}_left_tool"] = (_name, _left_tool)
+        _SELECTOR_TEMPLATE_ALIASES[f"{_name}_right_tool"] = (_name, _right_tool)
+        if _name.endswith("_m"):
+            _short = _name[:-2]
+            _SELECTOR_TEMPLATE_ALIASES[f"{_short}_left_c"] = (_name, _left_class)
+            _SELECTOR_TEMPLATE_ALIASES[f"{_short}_right_c"] = (_name, _right_class)
+            _SELECTOR_TEMPLATE_ALIASES[f"{_short}_left_tool"] = (_name, _left_tool)
+            _SELECTOR_TEMPLATE_ALIASES[f"{_short}_right_tool"] = (_name, _right_tool)
+
+_LAZY_SUPPORTED_CONSTRAINTS = (
+    set(_SELECTOR_TEMPLATE_ALIASES)
+    | {
+        "use_t",
+        "operationInput",
+    }
+)
+
 _LAZY_NATIVE_CONSTRAINTS = _LAZY_SUPPORTED_CONSTRAINTS | {
-    "at_step",
-    "used_iff_used",
-    "max_uses",
-    "mutex_tools",
-    "not_consecutive",
     "operation_input",
 }
 
@@ -492,6 +538,12 @@ _CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE: dict[str, str] = {
     "connected_op": "transitive",
     "operationInput": "transitive",
     "operation_input": "transitive",
+}
+
+_SELECTOR_POLICY_LABELS = {
+    "auto": "tool or class selector",
+    "class_transitive": "abstract class selector",
+    "tool_exact": "concrete tool selector",
 }
 
 
@@ -538,11 +590,20 @@ def _constraint_selector_mode(
     constraint_name: str,
     *,
     selector_kind: str,
+    selector_policy: str = "auto",
 ) -> str:
+    if selector_policy == "class_transitive":
+        return "transitive"
+    if selector_policy == "tool_exact":
+        return "exact"
     mode = _CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE.get(constraint_name, "transitive")
     if mode == "exact" and selector_kind == "class":
         return "transitive"
     return mode
+
+
+def _resolve_constraint_template_name(constraint_name: str) -> tuple[str, tuple[str, ...]]:
+    return _SELECTOR_TEMPLATE_ALIASES.get(constraint_name, (constraint_name, ("auto",)))
 
 
 def _parse_constraint_atom(text: str) -> tuple[str, tuple[str | int, ...]]:
@@ -663,18 +724,22 @@ def _emit_lazy_constraint(
     source_name: str,
     index: int,
 ) -> None:
+    base_constraint_name, selector_policies = _resolve_constraint_template_name(constraint_name)
+
     def _skip(reason: str) -> None:
         writer.emit_comment(f"skipping {source_name} constraint {index}: {reason}")
 
-    def _selector_id_for(selector: str) -> str:
+    def _selector_id_for(selector: str, *, position: int = 0) -> str:
         selector_kind = _constraint_selector_kind(
             selector,
             tool_ids=tool_ids,
             operation_ids=operation_ids,
         )
+        selector_policy = selector_policies[position] if position < len(selector_policies) else "auto"
         selector_mode = _constraint_selector_mode(
-            constraint_name,
+            base_constraint_name,
             selector_kind=selector_kind,
+            selector_policy=selector_policy,
         )
         selector_key = (selector, selector_mode)
         selector_id = selector_ids.get(selector_key)
@@ -718,6 +783,22 @@ def _emit_lazy_constraint(
         if selector not in allowed_selectors:
             _skip(f"unknown selector {selector}")
             return None
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_policy = selector_policies[position] if position < len(selector_policies) else "auto"
+        if selector_policy == "class_transitive" and selector_kind != "class":
+            _skip(
+                f"{constraint_name} expects an abstract class selector, got {selector_kind} {selector}"
+            )
+            return None
+        if selector_policy == "tool_exact" and selector_kind != "tool":
+            _skip(
+                f"{constraint_name} expects a concrete tool selector, got {selector_kind} {selector}"
+            )
+            return None
         return selector
 
     def _data_selector_arg(position: int) -> str | None:
@@ -753,25 +834,25 @@ def _emit_lazy_constraint(
             return None
         return raw_value
 
-    if constraint_name == "use_m":
+    if base_constraint_name == "use_m":
         if len(args) != 1:
             _skip("use_m expects 1 selector")
             return
         selector = _selector_arg(0)
         if selector is not None:
-            writer.emit_fact("constraint_must_use", _quote(_selector_id_for(selector)))
+            writer.emit_fact("constraint_must_use", _quote(_selector_id_for(selector, position=0)))
         return
 
-    if constraint_name == "nuse_m":
+    if base_constraint_name == "nuse_m":
         if len(args) != 1:
             _skip("nuse_m expects 1 selector")
             return
         selector = _selector_arg(0)
         if selector is not None:
-            writer.emit_fact("constraint_must_not_use", _quote(_selector_id_for(selector)))
+            writer.emit_fact("constraint_must_not_use", _quote(_selector_id_for(selector, position=0)))
         return
 
-    if constraint_name == "unique_inputs":
+    if base_constraint_name == "unique_inputs":
         if len(args) != 1:
             _skip("unique_inputs expects 1 selector")
             return
@@ -779,11 +860,11 @@ def _emit_lazy_constraint(
         if selector is not None:
             writer.emit_fact(
                 "constraint_unique_inputs",
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
             )
         return
 
-    if constraint_name == "first_m":
+    if base_constraint_name == "first_m":
         if len(args) != 1:
             _skip("first_m expects 1 selector")
             return
@@ -791,11 +872,11 @@ def _emit_lazy_constraint(
         if selector is not None:
             writer.emit_fact(
                 "constraint_first",
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
             )
         return
 
-    if constraint_name == "not_consecutive":
+    if base_constraint_name == "not_consecutive":
         if len(args) != 1:
             _skip("not_consecutive expects 1 selector")
             return
@@ -803,11 +884,11 @@ def _emit_lazy_constraint(
         if selector is not None:
             writer.emit_fact(
                 "constraint_not_consecutive",
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
             )
         return
 
-    if constraint_name == "use_t":
+    if base_constraint_name == "use_t":
         if len(args) != 1:
             _skip("use_t expects 1 data selector")
             return
@@ -819,7 +900,7 @@ def _emit_lazy_constraint(
             )
         return
 
-    if constraint_name == "at_step":
+    if base_constraint_name == "at_step":
         if len(args) != 2:
             _skip("at_step expects selector and step")
             return
@@ -829,11 +910,11 @@ def _emit_lazy_constraint(
             writer.emit_fact(
                 "constraint_tool_at_step",
                 str(step),
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
             )
         return
 
-    if constraint_name == "max_uses":
+    if base_constraint_name == "max_uses":
         if len(args) != 2:
             _skip("max_uses expects selector and limit")
             return
@@ -842,12 +923,12 @@ def _emit_lazy_constraint(
         if selector is not None and limit is not None:
             writer.emit_fact(
                 "constraint_max_uses",
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
                 str(limit),
             )
         return
 
-    if constraint_name in {"operation_input", "operationInput"}:
+    if base_constraint_name in {"operation_input", "operationInput"}:
         if len(args) != 2:
             _skip(f"{constraint_name} expects module selector and data selector")
             return
@@ -856,7 +937,7 @@ def _emit_lazy_constraint(
         if selector is not None and data_selector is not None:
             writer.emit_fact(
                 "constraint_operation_input",
-                _quote(_selector_id_for(selector)),
+                _quote(_selector_id_for(selector, position=0)),
                 _quote(_data_selector_id_for(data_selector)),
             )
         return
@@ -870,21 +951,21 @@ def _emit_lazy_constraint(
     if selector_a is None or selector_b is None:
         return
 
-    selector_a_id = _quote(_selector_id_for(selector_a))
-    selector_b_id = _quote(_selector_id_for(selector_b))
-    if constraint_name == "ite_m":
+    selector_a_id = _quote(_selector_id_for(selector_a, position=0))
+    selector_b_id = _quote(_selector_id_for(selector_b, position=1))
+    if base_constraint_name == "ite_m":
         writer.emit_fact("constraint_implies_future", selector_a_id, selector_b_id)
-    elif constraint_name == "depend_m":
+    elif base_constraint_name == "depend_m":
         writer.emit_fact("constraint_depends_prior", selector_a_id, selector_b_id)
-    elif constraint_name == "itn_m":
+    elif base_constraint_name == "itn_m":
         writer.emit_fact("constraint_forbid_later", selector_a_id, selector_b_id)
-    elif constraint_name == "next_m":
+    elif base_constraint_name == "next_m":
         writer.emit_fact("constraint_next", selector_a_id, selector_b_id)
-    elif constraint_name == "used_iff_used":
+    elif base_constraint_name == "used_iff_used":
         writer.emit_fact("constraint_used_iff_used", selector_a_id, selector_b_id)
-    elif constraint_name == "mutex_tools":
+    elif base_constraint_name == "mutex_tools":
         writer.emit_fact("constraint_mutex", selector_a_id, selector_b_id)
-    elif constraint_name == "connected_op":
+    elif base_constraint_name == "connected_op":
         writer.emit_fact("constraint_connected", selector_a_id, selector_b_id)
     else:
         _skip(f"unsupported constraint {constraint_name}")
@@ -1421,6 +1502,17 @@ def build_lazy_fact_bundle(
 
     bindable_pairs: set[tuple[str, int, str, int]] = set()
     reverse_edges: dict[str, set[str]] = defaultdict(set)
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in candidate_records
+    }
+    workflow_inputs = tuple(
+        {
+            str(dim): tuple(str(value) for value in values)
+            for dim, values in item.items()
+        }
+        for item in config.inputs
+    )
     direct_goal_candidates: set[str] = set()
 
     for record in candidate_records:
@@ -1450,15 +1542,51 @@ def build_lazy_fact_bundle(
 
     _t2 = perf_counter()
 
-    relevant_candidates = set(direct_goal_candidates)
-    frontier = list(direct_goal_candidates)
+    workflow_bindable_ports: dict[str, set[int]] = defaultdict(set)
+    produced_bindable_ports: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for record in candidate_records:
+        candidate_id = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            if any(
+                _workflow_input_matches_lazy_port(
+                    ontology,
+                    workflow_input,
+                    input_port["port_values_by_dimension"],
+                )
+                for workflow_input in workflow_inputs
+            ):
+                workflow_bindable_ports[candidate_id].add(port_idx)
+
+    for producer_candidate, _, consumer_candidate, consumer_port in bindable_pairs:
+        produced_bindable_ports[consumer_candidate][consumer_port].add(producer_candidate)
+
+    relevant_candidates: set[str] = set()
+    frontier: deque[str] = deque()
+    for record in candidate_records:
+        candidate_id = str(record["candidate_id"])
+        input_ports = tuple(record["input_ports"])
+        if all(int(port["port_idx"]) in workflow_bindable_ports[candidate_id] for port in input_ports):
+            relevant_candidates.add(candidate_id)
+            frontier.append(candidate_id)
+
     while frontier:
-        consumer_candidate = frontier.pop()
-        for producer_candidate in reverse_edges.get(consumer_candidate, set()):
-            if producer_candidate in relevant_candidates:
+        producer_candidate = frontier.popleft()
+        for consumer_candidate, ports_by_source in produced_bindable_ports.items():
+            if consumer_candidate in relevant_candidates:
                 continue
-            relevant_candidates.add(producer_candidate)
-            frontier.append(producer_candidate)
+            consumer_record = candidate_records_by_id[consumer_candidate]
+            input_ports = tuple(consumer_record["input_ports"])
+            if all(
+                int(port["port_idx"]) in workflow_bindable_ports[consumer_candidate]
+                or any(
+                    source_candidate in relevant_candidates
+                    for source_candidate in produced_bindable_ports[consumer_candidate].get(int(port["port_idx"]), set())
+                )
+                for port in input_ports
+            ):
+                relevant_candidates.add(consumer_candidate)
+                frontier.append(consumer_candidate)
 
     _t3 = perf_counter()
 
@@ -1562,15 +1690,10 @@ def build_lazy_fact_bundle(
     allowed_tools_by_step: dict[int, set[str]] = defaultdict(set)
     for record in relevant_records:
         candidate_id = str(record["candidate_id"])
-        goal_distance = min_goal_distance_by_candidate.get(candidate_id)
-        if goal_distance is None:
-            continue
         tool_id = str(record["tool"].mode_id)
         for step_index in range(1, config.solution_length_max + 1):
-            remaining_steps = config.solution_length_max - step_index
-            if goal_distance <= remaining_steps:
-                allowed_candidates_by_step[step_index].add(candidate_id)
-                allowed_tools_by_step[step_index].add(tool_id)
+            allowed_candidates_by_step[step_index].add(candidate_id)
+            allowed_tools_by_step[step_index].add(tool_id)
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
     _emit_lazy_constraints(writer, config, ontology, relevant_tools)

@@ -342,6 +342,14 @@ def extract_workflow_signature_key(
     return ("steps", tuple(tool_id for _, tool_id in step_tools))
 
 
+def workflow_signature_length(workflow_key: tuple[object, ...]) -> int:
+    """Return the workflow length encoded in the default signature key."""
+
+    if len(workflow_key) == 2 and workflow_key[0] == "steps" and isinstance(workflow_key[1], tuple):
+        return len(workflow_key[1])
+    return 0
+
+
 def reconstruct_solution(
     index: int,
     symbols: Iterable[clingo.Symbol],

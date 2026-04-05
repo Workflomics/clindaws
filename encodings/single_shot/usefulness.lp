@@ -21,7 +21,9 @@ useful(T, Tool) :-
     not tool_has_output(Tool).
 
 % --- Constraint: every tool that runs must be useful ---
-:- occurs(T, run(Tool)), not useful(T, Tool).
+:- enable_usefulness_pruning,
+   occurs(T, run(Tool)),
+   not useful(T, Tool).
 
 % SAT-aligned behavior permits reusing outputs from earlier runs of the same
 % tool when the resulting workflow remains useful.

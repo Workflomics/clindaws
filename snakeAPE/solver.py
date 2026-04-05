@@ -14,7 +14,11 @@ import clingo
 
 from .models import FactBundle, HorizonRecord, SnakeConfig
 from .runtime_stats import current_peak_rss_mb
-from .workflow import canonicalize_shown_symbols, extract_workflow_signature_key
+from .workflow import (
+    canonicalize_shown_symbols,
+    extract_workflow_signature_key,
+    workflow_signature_length,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -424,15 +428,25 @@ def _solve_multi_shot_with_programs(
                                 models_seen += 1
                                 shown_symbols = tuple(model.symbols(shown=True))
                                 workflow_key = extract_workflow_signature_key(shown_symbols)
+                                workflow_length = workflow_signature_length(workflow_key)
+                                in_length_window = (
+                                    config.solution_length_min
+                                    <= workflow_length
+                                    <= config.solution_length_max
+                                )
                                 if workflow_key not in seen_unique_keys:
                                     seen_unique_keys.add(workflow_key)
                                     unique_workflows_seen += 1
                                 store_raw = (
+                                    in_length_window
+                                    and
                                     capture_raw_models
                                     and workflow_key not in stored_raw_keys
                                     and len(raw_collected) < config.solutions
                                 )
                                 store_unique = (
+                                    in_length_window
+                                    and
                                     workflow_key not in stored_unique_keys
                                     and len(unique_collected) < config.solutions
                                 )
@@ -585,15 +599,25 @@ def _solve_single_shot_with_programs(
                             models_seen += 1
                             shown_symbols = tuple(model.symbols(shown=True))
                             workflow_key = extract_workflow_signature_key(shown_symbols)
+                            workflow_length = workflow_signature_length(workflow_key)
+                            in_length_window = (
+                                config.solution_length_min
+                                <= workflow_length
+                                <= config.solution_length_max
+                            )
                             if workflow_key not in seen_unique_keys:
                                 seen_unique_keys.add(workflow_key)
                                 unique_workflows_seen += 1
                             store_raw = (
+                                in_length_window
+                                and
                                 capture_raw_models
                                 and workflow_key not in stored_raw_keys
                                 and len(raw_solutions) < config.solutions
                             )
                             store_unique = (
+                                in_length_window
+                                and
                                 workflow_key not in stored_unique_keys
                                 and len(unique_solutions) < config.solutions
                             )
@@ -733,15 +757,25 @@ def _solve_single_shot_once(
                         models_seen += 1
                         shown_symbols = tuple(model.symbols(shown=True))
                         workflow_key = extract_workflow_signature_key(shown_symbols)
+                        workflow_length = workflow_signature_length(workflow_key)
+                        in_length_window = (
+                            config.solution_length_min
+                            <= workflow_length
+                            <= config.solution_length_max
+                        )
                         if workflow_key not in seen_unique_keys:
                             seen_unique_keys.add(workflow_key)
                             unique_workflows_seen += 1
                         store_raw = (
+                            in_length_window
+                            and
                             capture_raw_models
                             and workflow_key not in stored_raw_keys
                             and len(raw_solutions) < config.solutions
                         )
                         store_unique = (
+                            in_length_window
+                            and
                             workflow_key not in stored_unique_keys
                             and len(unique_solutions) < config.solutions
                         )

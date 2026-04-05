@@ -188,8 +188,6 @@ holds(t, goal) :- holds(t-1, goal).
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
 
 :- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
-:- occurs(t, run(_)), holds(t-1, goal).
-
 % SAT mode does not forbid repeated tool occurrences during synthesis. The
 % config-level tool_seq_repeat flag is applied later as a solution-distinction
 % policy, so repeated runs remain legal here.

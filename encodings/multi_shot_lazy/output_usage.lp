@@ -20,7 +20,10 @@ useful_check(t, T, Tool) :-
    occurs(T, run(Tool)),
    not tool_has_output(Tool).
 
-:- query(t), occurs(T, run(Tool)), not useful_check(t, T, Tool).
+:- query(t),
+   enable_usefulness_pruning,
+   occurs(T, run(Tool)),
+   not useful_check(t, T, Tool).
 % SAT permits reusing outputs from earlier runs of the same tool, so do not
 % forbid these chains here.
 
