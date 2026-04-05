@@ -32,3 +32,19 @@ same_input_signature(PortA, PortB) :-
     input_port(_, PortB),
     not input_signature_diff(PortA, PortB),
     not input_signature_diff(PortB, PortA).
+
+workflow_input(WF) :-
+    holds(0, avail(WF)).
+
+workflow_input_profile_mismatch(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    holds(0, dim(WF1, V, Cat)),
+    not holds(0, dim(WF2, V, Cat)).
+
+equivalent_workflow_inputs(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    WF1 < WF2,
+    not workflow_input_profile_mismatch(WF1, WF2),
+    not workflow_input_profile_mismatch(WF2, WF1).

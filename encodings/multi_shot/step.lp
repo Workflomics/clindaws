@@ -88,6 +88,16 @@ eligible(t, Port, WF) :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
+% Canonicalize equivalent workflow-input bindings for same-signature ports.
+:- occurs(t, use_variant(Tool, TI_ID)),
+   occurs(t, bind(Tool, Port1, WF1)),
+   occurs(t, bind(Tool, Port2, WF2)),
+   Port1 < Port2,
+   input_port(TI_ID, Port1),
+   input_port(TI_ID, Port2),
+   same_input_signature(Port1, Port2),
+   equivalent_workflow_inputs(WF2, WF1).
+
 % Artifact ancestry over committed runs.
 artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),

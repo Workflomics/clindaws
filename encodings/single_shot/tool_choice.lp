@@ -30,6 +30,15 @@ eligible(T, Port, WF) :-
     occurs(T, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
+:- occurs(T, use_variant(Tool, TI_ID)),
+   occurs(T, bind(Tool, Port1, WF1)),
+   occurs(T, bind(Tool, Port2, WF2)),
+   Port1 < Port2,
+   input_port(TI_ID, Port1),
+   input_port(TI_ID, Port2),
+   same_input_signature(Port1, Port2),
+   equivalent_workflow_inputs(WF2, WF1).
+
 artifact_parent(out(T, Tool, PortOut), WF) :-
     occurs(T, output(Tool, _, PortOut)),
     occurs(T, bind(Tool, _, WF)).

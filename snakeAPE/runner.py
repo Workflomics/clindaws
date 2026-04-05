@@ -45,12 +45,15 @@ from .solver import (
     solve_multi_shot_lazy,
     solve_single_shot,
 )
-from .tool_annotations import load_tool_annotations
-from .translator import (
+from .tool_annotations import (
+    load_direct_tool_annotations,
+    load_lazy_tool_annotations,
+)
+from .translator_direct import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
-    build_lazy_fact_bundle,
 )
+from .translator_lazy import build_lazy_fact_bundle
 from .workflow import reconstruct_solution
 
 
@@ -140,6 +143,12 @@ def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     if translation_pathway == "ape_multi_shot":
         return "ape_clingo_legacy"
     return grounding_strategy
+
+
+def _load_tools_for_mode(config, translation_pathway: str):
+    if translation_pathway == "lazy":
+        return load_lazy_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
+    return load_direct_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
 
 
 def _solver_family(mode: str) -> str:
@@ -928,7 +937,7 @@ def _prepare_run_context(
     _report(progress_callback, "Step 1: translation started.")
     start = perf_counter()
     ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
-    tools = load_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
+    tools = _load_tools_for_mode(config, mode_config.translation_pathway)
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
     if mode_config.translation_pathway == "lazy":
         fact_bundle = build_lazy_fact_bundle(

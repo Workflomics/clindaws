@@ -17,7 +17,43 @@ def _strip_prefix(value: str, prefix: str) -> str:
     return value
 
 
-def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
+def _normalize_output_ports(
+    raw_ports,
+    *,
+    prefix: str,
+    dedupe_duplicate_outputs: bool,
+) -> tuple[ToolPortSpec, ...]:
+    ports = tuple(
+        ToolPortSpec.from_mapping(
+            {
+                dim: tuple(_strip_prefix(value, prefix) for value in values)
+                for dim, values in port.items()
+            }
+        )
+        for port in raw_ports or []
+    )
+    if not dedupe_duplicate_outputs:
+        return ports
+
+    seen: set[frozenset[tuple[str, frozenset[str]]]] = set()
+    deduped: list[ToolPortSpec] = []
+    for spec in ports:
+        key = frozenset(
+            (dim, frozenset(vals)) for dim, vals in spec.dimensions.items()
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(spec)
+    return tuple(deduped)
+
+
+def load_tool_annotations(
+    path: Path,
+    prefix: str,
+    *,
+    dedupe_duplicate_outputs: bool = False,
+) -> tuple[ToolMode, ...]:
     """Load tool annotations from JSON."""
 
     with path.open("r", encoding="utf-8") as handle:
@@ -43,14 +79,10 @@ def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
             )
             for port in item.get("inputs") or []
         )
-        outputs = tuple(
-            ToolPortSpec.from_mapping(
-                {
-                    dim: tuple(_strip_prefix(value, prefix) for value in values)
-                    for dim, values in port.items()
-                }
-            )
-            for port in item.get("outputs") or []
+        outputs = _normalize_output_ports(
+            item.get("outputs") or [],
+            prefix=prefix,
+            dedupe_duplicate_outputs=dedupe_duplicate_outputs,
         )
         taxonomy_operations = tuple(
             _strip_prefix(value, prefix) for value in item.get("taxonomyOperations", [])
@@ -66,3 +98,23 @@ def load_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
             )
         )
     return tuple(tools)
+
+
+def load_direct_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
+    """Load tool annotations for direct modes with legacy duplicate-output dedupe."""
+
+    return load_tool_annotations(
+        path,
+        prefix,
+        dedupe_duplicate_outputs=True,
+    )
+
+
+def load_lazy_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
+    """Load tool annotations for lazy mode preserving duplicate outputs."""
+
+    return load_tool_annotations(
+        path,
+        prefix,
+        dedupe_duplicate_outputs=False,
+    )

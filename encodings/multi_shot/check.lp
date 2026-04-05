@@ -13,6 +13,54 @@
 :- query(t), exact_horizon_mode, t > 1, holds(t-1, goal).
 
 % ----------------------------------------------------------------
+% Output-dimension canonicalization
+% Keep the smallest terminal value that still satisfies all actual downstream
+% consumers and any goal the produced output satisfies at horizon t.
+% ----------------------------------------------------------------
+
+output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    occurs(TProd, output(ToolProd, _, Port)),
+    dimension(Port, (BaseV, Cat)),
+    not is_terminal(BaseV),
+    compatible(V, BaseV),
+    is_terminal(V),
+    occurs(TUse, bind(ToolUse, PortIn, out(TProd, ToolProd, Port))),
+    port_requires(PortIn, ReqV, Cat),
+    not compatible(V, ReqV).
+
+output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    occurs(TProd, output(ToolProd, _, Port)),
+    dimension(Port, (BaseV, Cat)),
+    not is_terminal(BaseV),
+    compatible(V, BaseV),
+    is_terminal(V),
+    goal_satisfied_by_output(t, GoalID, out(TProd, ToolProd, Port)),
+    goal_output(GoalID, GoalV, Cat),
+    not compatible(V, GoalV).
+
+output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    occurs(TProd, output(ToolProd, _, Port)),
+    dimension(Port, (BaseV, Cat)),
+    not is_terminal(BaseV),
+    compatible(V, BaseV),
+    is_terminal(V),
+    not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat),
+    not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat).
+
+output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Cat) :-
+    output_dim_supported(t, TProd, ToolProd, Port, V, Cat),
+    output_dim_supported(t, TProd, ToolProd, Port, V2, Cat),
+    V2 < V.
+
+:- query(t),
+   occurs(TProd, output_dim(ToolProd, Port, V, Cat)),
+   output_dim_supported(t, TProd, ToolProd, Port, V, Cat),
+   output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Cat).
+
+% ----------------------------------------------------------------
 % Usefulness: full backward propagation at check time
 % Namespaced as useful_check(t, T, Tool) to avoid stale atoms
 % from previous check iterations polluting the model.

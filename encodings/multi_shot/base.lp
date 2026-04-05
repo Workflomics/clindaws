@@ -157,26 +157,25 @@ tool_req_incompatible(Tool) :-
     not tool_req_compatible(Tool).
 
 % ----------------------------------------------------------------
-% Initial-state eligible items (needed for bind at t=1)
-% step(t) derives eligible(t,...) for use at bind(t+1,...).
-% The bind rule uses eligible(t-1,...), so at t=1 we need eligible(0,...).
-% ----------------------------------------------------------------
-
-port_cat_ok(0, Port, WF, Cat) :-
-    holds(0, avail(WF)),
-    port_requires(Port, ReqV, Cat),
-    holds(0, dim(WF, V, Cat)),
-    compatible(V, ReqV).
-
-eligible(0, Port, WF) :-
-    holds(0, avail(WF)),
-    input_port(_, Port),
-    port_cat_ok(0, Port, WF, Cat) : port_requires(Port, _, Cat).
-
-% ----------------------------------------------------------------
 % From unit_reasoning.lp — static derivations only
 % (unit carry-forward and production are in step.lp)
 % ----------------------------------------------------------------
+
+workflow_input(WF) :-
+    holds(0, avail(WF)).
+
+workflow_input_profile_mismatch(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    holds(0, dim(WF1, V, Cat)),
+    not holds(0, dim(WF2, V, Cat)).
+
+equivalent_workflow_inputs(WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    WF1 < WF2,
+    not workflow_input_profile_mismatch(WF1, WF2),
+    not workflow_input_profile_mismatch(WF2, WF1).
 
 unit_ancestor(U, U) :- unit_is_a(U, _).
 unit_ancestor(U, U) :- unit_is_a(_, U).

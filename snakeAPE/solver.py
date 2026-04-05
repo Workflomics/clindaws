@@ -53,6 +53,7 @@ ape_goal_out(T, GoalID, WF) :-
     holds(T, goal_time(T)),
     goal_output(GoalID, _, _),
     holds(T, avail(WF)),
+    not holds(0, avail(WF)),
     goal_dim_match_at(T, GoalID, WF, _, _),
     not goal_dim_missing_at(T, GoalID, WF).
 """
@@ -119,6 +120,7 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot"
     return (
         base / "base.lp",
+        base / "init.lp",
         base / "step.lp",
         base / "constraints.lp",
         base / "check.lp",
@@ -280,6 +282,25 @@ def _lazy_horizon_parts(
     parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
     parts.append(("check_usage", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
+def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if horizon == 1:
+        parts.append(("init", ()))
+    parts.append(("step", (clingo.Number(horizon),)))
+    parts.append(("check", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
+def _multi_shot_grounding_horizon_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if horizon == 1:
+        parts.append(("init", ()))
+    parts.append(("step", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -789,7 +810,7 @@ def solve_single_shot(
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
 ) -> SolveOutput:
-    """Solve using the single-shot encoding: ground once for max horizon, solve once."""
+    """Solve single-shot mode as one grounding over time(1..max_length)."""
 
     return _solve_single_shot_once(
         config,
@@ -906,6 +927,7 @@ def solve_multi_shot(
         horizon_record_callback=horizon_record_callback,
         solve_all_horizons=False,
         stop_on_solution=False,
+        horizon_parts_builder=_multi_shot_horizon_parts,
         capture_raw_models=capture_raw_models,
     )
 
@@ -932,12 +954,7 @@ def ground_multi_shot(
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
-        horizon_parts_builder=lambda horizon: _default_horizon_parts(
-            horizon,
-            initial_step_program=None,
-            initial_seed_program=None,
-            grounding_only=True,
-        ),
+        horizon_parts_builder=_multi_shot_grounding_horizon_parts,
     )
 
 
