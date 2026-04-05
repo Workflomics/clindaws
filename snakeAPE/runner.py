@@ -70,6 +70,8 @@ SCHEMA_PREDICATES = (
     "lazy_profile_value",
     "lazy_profile_accepts",
     "lazy_candidate_output_port",
+    "lazy_candidate_output_multiplicity",
+    "lazy_candidate_total_output_multiplicity",
     "lazy_candidate_output_singleton",
     "lazy_candidate_output_choice_value",
     "lazy_candidate_output_declared_type",

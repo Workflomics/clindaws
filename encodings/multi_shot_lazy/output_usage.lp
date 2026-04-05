@@ -26,9 +26,12 @@ useful_check(t, T, Tool) :-
 
 :- query(t),
    enable_all_outputs_consumed,
-   occurs(T, output(Tool, _, Port)),
-   not chosen_goal_output(t, _, out(T, Tool, Port)),
-   #count { T2, Tool2, Port2 : occurs(T2, bind(Tool2, Port2, out(T, Tool, Port))) } = 0.
+   occurs(T, output(Tool, Candidate, Port)),
+   lazy_candidate_output_multiplicity(Candidate, Port, RequiredUses),
+   RequiredUses > #count {
+       goal(GoalID) : chosen_goal_output(t, GoalID, out(T, Tool, Port));
+       bind(T2, Tool2, Port2) : occurs(T2, bind(Tool2, Port2, out(T, Tool, Port)))
+   }.
 
 :- query(t),
    enable_primary_output_consumed,

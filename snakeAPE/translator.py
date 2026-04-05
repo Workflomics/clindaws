@@ -1123,6 +1123,48 @@ def _group_port_values_by_dimension(
     }
 
 
+def _output_port_group_key(
+    output_port: Mapping[str, object],
+) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[tuple[str, tuple[str, ...]], ...]]:
+    declared_dims = output_port["declared_dims"]
+    port_values_by_dimension = output_port["port_values_by_dimension"]
+    assert isinstance(declared_dims, Mapping)
+    assert isinstance(port_values_by_dimension, Mapping)
+    return (
+        tuple((str(dim), tuple(str(value) for value in values)) for dim, values in sorted(declared_dims.items())),
+        tuple(
+            (str(dim), tuple(str(value) for value in values))
+            for dim, values in sorted(port_values_by_dimension.items())
+        ),
+    )
+
+
+def _compress_duplicate_output_ports(
+    output_ports: tuple[dict[str, object], ...],
+) -> tuple[dict[str, object], ...]:
+    grouped: list[dict[str, object]] = []
+    grouped_by_key: dict[
+        tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[tuple[str, tuple[str, ...]], ...]],
+        dict[str, object],
+    ] = {}
+
+    for output_port in output_ports:
+        group_key = _output_port_group_key(output_port)
+        existing = grouped_by_key.get(group_key)
+        multiplicity = int(output_port.get("multiplicity", 1))
+        if existing is None:
+            grouped_port = {
+                **output_port,
+                "multiplicity": multiplicity,
+            }
+            grouped.append(grouped_port)
+            grouped_by_key[group_key] = grouped_port
+        else:
+            existing["multiplicity"] = int(existing.get("multiplicity", 1)) + multiplicity
+
+    return tuple(grouped)
+
+
 def _workflow_input_matches_lazy_port(
     ontology: Ontology,
     workflow_input: Mapping[str, tuple[str, ...]],
@@ -1352,7 +1394,7 @@ def build_lazy_fact_bundle(
                 "tool": tool,
                 "candidate_id": candidate_id,
                 "input_ports": tuple(input_ports),
-                "output_ports": tuple(output_ports),
+                "output_ports": _compress_duplicate_output_ports(tuple(output_ports)),
             }
         )
 
@@ -1455,7 +1497,7 @@ def build_lazy_fact_bundle(
                     "port_values_fset": compressed_fset,
                 }
             )
-        record["output_ports"] = tuple(compressed_output_ports)
+        record["output_ports"] = _compress_duplicate_output_ports(tuple(compressed_output_ports))
 
     _t4 = perf_counter()
     relevant_tools = tuple(record["tool"] for record in relevant_records)
@@ -1479,6 +1521,10 @@ def build_lazy_fact_bundle(
         )
         if not goals_satisfied:
             continue
+        total_output_multiplicity = sum(
+            int(output_port.get("multiplicity", 1))
+            for output_port in output_ports
+        )
         if config.use_all_generated_data == "ALL" and any(
             not any(
                 _lazy_output_matches_lazy_input_fset(
@@ -1489,6 +1535,8 @@ def build_lazy_fact_bundle(
             )
             for output_port in output_ports
         ):
+            continue
+        if config.use_all_generated_data == "ALL" and total_output_multiplicity != len(goal_fsets):
             continue
         query_goal_candidates.add(candidate_id)
     query_goal_tools = {
@@ -1582,6 +1630,12 @@ def build_lazy_fact_bundle(
                 _quote(candidate_id),
                 str(port_idx),
             )
+            writer.emit_fact(
+                "lazy_candidate_output_multiplicity",
+                _quote(candidate_id),
+                str(port_idx),
+                str(int(output_port.get("multiplicity", 1))),
+            )
             for dim, declared_values in output_port["declared_dims"].items():
                 for declared_value in declared_values:
                     writer.emit_fact(
@@ -1609,6 +1663,11 @@ def build_lazy_fact_bundle(
                             _quote(value),
                             _quote(dim),
                         )
+        writer.emit_fact(
+            "lazy_candidate_total_output_multiplicity",
+            _quote(candidate_id),
+            str(sum(int(output_port.get("multiplicity", 1)) for output_port in tuple(record["output_ports"]))),
+        )
 
     for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:

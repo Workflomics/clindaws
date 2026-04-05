@@ -36,7 +36,7 @@ occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
 :- initial_goal_filter_active(t),
    occurs(t, use_lazy_candidate(_, Candidate)),
    enable_all_outputs_consumed,
-   NP = #count { Port : lazy_candidate_output_port(Candidate, Port) },
+   lazy_candidate_total_output_multiplicity(Candidate, NP),
    NG = #count { GoalID : goal_id(GoalID) },
    NP != NG.
 

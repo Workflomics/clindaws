@@ -61,8 +61,7 @@ lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :-
 
 lazy_initial_goal_candidate_output_mismatch(Candidate) :-
     enable_all_outputs_consumed,
-    lazy_tool_candidate(Candidate, _),
-    NP = #count { Port : lazy_candidate_output_port(Candidate, Port) },
+    lazy_candidate_total_output_multiplicity(Candidate, NP),
     NG = #count { G : goal_id(G) },
     NP != NG.
 
