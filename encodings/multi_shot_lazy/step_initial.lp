@@ -61,16 +61,6 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
 
-smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, SmallerPort) :-
-    occurs(t, use_lazy_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
-    occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, SmallerPort)),
-    same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, Candidate, Port, SmallerPort).
-
-:- smaller_equivalent_producer_port_available(
-       t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, _).
-
 % paired_symmetric_producers and repeated_same_candidate_symmetric_join_swap are
 % omitted here: both require T1 < T2 < TJ, which needs at least 3 time steps.
 % At t=1 these rules are dead code. They are enforced in step.lp at t>=3.

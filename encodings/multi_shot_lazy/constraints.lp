@@ -122,8 +122,7 @@ constraint_used_data_check(t, Sel) :-
            constraint_selected_tool(T1, SelA, ToolA),
            constraint_selected_tool(T2, SelB, ToolB),
            T1 < T2,
-           occurs(T1, output(ToolA, _, Port)),
-           occurs(T2, bind(ToolB, _, out(T1, ToolA, Port)))
+           output_used_by(T1, ToolA, Port, T2, ToolB, Port2)
    } = 0.
 
 % used_iff_used: A appears iff B appears.

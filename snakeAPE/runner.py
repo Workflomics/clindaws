@@ -241,6 +241,8 @@ def _solve_worker_entrypoint(
     config,
     fact_bundle,
     capture_raw_models: bool,
+    parallel_mode: str | None,
+    project_models: bool,
     result_queue: multiprocessing.queues.Queue,
     progress_queue: multiprocessing.queues.Queue,
 ) -> None:
@@ -253,6 +255,8 @@ def _solve_worker_entrypoint(
             fact_bundle,
             progress_callback=_worker_progress,
             capture_raw_models=capture_raw_models,
+            parallel_mode=parallel_mode,
+            project_models=project_models,
         )
         result_queue.put(
             {
@@ -288,6 +292,8 @@ def _run_solve_in_worker(
     config,
     fact_bundle,
     capture_raw_models: bool,
+    parallel_mode: str | None,
+    project_models: bool,
     remaining_timeout: float,
     progress_callback: ProgressCallback,
 ) -> tuple[object, bool]:
@@ -301,6 +307,8 @@ def _run_solve_in_worker(
             "config": config,
             "fact_bundle": fact_bundle,
             "capture_raw_models": capture_raw_models,
+            "parallel_mode": parallel_mode,
+            "project_models": project_models,
             "result_queue": result_queue,
             "progress_queue": progress_queue,
         },
@@ -1087,6 +1095,8 @@ def run_once(
     solutions: int | None = None,
     min_length: int | None = None,
     max_length: int | None = None,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
     graph_format: str = "png",
     render_graphs: bool = True,
     write_raw_answer_sets: bool = False,
@@ -1145,6 +1155,8 @@ def run_once(
             config=config,
             fact_bundle=fact_bundle,
             capture_raw_models=True,
+            parallel_mode=parallel_mode,
+            project_models=project_models,
             remaining_timeout=remaining_timeout,
             progress_callback=progress_callback,
         )
@@ -1447,6 +1459,8 @@ def benchmark_grounding(
     solutions: int | None = None,
     min_length: int | None = None,
     max_length: int | None = None,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
     graph_format: str = "png",
     render_graphs: bool = False,
     repetitions: int = 1,
@@ -1471,6 +1485,8 @@ def benchmark_grounding(
                 solutions=solutions,
                 min_length=min_length,
                 max_length=max_length,
+                parallel_mode=parallel_mode,
+                project_models=project_models,
                 graph_format=graph_format,
                 render_graphs=render_graphs,
                 progress_callback=progress_callback,

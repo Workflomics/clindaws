@@ -2560,16 +2560,14 @@ def build_lazy_fact_bundle(
             str(sum(int(output_port.get("multiplicity", 1)) for output_port in tuple(record["output_ports"]))),
         )
 
-    for producer_candidate, producer_port, consumer_candidate, consumer_port in sorted(bindable_pairs):
+    canonical_bindable_ports: dict[tuple[str, int, str], int] = {}
+    for producer_candidate, producer_port, consumer_candidate, consumer_port in bindable_pairs:
         if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
             continue
-        writer.emit_fact(
-            "lazy_candidate_port_bindable",
-            _quote(producer_candidate),
-            str(producer_port),
-            _quote(consumer_candidate),
-            str(consumer_port),
-        )
+        key = (consumer_candidate, consumer_port, producer_candidate)
+        current_port = canonical_bindable_ports.get(key)
+        if current_port is None or producer_port < current_port:
+            canonical_bindable_ports[key] = producer_port
     for consumer_candidate, ports_by_source in sorted(produced_bindable_ports.items()):
         if consumer_candidate not in relevant_candidates:
             continue
@@ -2577,12 +2575,11 @@ def build_lazy_fact_bundle(
             for producer_candidate in sorted(producer_candidates):
                 if producer_candidate not in relevant_candidates:
                     continue
-                writer.emit_fact(
-                    "lazy_candidate_bindable_producer",
-                    _quote(consumer_candidate),
-                    str(consumer_port),
-                    _quote(producer_candidate),
+                producer_port = canonical_bindable_ports.get(
+                    (consumer_candidate, consumer_port, producer_candidate)
                 )
+                if producer_port is None:
+                    continue
                 consumer_min_step = min_step_by_candidate.get(consumer_candidate)
                 consumer_max_step = max_step_by_candidate.get(consumer_candidate)
                 producer_min_step = min_step_by_candidate.get(producer_candidate)
@@ -2599,21 +2596,17 @@ def build_lazy_fact_bundle(
                     latest_prior_step = min(producer_max_step, consumer_step - 1)
                     if latest_prior_step < producer_min_step:
                         continue
-                    if not has_valid_prior:
-                        writer.emit_fact(
-                            "lazy_bindable_prior_candidate",
-                            _quote(consumer_candidate),
-                            str(consumer_port),
-                            _quote(producer_candidate),
-                        )
-                        has_valid_prior = True
-                    writer.emit_fact(
-                        "lazy_bindable_prior_step",
-                        _quote(consumer_candidate),
-                        str(consumer_port),
-                        _quote(producer_candidate),
-                        str(consumer_step),
-                    )
+                    has_valid_prior = True
+                    break
+                if not has_valid_prior:
+                    continue
+                writer.emit_fact(
+                    "lazy_bindable_producer_port",
+                    _quote(consumer_candidate),
+                    str(consumer_port),
+                    _quote(producer_candidate),
+                    str(producer_port),
+                )
     for signature_id, category_profiles in sorted(signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(

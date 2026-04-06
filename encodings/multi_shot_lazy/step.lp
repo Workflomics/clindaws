@@ -40,16 +40,9 @@ produced_bind_option(
     ProducerCandidate,
     ProducerPort
 ) :-
-    lazy_bindable_prior_step(Candidate, Port, ProducerCandidate, t),
-    lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port),
-    not same_producer_equivalent_bind_option(
-        ProducerCandidate,
-        ProducerPort,
-        Candidate,
-        Port,
-        _
-    ),
+    lazy_bindable_producer_port(Candidate, Port, ProducerCandidate, ProducerPort),
     occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
+    lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     TPrev < t.
 
@@ -111,23 +104,6 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
 artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
-
-smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, SmallerPort) :-
-    chosen_produced_bind(
-        t,
-        Tool,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, SmallerPort)),
-    same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, Candidate, Port, SmallerPort).
-
-:- smaller_equivalent_producer_port_available(
-       t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, _).
 
 paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2) :-
     paired_symmetric_producer_candidate_pair(Candidate1, Candidate2),
@@ -226,6 +202,10 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
 
+output_used_by(TPrev, ToolPrev, Port, t, Tool, ConsumerPort) :-
+    occurs(t, bind(Tool, ConsumerPort, out(TPrev, ToolPrev, Port))),
+    TPrev < t.
+
 is_root(t, Tool) :-
     occurs(t, run(Tool)),
     not tool_has_input(Tool).
@@ -244,8 +224,7 @@ reachable(t, Tool) :- reachable(t-1, Tool).
 % because carry-forward already accumulates all prior reachable sets.
 reachable(t, Tool2) :-
     reachable(t-1, Tool1),
-    occurs(T1, output(Tool1, _, Port)),
-    occurs(t, bind(Tool2, _, out(T1, Tool1, Port))),
+    output_used_by(T1, Tool1, ProducerPort, t, Tool2, ConsumerPort),
     T1 < t.
 
 :- occurs(t, run(Tool)), not reachable(t, Tool).

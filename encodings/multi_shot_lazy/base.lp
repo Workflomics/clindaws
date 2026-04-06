@@ -248,6 +248,9 @@ symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
     candidate_single_input(Candidate2),
     same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2).
 
+lazy_candidate_bindable_producer(ConsumerCandidate, ConsumerPort, ProducerCandidate) :-
+    lazy_bindable_producer_port(ConsumerCandidate, ConsumerPort, ProducerCandidate, _).
+
 join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
     JoinPort2 < JoinPort1,
     same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
@@ -255,17 +258,10 @@ join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
 paired_symmetric_producer_candidate_pair(Candidate1, Candidate2) :-
     symmetric_candidate_input_pair(Candidate1, _, Candidate2, _),
     join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2),
-    lazy_candidate_port_bindable(Candidate1, _, JoinCandidate, JoinPort1),
-    lazy_candidate_port_bindable(Candidate2, _, JoinCandidate, JoinPort2).
+    lazy_candidate_bindable_producer(JoinCandidate, JoinPort1, Candidate1),
+    lazy_candidate_bindable_producer(JoinCandidate, JoinPort2, Candidate2).
 
 repeated_same_candidate_join_guard(Candidate) :-
     join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
-    lazy_candidate_port_bindable(Candidate, _, JoinCandidate, JoinPortHigh),
-    lazy_candidate_port_bindable(Candidate, _, JoinCandidate, JoinPortLow).
-
-same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, ConsumerCandidate, ConsumerPort, SmallerPort) :-
-    lazy_candidate_output_port(ProducerCandidate, ProducerPort),
-    lazy_candidate_output_port(ProducerCandidate, SmallerPort),
-    SmallerPort < ProducerPort,
-    lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, ConsumerCandidate, ConsumerPort),
-    lazy_candidate_port_bindable(ProducerCandidate, SmallerPort, ConsumerCandidate, ConsumerPort).
+    lazy_candidate_bindable_producer(JoinCandidate, JoinPortHigh, Candidate),
+    lazy_candidate_bindable_producer(JoinCandidate, JoinPortLow, Candidate).

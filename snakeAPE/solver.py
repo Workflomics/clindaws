@@ -74,10 +74,25 @@ def _single_shot_overlay(horizon: int) -> str:
     )
 
 
-def _make_control(config: SnakeConfig) -> clingo.Control:
-    """Create a clingo control configured with the run's model limit."""
+def _make_solve_control(
+    *,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
+) -> clingo.Control:
+    """Create a clingo control for full model enumeration during solving."""
 
-    return clingo.Control([str(config.solutions), "--warn=none"])
+    args = ["0", "--warn=none"]
+    if project_models:
+        args.append("--project")
+    if parallel_mode:
+        args.append(f"--parallel-mode={parallel_mode}")
+    return clingo.Control(args)
+
+
+def _make_grounding_control() -> clingo.Control:
+    """Create a clingo control for grounding-only operations."""
+
+    return clingo.Control(["0", "--warn=none"])
 
 
 @dataclass(frozen=True)
@@ -385,8 +400,13 @@ def _solve_multi_shot_with_programs(
     horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
     capture_raw_models: bool = False,
     solve_start_horizon: int | None = None,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
-    control = _make_control(config)
+    control = _make_solve_control(
+        parallel_mode=parallel_mode,
+        project_models=project_models,
+    )
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -574,6 +594,8 @@ def _solve_single_shot_with_programs(
     horizon_record_callback: HorizonRecordCallback = None,
     solve_all_horizons: bool = False,
     capture_raw_models: bool = False,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
     """Solve using the single-shot encoding by iterating horizons."""
 
@@ -593,7 +615,10 @@ def _solve_single_shot_with_programs(
         if not solve_all_horizons and len(unique_solutions) >= config.solutions:
             break
 
-        control = _make_control(config)
+        control = _make_solve_control(
+            parallel_mode=parallel_mode,
+            project_models=project_models,
+        )
         for program_path in program_paths:
             control.load(str(program_path))
         control.add("base", [], facts.facts)
@@ -738,6 +763,8 @@ def _solve_single_shot_once(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
     """Ground once with time(1..max_length) and solve in a single shot."""
 
@@ -752,7 +779,10 @@ def _solve_single_shot_once(
         + ":- time(T), 2 { occurs(T, run(_)) }.\n"
     )
 
-    control = _make_control(config)
+    control = _make_solve_control(
+        parallel_mode=parallel_mode,
+        project_models=project_models,
+    )
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -879,6 +909,8 @@ def solve_single_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
     """Solve single-shot mode as one grounding over time(1..max_length)."""
 
@@ -890,6 +922,8 @@ def solve_single_shot(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         capture_raw_models=capture_raw_models,
+        parallel_mode=parallel_mode,
+        project_models=project_models,
     )
 
 
@@ -986,6 +1020,8 @@ def solve_multi_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
     """Solve using the multi-shot encoding."""
     return _solve_multi_shot_with_programs(
@@ -999,6 +1035,8 @@ def solve_multi_shot(
         stop_on_solution=False,
         horizon_parts_builder=_multi_shot_horizon_parts,
         capture_raw_models=capture_raw_models,
+        parallel_mode=parallel_mode,
+        project_models=project_models,
     )
 
 
@@ -1013,7 +1051,7 @@ def ground_multi_shot(
 ) -> GroundingOutput:
     """Ground the multi-shot encoding without solving."""
 
-    control = _make_control(config)
+    control = _make_grounding_control()
     for program_path in _multi_shot_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -1037,6 +1075,8 @@ def solve_multi_shot_lazy(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
 ) -> SolveOutput:
     """Solve using the lazy multi-shot encoding."""
 
@@ -1069,6 +1109,8 @@ def solve_multi_shot_lazy(
         ),
         capture_raw_models=capture_raw_models,
         solve_start_horizon=effective_solve_start,
+        parallel_mode=parallel_mode,
+        project_models=project_models,
     )
 
 
@@ -1084,7 +1126,7 @@ def ground_multi_shot_lazy(
 ) -> GroundingOutput:
     """Ground the lazy multi-shot encoding without solving."""
 
-    control = _make_control(config)
+    control = _make_grounding_control()
     for program_path in _multi_shot_lazy_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)

@@ -65,6 +65,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the maximum solution length.",
     )
     parser.add_argument(
+        "--parallel-mode",
+        help="Override clingo solve parallel mode, for example 8,compete. Applies to solving only.",
+    )
+    parser.add_argument(
+        "--project",
+        action="store_true",
+        help="Enable clingo model projection on the encoding's declared projection predicates during solving.",
+    )
+    parser.add_argument(
         "--graph-format",
         choices=("png", "dot", "svg"),
         default="png",
@@ -141,6 +150,8 @@ def main(argv: list[str] | None = None) -> int:
                 solutions=args.solutions,
                 min_length=args.min_length,
                 max_length=args.max_length,
+                parallel_mode=args.parallel_mode,
+                project_models=args.project,
                 graph_format=args.graph_format,
                 render_graphs=not args.no_graphs,
                 repetitions=args.benchmark_repetitions,
@@ -229,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
             solutions=args.solutions,
             min_length=args.min_length,
             max_length=args.max_length,
+            parallel_mode=args.parallel_mode,
+            project_models=args.project,
             graph_format=args.graph_format,
             render_graphs=not args.no_graphs,
             write_raw_answer_sets=args.write_raw_answer_sets,

@@ -7,6 +7,7 @@
 % groundings: re-registration at each step(t) invocation is idempotent.
 
 % Which tool runs at this step.
+#project tool_at_time/2.
 tool_at_time(t, Tool) :- occurs(t, run(Tool)).
 #show tool_at_time/2.
 
