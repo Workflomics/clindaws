@@ -71,50 +71,21 @@ smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, Tool
 :- smaller_equivalent_producer_port_available(
        t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, _).
 
-paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2) :-
-    T1 < T2,
-    occurs(T1, use_lazy_candidate(Tool1, Candidate1)),
-    occurs(T2, use_lazy_candidate(Tool2, Candidate2)),
-    paired_symmetric_producer_candidate_pair(Candidate1, Candidate2),
-    occurs(T1, bind(Tool1, Port1, WF1)),
-    occurs(T2, bind(Tool2, Port2, WF2)),
-    symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2),
-    occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
-    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
-    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
-    TJ > T2,
-    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2).
-
-:- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF, T2, Tool2, Candidate2, Port2, WF).
-
-:- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2),
-   artifact_ancestor(t, WF1, WF2).
+% paired_symmetric_producers and repeated_same_candidate_symmetric_join_swap are
+% omitted here: both require T1 < T2 < TJ, which needs at least 3 time steps.
+% At t=1 these rules are dead code. They are enforced in step.lp at t>=3.
 
 repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2) :-
-    T1 < T2,
+    candidate_has_repeated_signature_inputs(Candidate),
+    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
     occurs(T1, use_lazy_candidate(Tool, Candidate)),
     occurs(T2, use_lazy_candidate(Tool, Candidate)),
+    T1 < T2,
     occurs(T1, bind(Tool, Port1, WF1)),
     occurs(T2, bind(Tool, Port2, WF2)),
-    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
     artifact_ancestor(t, WF1, WF2).
 
 :- repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2).
-
-repeated_same_candidate_symmetric_join_swap(
-    t, T1, Tool, Candidate, T2, JoinTool, JoinCandidate, JoinPortHigh, JoinPortLow
-) :-
-    T1 < T2,
-    occurs(T1, use_lazy_candidate(Tool, Candidate)),
-    occurs(T2, use_lazy_candidate(Tool, Candidate)),
-    occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
-    TJ > T2,
-    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
-    occurs(TJ, bind(JoinTool, JoinPortHigh, out(T1, Tool, _))),
-    occurs(TJ, bind(JoinTool, JoinPortLow, out(T2, Tool, _))).
-
-:- repeated_same_candidate_symmetric_join_swap(
-       t, T1, Tool, Candidate, T2, JoinTool, JoinCandidate, JoinPortHigh, JoinPortLow).
 
 :- occurs(t, use_lazy_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),

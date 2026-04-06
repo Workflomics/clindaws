@@ -41,11 +41,6 @@ produced_bind_option(
     ProducerPort
 ) :-
     lazy_bindable_prior_step(Candidate, Port, ProducerCandidate, t),
-    occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
-    lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
-    lazy_candidate_bindable_producer(Candidate, Port, ProducerCandidate),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
-    TPrev < t,
     lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port),
     not same_producer_equivalent_bind_option(
         ProducerCandidate,
@@ -53,7 +48,10 @@ produced_bind_option(
         Candidate,
         Port,
         _
-    ).
+    ),
+    occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t.
 
 chosen_produced_bind(
     t,
@@ -132,18 +130,18 @@ smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, Tool
        t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, _).
 
 paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Candidate2, Port2, WF2) :-
-    T1 < T2,
+    paired_symmetric_producer_candidate_pair(Candidate1, Candidate2),
+    symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2),
+    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2),
     occurs(T1, use_lazy_candidate(Tool1, Candidate1)),
     occurs(T2, use_lazy_candidate(Tool2, Candidate2)),
-    paired_symmetric_producer_candidate_pair(Candidate1, Candidate2),
+    T1 < T2,
     occurs(T1, bind(Tool1, Port1, WF1)),
     occurs(T2, bind(Tool2, Port2, WF2)),
-    symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2),
     occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
     occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
     occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
-    TJ > T2,
-    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2).
+    TJ > T2.
 
 :- paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF, T2, Tool2, Candidate2, Port2, WF).
 
@@ -151,12 +149,13 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
    artifact_ancestor(t, WF1, WF2).
 
 repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2) :-
-    T1 < T2,
+    candidate_has_repeated_signature_inputs(Candidate),
+    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
     occurs(T1, use_lazy_candidate(Tool, Candidate)),
     occurs(T2, use_lazy_candidate(Tool, Candidate)),
+    T1 < T2,
     occurs(T1, bind(Tool, Port1, WF1)),
     occurs(T2, bind(Tool, Port2, WF2)),
-    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
     artifact_ancestor(t, WF1, WF2).
 
 :- repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2).
@@ -164,12 +163,13 @@ repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T
 repeated_same_candidate_symmetric_join_swap(
     t, T1, Tool, Candidate, T2, JoinTool, JoinCandidate, JoinPortHigh, JoinPortLow
 ) :-
-    T1 < T2,
+    repeated_same_candidate_join_guard(Candidate),
+    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
     occurs(T1, use_lazy_candidate(Tool, Candidate)),
     occurs(T2, use_lazy_candidate(Tool, Candidate)),
+    T1 < T2,
     occurs(TJ, use_lazy_candidate(JoinTool, JoinCandidate)),
     TJ > T2,
-    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
     occurs(TJ, bind(JoinTool, JoinPortHigh, out(T1, Tool, _))),
     occurs(TJ, bind(JoinTool, JoinPortLow, out(T2, Tool, _))).
 
