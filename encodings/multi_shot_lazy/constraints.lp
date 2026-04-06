@@ -29,10 +29,17 @@
 
 constraint_selected_tool(t, Sel, Tool) :-
     occurs(t, run(Tool)),
-    constraint_selector_matches_tool(Sel, Tool).
+    lazy_constraint_selector_matches_tool(Sel, Tool).
 
 constraint_selected_time(t, Sel) :-
     constraint_selected_tool(t, Sel, _).
+
+constraint_selected_any(t, Sel) :-
+    constraint_selected_time(t, Sel).
+
+constraint_selected_any(t, Sel) :-
+    t > 1,
+    constraint_selected_any(t-1, Sel).
 
 % Integrity constraints checked at each horizon.
 % All rules are guarded by query(t) so they only fire when the solver

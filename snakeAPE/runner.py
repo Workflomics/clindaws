@@ -1051,6 +1051,7 @@ def run_translate_only(
         base_grounding_peak_rss_mb=0.0,
         horizon_records=(),
         raw_solutions_found=0,
+        raw_models_seen=0,
         solutions_found=0,
     )
     run_log_path = csv_writers.run_log_path

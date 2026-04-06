@@ -66,9 +66,7 @@ smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, Tool
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
     occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, SmallerPort)),
-    SmallerPort < ProducerPort,
-    lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port),
-    lazy_candidate_port_bindable(ProducerCandidate, SmallerPort, Candidate, Port).
+    same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, Candidate, Port, SmallerPort).
 
 :- smaller_equivalent_producer_port_available(
        t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, _).
@@ -77,6 +75,7 @@ paired_symmetric_producers(t, T1, Tool1, Candidate1, Port1, WF1, T2, Tool2, Cand
     T1 < T2,
     occurs(T1, use_lazy_candidate(Tool1, Candidate1)),
     occurs(T2, use_lazy_candidate(Tool2, Candidate2)),
+    paired_symmetric_producer_candidate_pair(Candidate1, Candidate2),
     occurs(T1, bind(Tool1, Port1, WF1)),
     occurs(T2, bind(Tool2, Port2, WF2)),
     symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2),

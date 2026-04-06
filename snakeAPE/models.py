@@ -107,6 +107,7 @@ class FactBundle:
     tool_stats: tuple[ToolExpansionStat, ...]
     cache_stats: Mapping[str, int]
     emit_stats: Mapping[str, int]
+    earliest_solution_step: int = 1
 
 
 @dataclass(frozen=True)

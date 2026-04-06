@@ -384,6 +384,7 @@ def _solve_multi_shot_with_programs(
     stop_on_solution: bool = True,
     horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
     capture_raw_models: bool = False,
+    solve_start_horizon: int | None = None,
 ) -> SolveOutput:
     control = _make_control(config)
     for program_path in program_paths:
@@ -400,6 +401,7 @@ def _solve_multi_shot_with_programs(
     horizon_records: list[HorizonRecord] = []
     solving_started = False
     tool_input_signatures = dict(facts.tool_input_signatures)
+    effective_solve_start = solve_start_horizon if solve_start_horizon is not None else config.solution_length_min
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -442,7 +444,7 @@ def _solve_multi_shot_with_programs(
                     f"Grounding progress: horizon {horizon} finished after {ground_elapsed:.3f}s.",
                 )
 
-                if horizon < config.solution_length_min:
+                if horizon < effective_solve_start:
                     horizon += 1
                     continue
 
@@ -1039,6 +1041,7 @@ def solve_multi_shot_lazy(
     """Solve using the lazy multi-shot encoding."""
 
     has_translated_constraints = _has_translated_constraints(facts)
+    effective_solve_start = max(config.solution_length_min, facts.earliest_solution_step)
 
     return _solve_multi_shot_with_programs(
         config,
@@ -1057,7 +1060,7 @@ def solve_multi_shot_lazy(
                 initial_seed_program=None,
                 include_constraint_step=has_translated_constraints,
             )
-            if horizon < config.solution_length_min
+            if horizon < effective_solve_start
             else _lazy_horizon_parts(
                 horizon,
                 initial_step_program="step_initial",
@@ -1065,6 +1068,7 @@ def solve_multi_shot_lazy(
             )
         ),
         capture_raw_models=capture_raw_models,
+        solve_start_horizon=effective_solve_start,
     )
 
 

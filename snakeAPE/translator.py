@@ -206,6 +206,7 @@ def _finalize_fact_bundle(
     tools: tuple[ToolMode, ...],
     tool_stats: list[ToolExpansionStat],
     cache_stats: dict[str, int],
+    earliest_solution_step: int = 1,
 ) -> FactBundle:
     tool_labels, tool_input_signatures, workflow_input_ids = _bundle_metadata(config, tools)
     return FactBundle(
@@ -219,6 +220,7 @@ def _finalize_fact_bundle(
         tool_stats=tuple(tool_stats),
         cache_stats=cache_stats,
         emit_stats=writer.stats(),
+        earliest_solution_step=earliest_solution_step,
     )
 
 
@@ -1120,6 +1122,572 @@ def _load_lazy_constraints(config: SnakeConfig) -> tuple[object, list[Any], str]
     )
 
 
+def _tool_selector_ancestors(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> dict[str, frozenset[str]]:
+    tool_taxonomy_nodes = set(ontology.descendants_of(config.tools_taxonomy_root))
+    tool_taxonomy_nodes.add(config.tools_taxonomy_root)
+    ancestors_by_tool: dict[str, frozenset[str]] = {}
+    for tool in tools:
+        ancestors = {tool.mode_id}
+        for tax_op in tool.taxonomy_operations:
+            ancestors.add(tax_op)
+            if tax_op in ontology.nodes:
+                ancestors.update(
+                    ancestor
+                    for ancestor in ontology.ancestors_of(tax_op)
+                    if ancestor in tool_taxonomy_nodes
+                )
+        ancestors_by_tool[tool.mode_id] = frozenset(ancestors)
+    return ancestors_by_tool
+
+
+def _collect_lazy_forbidden_tool_ids(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+) -> set[str]:
+    loaded_constraints = _load_lazy_constraints(config)
+    if loaded_constraints is None:
+        return set()
+
+    allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    tool_ids = {tool.mode_id for tool in tools}
+    operation_ids = {tax_op for tool in tools for tax_op in tool.taxonomy_operations}
+    ancestors_by_tool = _tool_selector_ancestors(config, ontology, tools)
+    forbidden_tool_ids: set[str] = set()
+
+    def _mark_forbidden(constraint_name: str, args: tuple[str | int, ...]) -> None:
+        base_constraint_name, selector_policies = _resolve_constraint_template_name(constraint_name)
+        if base_constraint_name != "nuse_m" or len(args) != 1:
+            return
+        raw_value = args[0]
+        if not isinstance(raw_value, str):
+            return
+        selector = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+        if not selector or selector not in allowed_selectors:
+            return
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_policy = selector_policies[0] if selector_policies else "auto"
+        if selector_policy == "class_transitive" and selector_kind != "class":
+            return
+        if selector_policy == "tool_exact" and selector_kind != "tool":
+            return
+        selector_mode = _constraint_selector_mode(
+            base_constraint_name,
+            selector_kind=selector_kind,
+            selector_policy=selector_policy,
+        )
+        for tool in tools:
+            if selector_mode == "exact":
+                if selector == tool.mode_id or selector in tool.taxonomy_operations:
+                    forbidden_tool_ids.add(tool.mode_id)
+            elif selector in ancestors_by_tool.get(tool.mode_id, frozenset()):
+                forbidden_tool_ids.add(tool.mode_id)
+
+    _constraints_path, constraints, constraint_kind = loaded_constraints
+    if constraint_kind == "template":
+        for raw_constraint in constraints:
+            constraint_id = str(raw_constraint.get("constraintid", "")).strip()
+            if not constraint_id:
+                continue
+            raw_parameters = raw_constraint.get("parameters") or []
+            try:
+                selectors = tuple(
+                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+                    for parameter in raw_parameters
+                )
+            except ValueError:
+                continue
+            _mark_forbidden(constraint_id, selectors)
+    else:
+        for raw_constraint in constraints:
+            if not isinstance(raw_constraint, str):
+                continue
+            try:
+                constraint_name, args = _parse_constraint_atom(raw_constraint)
+            except ValueError:
+                continue
+            _mark_forbidden(constraint_name, args)
+
+    return forbidden_tool_ids
+
+
+def _collect_lazy_selector_lower_bounds(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+    *,
+    tool_min_steps: Mapping[str, int],
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    loaded_constraints = _load_lazy_constraints(config)
+    if loaded_constraints is None:
+        return (), ()
+
+    allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    tool_ids = {tool.mode_id for tool in tools}
+    operation_ids = {tax_op for tool in tools for tax_op in tool.taxonomy_operations}
+    ancestors_by_tool = _tool_selector_ancestors(config, ontology, tools)
+    tools_by_id = {tool.mode_id: tool for tool in tools}
+    must_use_steps: list[int] = []
+    at_step_steps: list[int] = []
+
+    def _matching_tool_steps(constraint_name: str, raw_value: str, position: int) -> list[int]:
+        base_constraint_name, selector_policies = _resolve_constraint_template_name(constraint_name)
+        selector = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+        if not selector or selector not in allowed_selectors:
+            return []
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_policy = selector_policies[position] if position < len(selector_policies) else "auto"
+        if selector_policy == "class_transitive" and selector_kind != "class":
+            return []
+        if selector_policy == "tool_exact" and selector_kind != "tool":
+            return []
+        selector_mode = _constraint_selector_mode(
+            base_constraint_name,
+            selector_kind=selector_kind,
+            selector_policy=selector_policy,
+        )
+        matching_steps: list[int] = []
+        for tool_id, min_step in tool_min_steps.items():
+            tool = tools_by_id[tool_id]
+            if selector_mode == "exact":
+                matches_tool = selector == tool.mode_id or selector in tool.taxonomy_operations
+            else:
+                matches_tool = selector in ancestors_by_tool.get(tool.mode_id, frozenset())
+            if matches_tool:
+                matching_steps.append(min_step)
+        return matching_steps
+
+    _constraints_path, constraints, constraint_kind = loaded_constraints
+    if constraint_kind == "template":
+        parsed_constraints: list[tuple[str, tuple[str | int, ...]]] = []
+        for raw_constraint in constraints:
+            constraint_id = str(raw_constraint.get("constraintid", "")).strip()
+            if not constraint_id:
+                continue
+            raw_parameters = raw_constraint.get("parameters") or []
+            try:
+                selectors = tuple(
+                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+                    for parameter in raw_parameters
+                )
+            except ValueError:
+                continue
+            parsed_constraints.append((constraint_id, selectors))
+    else:
+        parsed_constraints = []
+        for raw_constraint in constraints:
+            if not isinstance(raw_constraint, str):
+                continue
+            try:
+                parsed_constraints.append(_parse_constraint_atom(raw_constraint))
+            except ValueError:
+                continue
+
+    for constraint_name, args in parsed_constraints:
+        base_constraint_name, _selector_policies = _resolve_constraint_template_name(constraint_name)
+        if base_constraint_name == "use_m" and len(args) == 1 and isinstance(args[0], str):
+            matching_steps = _matching_tool_steps(constraint_name, args[0], 0)
+            if matching_steps:
+                must_use_steps.append(min(matching_steps))
+        elif (
+            base_constraint_name == "at_step"
+            and len(args) == 2
+            and isinstance(args[0], str)
+            and isinstance(args[1], int)
+        ):
+            matching_steps = _matching_tool_steps(constraint_name, args[0], 0)
+            if matching_steps:
+                at_step_steps.append(max(min(matching_steps), args[1]))
+
+    return tuple(must_use_steps), tuple(at_step_steps)
+
+
+def _candidate_outputs_match_data_selector(
+    ontology: Ontology,
+    candidate_record: Mapping[str, object],
+    data_selector: str,
+) -> bool:
+    for output_port in tuple(candidate_record["output_ports"]):
+        for values in output_port["port_values_by_dimension"].values():
+            for actual_value in values:
+                if actual_value == data_selector or data_selector in ontology.ancestors_of(actual_value):
+                    return True
+    return False
+
+
+def _collect_lazy_backward_relevant_candidates(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+    *,
+    candidate_records: Iterable[Mapping[str, object]],
+    reverse_edges: Mapping[str, set[str]],
+    direct_goal_candidates: set[str],
+) -> tuple[set[str], dict[str, int]]:
+    """Collect exact backward-relevant candidates for use_all_generated_data=ALL.
+
+    The anchors are the candidates that can directly satisfy a terminal
+    requirement:
+    - goal-producing candidates,
+    - selector-matching candidates for positive tool-use constraints,
+    - candidates that can produce required data-selector artifacts,
+    - candidates whose tools can witness operation_input constraints.
+    """
+
+    loaded_constraints = _load_lazy_constraints(config)
+    if loaded_constraints is None:
+        return set(direct_goal_candidates), {
+            candidate_id: 0 for candidate_id in direct_goal_candidates
+        }
+
+    allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    allowed_data_selectors = _lazy_allowed_data_selectors(config, ontology, tools)
+    tool_ids = {tool.mode_id for tool in tools}
+    operation_ids = {tax_op for tool in tools for tax_op in tool.taxonomy_operations}
+    ancestors_by_tool = _tool_selector_ancestors(config, ontology, tools)
+    tools_by_id = {tool.mode_id: tool for tool in tools}
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in candidate_records
+    }
+    candidate_ids_by_tool_id: dict[str, set[str]] = defaultdict(set)
+    for candidate_id, record in candidate_records_by_id.items():
+        tool_id = str(record["tool"].mode_id)
+        candidate_ids_by_tool_id[tool_id].add(candidate_id)
+
+    def _matching_tool_ids(
+        constraint_name: str,
+        raw_value: str,
+        position: int,
+    ) -> frozenset[str]:
+        base_constraint_name, selector_policies = _resolve_constraint_template_name(constraint_name)
+        selector = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+        if not selector or selector not in allowed_selectors:
+            return frozenset()
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_policy = selector_policies[position] if position < len(selector_policies) else "auto"
+        if selector_policy == "class_transitive" and selector_kind != "class":
+            return frozenset()
+        if selector_policy == "tool_exact" and selector_kind != "tool":
+            return frozenset()
+        selector_mode = _constraint_selector_mode(
+            base_constraint_name,
+            selector_kind=selector_kind,
+            selector_policy=selector_policy,
+        )
+        matches: set[str] = set()
+        for tool_id in tools_by_id:
+            tool = tools_by_id[tool_id]
+            if selector_mode == "exact":
+                matches_tool = selector == tool.mode_id or selector in tool.taxonomy_operations
+            else:
+                matches_tool = selector in ancestors_by_tool.get(tool.mode_id, frozenset())
+            if matches_tool:
+                matches.add(tool_id)
+        return frozenset(matches)
+
+    def _matching_data_selector(raw_value: str) -> str | None:
+        selector = raw_value.strip()
+        if not selector:
+            return None
+        aliases = _data_selector_aliases(selector, prefix=config.ontology_prefix)
+        for alias in aliases:
+            if alias in allowed_data_selectors:
+                return alias
+        return None
+
+    _constraints_path, constraints, constraint_kind = loaded_constraints
+    if constraint_kind == "template":
+        parsed_constraints: list[tuple[str, tuple[str | int, ...]]] = []
+        for raw_constraint in constraints:
+            constraint_id = str(raw_constraint.get("constraintid", "")).strip()
+            if not constraint_id:
+                continue
+            raw_parameters = raw_constraint.get("parameters") or []
+            try:
+                selectors = tuple(
+                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+                    for parameter in raw_parameters
+                )
+            except ValueError:
+                continue
+            parsed_constraints.append((constraint_id, selectors))
+    else:
+        parsed_constraints = []
+        for raw_constraint in constraints:
+            if not isinstance(raw_constraint, str):
+                continue
+            try:
+                parsed_constraints.append(_parse_constraint_atom(raw_constraint))
+            except ValueError:
+                continue
+
+    anchor_candidate_ids: set[str] = set(direct_goal_candidates)
+
+    positive_tool_constraints = {
+        "use_m",
+        "at_step",
+        "first_m",
+        "unique_inputs",
+        "max_uses",
+        "used_iff_used",
+        "connected_op",
+        "ite_m",
+        "depend_m",
+        "itn_m",
+        "next_m",
+    }
+
+    for constraint_name, args in parsed_constraints:
+        base_constraint_name, _selector_policies = _resolve_constraint_template_name(constraint_name)
+        if base_constraint_name in positive_tool_constraints:
+            for position, arg in enumerate(args):
+                if not isinstance(arg, str):
+                    continue
+                for tool_id in _matching_tool_ids(constraint_name, arg, position):
+                    anchor_candidate_ids.update(candidate_ids_by_tool_id.get(tool_id, set()))
+        elif base_constraint_name == "operation_input":
+            if len(args) == 2 and isinstance(args[0], str):
+                for tool_id in _matching_tool_ids(constraint_name, args[0], 0):
+                    anchor_candidate_ids.update(candidate_ids_by_tool_id.get(tool_id, set()))
+            if len(args) == 2 and isinstance(args[1], str):
+                data_selector = _matching_data_selector(args[1])
+                if data_selector is not None:
+                    for candidate_id, record in candidate_records_by_id.items():
+                        if _candidate_outputs_match_data_selector(ontology, record, data_selector):
+                            anchor_candidate_ids.add(candidate_id)
+        elif base_constraint_name == "use_t":
+            if len(args) == 1 and isinstance(args[0], str):
+                data_selector = _matching_data_selector(args[0])
+                if data_selector is not None:
+                    for candidate_id, record in candidate_records_by_id.items():
+                        if _candidate_outputs_match_data_selector(ontology, record, data_selector):
+                            anchor_candidate_ids.add(candidate_id)
+
+    backward_relevant_candidates: set[str] = set(anchor_candidate_ids)
+    min_anchor_distance_by_candidate: dict[str, int] = {
+        candidate_id: 0 for candidate_id in anchor_candidate_ids
+    }
+    frontier: deque[str] = deque(sorted(anchor_candidate_ids))
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        next_distance = min_anchor_distance_by_candidate[consumer_candidate] + 1
+        for producer_candidate in sorted(reverse_edges.get(consumer_candidate, set())):
+            if producer_candidate in backward_relevant_candidates:
+                continue
+            backward_relevant_candidates.add(producer_candidate)
+            min_anchor_distance_by_candidate[producer_candidate] = next_distance
+            frontier.append(producer_candidate)
+
+    return backward_relevant_candidates, min_anchor_distance_by_candidate
+
+
+def _collect_lazy_exact_prefix_lower_bound(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+    *,
+    candidate_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    query_goal_candidates: set[str],
+    max_exact_horizon: int = 2,
+) -> int:
+    """Compute a small exact lower bound for early lazy horizons.
+
+    This is intentionally limited to the first two horizons. It performs an
+    exact candidate-level feasibility check for 1-step and 2-step workflows
+    using the already-computed workflow/producers bindability surface. If no
+    such workflow can satisfy the must-use selectors plus the goal within the
+    tested horizons, later solving can safely skip them entirely.
+    """
+
+    if config.solution_length_max <= 1 or max_exact_horizon < 1:
+        return 1
+
+    loaded_constraints = _load_lazy_constraints(config)
+    if loaded_constraints is None:
+        return 1
+
+    allowed_selectors = _lazy_allowed_selectors(config, ontology, tools)
+    tool_ids = {tool.mode_id for tool in tools}
+    operation_ids = {tax_op for tool in tools for tax_op in tool.taxonomy_operations}
+    ancestors_by_tool = _tool_selector_ancestors(config, ontology, tools)
+    tools_by_id = {tool.mode_id: tool for tool in tools}
+
+    def _matching_tool_ids(
+        constraint_name: str,
+        raw_value: str,
+        position: int,
+    ) -> frozenset[str]:
+        base_constraint_name, selector_policies = _resolve_constraint_template_name(constraint_name)
+        selector = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+        if not selector or selector not in allowed_selectors:
+            return frozenset()
+        selector_kind = _constraint_selector_kind(
+            selector,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+        )
+        selector_policy = selector_policies[position] if position < len(selector_policies) else "auto"
+        if selector_policy == "class_transitive" and selector_kind != "class":
+            return frozenset()
+        if selector_policy == "tool_exact" and selector_kind != "tool":
+            return frozenset()
+        selector_mode = _constraint_selector_mode(
+            base_constraint_name,
+            selector_kind=selector_kind,
+            selector_policy=selector_policy,
+        )
+        matches: set[str] = set()
+        for tool_id in tools_by_id:
+            tool = tools_by_id[tool_id]
+            if selector_mode == "exact":
+                matches_tool = selector == tool.mode_id or selector in tool.taxonomy_operations
+            else:
+                matches_tool = selector in ancestors_by_tool.get(tool.mode_id, frozenset())
+            if matches_tool:
+                matches.add(tool_id)
+        return frozenset(matches)
+
+    _constraints_path, constraints, constraint_kind = loaded_constraints
+    if constraint_kind == "template":
+        parsed_constraints: list[tuple[str, tuple[str | int, ...]]] = []
+        for raw_constraint in constraints:
+            constraint_id = str(raw_constraint.get("constraintid", "")).strip()
+            if not constraint_id:
+                continue
+            raw_parameters = raw_constraint.get("parameters") or []
+            try:
+                selectors = tuple(
+                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+                    for parameter in raw_parameters
+                )
+            except ValueError:
+                continue
+            parsed_constraints.append((constraint_id, selectors))
+    else:
+        parsed_constraints = []
+        for raw_constraint in constraints:
+            if not isinstance(raw_constraint, str):
+                continue
+            try:
+                parsed_constraints.append(_parse_constraint_atom(raw_constraint))
+            except ValueError:
+                continue
+
+    must_use_selector_tools: list[frozenset[str]] = []
+    at_step_requirements: dict[int, list[frozenset[str]]] = defaultdict(list)
+    for constraint_name, args in parsed_constraints:
+        base_constraint_name, _selector_policies = _resolve_constraint_template_name(constraint_name)
+        if base_constraint_name == "use_m" and len(args) == 1 and isinstance(args[0], str):
+            matching_tools = _matching_tool_ids(constraint_name, args[0], 0)
+            if matching_tools:
+                must_use_selector_tools.append(matching_tools)
+        elif (
+            base_constraint_name == "at_step"
+            and len(args) == 2
+            and isinstance(args[0], str)
+            and isinstance(args[1], int)
+        ):
+            matching_tools = _matching_tool_ids(constraint_name, args[0], 0)
+            if matching_tools:
+                at_step_requirements[int(args[1])].append(matching_tools)
+
+    candidate_tool_ids = {
+        str(record["candidate_id"]): str(record["tool"].mode_id)
+        for record in candidate_records
+    }
+    candidate_input_ports = {
+        str(record["candidate_id"]): tuple(int(port["port_idx"]) for port in tuple(record["input_ports"]))
+        for record in candidate_records
+    }
+    candidate_must_use_mask: dict[str, int] = {}
+    for candidate_id, tool_id in candidate_tool_ids.items():
+        mask = 0
+        for index, matching_tools in enumerate(must_use_selector_tools):
+            if tool_id in matching_tools:
+                mask |= 1 << index
+        candidate_must_use_mask[candidate_id] = mask
+    full_must_use_mask = (1 << len(must_use_selector_tools)) - 1
+
+    def _matches_step_constraints(candidate_id: str, step_index: int) -> bool:
+        tool_id = candidate_tool_ids[candidate_id]
+        return all(
+            tool_id in matching_tools
+            for matching_tools in at_step_requirements.get(step_index, ())
+        )
+
+    def _workflow_feasible(candidate_id: str) -> bool:
+        return all(
+            port_idx in workflow_bindable_ports.get(candidate_id, set())
+            for port_idx in candidate_input_ports[candidate_id]
+        )
+
+    def _sequence_step_two_feasible(first_candidate: str, second_candidate: str) -> bool:
+        for port_idx in candidate_input_ports[second_candidate]:
+            if port_idx in workflow_bindable_ports.get(second_candidate, set()):
+                continue
+            if first_candidate not in produced_bindable_ports.get(second_candidate, {}).get(port_idx, set()):
+                return False
+        return True
+
+    feasible_step_one_candidates = [
+        candidate_id
+        for candidate_id in candidate_tool_ids
+        if _workflow_feasible(candidate_id)
+    ]
+
+    if 1 not in at_step_requirements or feasible_step_one_candidates:
+        for candidate_id in feasible_step_one_candidates:
+            if not _matches_step_constraints(candidate_id, 1):
+                continue
+            if full_must_use_mask and candidate_must_use_mask[candidate_id] != full_must_use_mask:
+                continue
+            if candidate_id in query_goal_candidates:
+                return 1
+
+    if config.solution_length_max <= 2 or max_exact_horizon < 2:
+        return 2
+
+    if any(required_step > 2 for required_step in at_step_requirements):
+        return 3
+
+    for first_candidate in feasible_step_one_candidates:
+        if not _matches_step_constraints(first_candidate, 1):
+            continue
+        first_mask = candidate_must_use_mask[first_candidate]
+        first_has_goal = first_candidate in query_goal_candidates
+        for second_candidate in candidate_tool_ids:
+            if not _matches_step_constraints(second_candidate, 2):
+                continue
+            if not _sequence_step_two_feasible(first_candidate, second_candidate):
+                continue
+            combined_mask = first_mask | candidate_must_use_mask[second_candidate]
+            if combined_mask != full_must_use_mask:
+                continue
+            if first_has_goal or second_candidate in query_goal_candidates:
+                return 2
+
+    return 3
+
+
 def _emit_lazy_constraints(
     writer: _FactWriter,
     config: SnakeConfig,
@@ -1163,6 +1731,21 @@ def _emit_lazy_constraints(
             tool_ids=tool_ids,
             operation_ids=operation_ids,
         )
+
+    ancestors_by_tool = _tool_selector_ancestors(config, ontology, tools)
+    for (selector, selector_mode), selector_id in sorted(selector_ids.items()):
+        for tool in tools:
+            matches_tool = False
+            if selector_mode == "exact":
+                matches_tool = selector == tool.mode_id or selector in tool.taxonomy_operations
+            else:
+                matches_tool = selector in ancestors_by_tool.get(tool.mode_id, frozenset())
+            if matches_tool:
+                writer.emit_fact(
+                    "lazy_constraint_selector_matches_tool",
+                    _quote(selector_id),
+                    _quote(tool.mode_id),
+                )
 
 
 def _lazy_port_expansion(
@@ -1474,6 +2057,17 @@ def _compress_lazy_output_choice_values(
     return compressed
 
 
+def _lazy_dim_values_cache_key(
+    dim_values: Mapping[str, Iterable[str]],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        sorted(
+            (str(dim), tuple(str(value) for value in values))
+            for dim, values in dim_values.items()
+        )
+    )
+
+
 
 def build_lazy_fact_bundle(
     config: SnakeConfig,
@@ -1488,7 +2082,14 @@ def build_lazy_fact_bundle(
 
     lazy_offset: dict[str, int] = defaultdict(int)
 
-    for tool in tools:
+    forbidden_tool_ids = _collect_lazy_forbidden_tool_ids(config, ontology, tools)
+    candidate_source_tools = tuple(
+        tool
+        for tool in tools
+        if tool.mode_id not in forbidden_tool_ids
+    )
+
+    for tool in candidate_source_tools:
         candidate_index = lazy_offset[tool.mode_id]
         candidate_id = f"{tool.mode_id}_lc{candidate_index}"
         lazy_offset[tool.mode_id] += 1
@@ -1684,11 +2285,31 @@ def build_lazy_fact_bundle(
 
     _t3 = perf_counter()
 
+    min_anchor_distance_by_candidate: dict[str, int] = {}
+    if config.use_all_generated_data == "ALL":
+        backward_relevant_candidates, min_anchor_distance_by_candidate = _collect_lazy_backward_relevant_candidates(
+            config,
+            ontology,
+            tools,
+            candidate_records=(
+                record
+                for record in candidate_records
+                if str(record["candidate_id"]) in relevant_candidates
+            ),
+            reverse_edges=reverse_edges,
+            direct_goal_candidates=direct_goal_candidates,
+        )
+        relevant_candidates &= backward_relevant_candidates
+
     relevant_records = [
         record
         for record in candidate_records
         if str(record["candidate_id"]) in relevant_candidates
     ]
+    output_compression_cache: dict[
+        tuple[tuple[tuple[str, tuple[str, ...]], ...], bool],
+        dict[str, tuple[str, ...]],
+    ] = {}
     relevant_input_ports = tuple(
         input_port
         for record in relevant_records
@@ -1702,15 +2323,23 @@ def build_lazy_fact_bundle(
     for record in relevant_records:
         compressed_output_ports: list[dict[str, object]] = []
         for output_port in tuple(record["output_ports"]):
-            compressed_vals = _compress_lazy_output_choice_values(
-                ontology,
-                output_port["port_values_by_dimension"],
-                output_port["port_values_fset"],
-                relevant_input_ports,
-                goal_port_values_tuple,
-                goal_fsets,
-                preserve_goal_profiles=str(record["candidate_id"]) in direct_goal_candidates,
+            preserve_goal_profiles = str(record["candidate_id"]) in direct_goal_candidates
+            compression_cache_key = (
+                _lazy_dim_values_cache_key(output_port["port_values_by_dimension"]),
+                preserve_goal_profiles,
             )
+            compressed_vals = output_compression_cache.get(compression_cache_key)
+            if compressed_vals is None:
+                compressed_vals = _compress_lazy_output_choice_values(
+                    ontology,
+                    output_port["port_values_by_dimension"],
+                    output_port["port_values_fset"],
+                    relevant_input_ports,
+                    goal_port_values_tuple,
+                    goal_fsets,
+                    preserve_goal_profiles=preserve_goal_profiles,
+                )
+                output_compression_cache[compression_cache_key] = compressed_vals
             compressed_fset = {dim: frozenset(vals) for dim, vals in compressed_vals.items()}
             compressed_output_ports.append(
                 {
@@ -1785,6 +2414,31 @@ def build_lazy_fact_bundle(
         workflow_bindable_ports,
         produced_bindable_ports,
     )
+    tool_min_steps: dict[str, int] = {}
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        tool_id = str(record["tool"].mode_id)
+        min_step = min_step_by_candidate.get(candidate_id)
+        if min_step is None:
+            continue
+        existing_step = tool_min_steps.get(tool_id)
+        if existing_step is None or min_step < existing_step:
+            tool_min_steps[tool_id] = min_step
+    must_use_min_steps, at_step_lower_bounds = _collect_lazy_selector_lower_bounds(
+        config,
+        ontology,
+        tools,
+        tool_min_steps=tool_min_steps,
+    )
+    exact_prefix_lower_bound = _collect_lazy_exact_prefix_lower_bound(
+        config,
+        ontology,
+        tools,
+        candidate_records=relevant_records,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=produced_bindable_ports,
+        query_goal_candidates=query_goal_candidates,
+    )
     allowed_candidates_by_step: dict[int, set[str]] = defaultdict(set)
     allowed_tools_by_step: dict[int, set[str]] = defaultdict(set)
     for record in relevant_records:
@@ -1793,12 +2447,22 @@ def build_lazy_fact_bundle(
         min_step = min_step_by_candidate.get(candidate_id)
         if min_step is None:
             continue
-        for step_index in range(min_step, config.solution_length_max + 1):
+        max_step = config.solution_length_max
+        if config.use_all_generated_data == "ALL":
+            anchor_distance = min_anchor_distance_by_candidate.get(candidate_id)
+            if anchor_distance is not None:
+                max_step = min(
+                    max_step,
+                    config.solution_length_max - anchor_distance,
+                )
+        if max_step < min_step:
+            continue
+        for step_index in range(min_step, max_step + 1):
             allowed_candidates_by_step[step_index].add(candidate_id)
             allowed_tools_by_step[step_index].add(tool_id)
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, relevant_tools)
-    _emit_lazy_constraints(writer, config, ontology, relevant_tools)
+    _emit_lazy_constraints(writer, config, ontology, tools)
 
     for candidate_id in sorted(query_goal_candidates):
         writer.emit_fact("lazy_query_goal_candidate", _quote(candidate_id))
@@ -1904,6 +2568,19 @@ def build_lazy_fact_bundle(
             _quote(consumer_candidate),
             str(consumer_port),
         )
+    for consumer_candidate, ports_by_source in sorted(produced_bindable_ports.items()):
+        if consumer_candidate not in relevant_candidates:
+            continue
+        for consumer_port, producer_candidates in sorted(ports_by_source.items()):
+            for producer_candidate in sorted(producer_candidates):
+                if producer_candidate not in relevant_candidates:
+                    continue
+                writer.emit_fact(
+                    "lazy_candidate_bindable_producer",
+                    _quote(consumer_candidate),
+                    str(consumer_port),
+                    _quote(producer_candidate),
+                )
     for signature_id, category_profiles in sorted(signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(
@@ -1937,12 +2614,29 @@ def build_lazy_fact_bundle(
         f"fact_emission={_t6-_t5:.2f}s"
     )
 
+    earliest_goal_step = min(
+        (
+            min_step_by_candidate[candidate_id]
+            for candidate_id in query_goal_candidates
+            if candidate_id in min_step_by_candidate
+        ),
+        default=config.solution_length_max + 1,
+    )
+    earliest_solution_step = max(
+        1,
+        earliest_goal_step,
+        exact_prefix_lower_bound,
+        *must_use_min_steps,
+        *at_step_lower_bounds,
+    )
+
     return _finalize_fact_bundle(
         writer,
         config=config,
         tools=relevant_tools,
         tool_stats=tool_stats,
         cache_stats={**ontology.cache_stats(), **resolver.stats(), **lazy_schema_stats},
+        earliest_solution_step=earliest_solution_step,
     )
 
 

@@ -47,6 +47,10 @@ same_candidate_input_signature(CandidateA, PortA, CandidateB, PortB) :-
     lazy_candidate_input_signature_id(CandidateA, PortA, SigID),
     lazy_candidate_input_signature_id(CandidateB, PortB, SigID).
 
+candidate_has_repeated_signature_inputs(Candidate) :-
+    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
+    Port1 < Port2.
+
 goal_id(GoalID) :- goal_output(GoalID, _, _).
 
 lazy_candidate_output_goal_match(Candidate, Port, GoalID, Category) :-
@@ -247,3 +251,21 @@ symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
 join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
     JoinPort2 < JoinPort1,
     same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
+
+paired_symmetric_producer_candidate_pair(Candidate1, Candidate2) :-
+    symmetric_candidate_input_pair(Candidate1, _, Candidate2, _),
+    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2),
+    lazy_candidate_port_bindable(Candidate1, _, JoinCandidate, JoinPort1),
+    lazy_candidate_port_bindable(Candidate2, _, JoinCandidate, JoinPort2).
+
+repeated_same_candidate_join_guard(Candidate) :-
+    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
+    lazy_candidate_port_bindable(Candidate, _, JoinCandidate, JoinPortHigh),
+    lazy_candidate_port_bindable(Candidate, _, JoinCandidate, JoinPortLow).
+
+same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, ConsumerCandidate, ConsumerPort, SmallerPort) :-
+    lazy_candidate_output_port(ProducerCandidate, ProducerPort),
+    lazy_candidate_output_port(ProducerCandidate, SmallerPort),
+    SmallerPort < ProducerPort,
+    lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, ConsumerCandidate, ConsumerPort),
+    lazy_candidate_port_bindable(ProducerCandidate, SmallerPort, ConsumerCandidate, ConsumerPort).
