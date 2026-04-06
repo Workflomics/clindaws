@@ -74,6 +74,12 @@ def _single_shot_overlay(horizon: int) -> str:
     )
 
 
+def _make_control(config: SnakeConfig) -> clingo.Control:
+    """Create a clingo control configured with the run's model limit."""
+
+    return clingo.Control([str(config.solutions), "--warn=none"])
+
+
 @dataclass(frozen=True)
 class SolveOutput:
     """Raw solver output."""
@@ -379,7 +385,7 @@ def _solve_multi_shot_with_programs(
     horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
     capture_raw_models: bool = False,
 ) -> SolveOutput:
-    control = clingo.Control(["0", "--warn=none"])
+    control = _make_control(config)
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -390,7 +396,6 @@ def _solve_multi_shot_with_programs(
     base_grounding_sec = 0.0
     raw_collected: list[tuple[clingo.Symbol, ...]] = []
     unique_collected: list[tuple[clingo.Symbol, ...]] = []
-    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     horizon_records: list[HorizonRecord] = []
     solving_started = False
@@ -475,7 +480,6 @@ def _solve_multi_shot_with_programs(
                                     in_length_window
                                     and
                                     capture_raw_models
-                                    and workflow_key not in stored_raw_keys
                                     and len(raw_collected) < config.solutions
                                 )
                                 store_unique = (
@@ -484,18 +488,18 @@ def _solve_multi_shot_with_programs(
                                     workflow_key not in stored_unique_keys
                                     and len(unique_collected) < config.solutions
                                 )
-                                if store_raw or store_unique:
-                                    shown = canonicalize_shown_symbols(
+                                canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                                if store_unique:
+                                    canonical_shown = canonicalize_shown_symbols(
                                         shown_symbols,
                                         tool_input_signatures,
                                     )
                                 if store_raw:
-                                    stored_raw_keys.add(workflow_key)
-                                    raw_collected.append(shown)
+                                    raw_collected.append(shown_symbols)
                                     models_stored += 1
                                 if store_unique:
                                     stored_unique_keys.add(workflow_key)
-                                    unique_collected.append(shown)
+                                    unique_collected.append(canonical_shown if canonical_shown is not None else shown_symbols)
                                     unique_workflows_stored += 1
                                 elif (
                                     solve_all_horizons
@@ -535,8 +539,8 @@ def _solve_multi_shot_with_programs(
                     progress_callback,
                     f"Solving progress: horizon {horizon} finished after {solve_elapsed:.3f}s, "
                     f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                    f"unique workflows seen={unique_workflows_seen}, "
-                    f"unique workflows stored={unique_workflows_stored}, "
+                    f"unique tool sequences seen={unique_workflows_seen}, "
+                    f"unique tool sequences stored={unique_workflows_stored}, "
                     f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
                 )
                 if unique_collected and not solve_all_horizons and stop_on_solution:
@@ -573,7 +577,6 @@ def _solve_single_shot_with_programs(
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
-    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     total_grounding = 0.0
     total_solving = 0.0
@@ -588,7 +591,7 @@ def _solve_single_shot_with_programs(
         if not solve_all_horizons and len(unique_solutions) >= config.solutions:
             break
 
-        control = clingo.Control(["0", "--warn=none"])
+        control = _make_control(config)
         for program_path in program_paths:
             control.load(str(program_path))
         control.add("base", [], facts.facts)
@@ -646,7 +649,6 @@ def _solve_single_shot_with_programs(
                                 in_length_window
                                 and
                                 capture_raw_models
-                                and workflow_key not in stored_raw_keys
                                 and len(raw_solutions) < config.solutions
                             )
                             store_unique = (
@@ -655,18 +657,18 @@ def _solve_single_shot_with_programs(
                                 workflow_key not in stored_unique_keys
                                 and len(unique_solutions) < config.solutions
                             )
-                            if store_raw or store_unique:
-                                shown = canonicalize_shown_symbols(
+                            canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                            if store_unique:
+                                canonical_shown = canonicalize_shown_symbols(
                                     shown_symbols,
                                     tool_input_signatures,
                                 )
                             if store_raw:
-                                stored_raw_keys.add(workflow_key)
-                                raw_solutions.append(shown)
+                                raw_solutions.append(shown_symbols)
                                 models_stored += 1
                             if store_unique:
                                 stored_unique_keys.add(workflow_key)
-                                unique_solutions.append(shown)
+                                unique_solutions.append(canonical_shown if canonical_shown is not None else shown_symbols)
                                 unique_workflows_stored += 1
                             elif (
                                 solve_all_horizons
@@ -698,8 +700,8 @@ def _solve_single_shot_with_programs(
                     progress_callback,
                     f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
                     f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                    f"unique workflows seen={unique_workflows_seen}, "
-                    f"unique workflows stored={unique_workflows_stored}, "
+                    f"unique tool sequences seen={unique_workflows_seen}, "
+                    f"unique tool sequences stored={unique_workflows_stored}, "
                     f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
                 )
         except KeyboardInterrupt:
@@ -739,7 +741,6 @@ def _solve_single_shot_once(
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
-    stored_raw_keys: set[tuple[object, ...]] = set()
     stored_unique_keys: set[tuple[object, ...]] = set()
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_max
@@ -749,7 +750,7 @@ def _solve_single_shot_once(
         + ":- time(T), 2 { occurs(T, run(_)) }.\n"
     )
 
-    control = clingo.Control(["0", "--warn=none"])
+    control = _make_control(config)
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -804,7 +805,6 @@ def _solve_single_shot_once(
                             in_length_window
                             and
                             capture_raw_models
-                            and workflow_key not in stored_raw_keys
                             and len(raw_solutions) < config.solutions
                         )
                         store_unique = (
@@ -813,18 +813,18 @@ def _solve_single_shot_once(
                             workflow_key not in stored_unique_keys
                             and len(unique_solutions) < config.solutions
                         )
-                        if store_raw or store_unique:
-                            shown = canonicalize_shown_symbols(
+                        canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                        if store_unique:
+                            canonical_shown = canonicalize_shown_symbols(
                                 shown_symbols,
                                 tool_input_signatures,
                             )
                         if store_raw:
-                            stored_raw_keys.add(workflow_key)
-                            raw_solutions.append(shown)
+                            raw_solutions.append(shown_symbols)
                             models_stored += 1
                         if store_unique:
                             stored_unique_keys.add(workflow_key)
-                            unique_solutions.append(shown)
+                            unique_solutions.append(canonical_shown if canonical_shown is not None else shown_symbols)
                             unique_workflows_stored += 1
                         if len(unique_solutions) >= config.solutions:
                             break
@@ -835,8 +835,8 @@ def _solve_single_shot_once(
                 progress_callback,
                 f"Solving progress: single-shot finished after {solve_elapsed:.3f}s, "
                 f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                f"unique workflows seen={unique_workflows_seen}, "
-                f"unique workflows stored={unique_workflows_stored}, "
+                f"unique tool sequences seen={unique_workflows_seen}, "
+                f"unique tool sequences stored={unique_workflows_stored}, "
                 f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
             )
     except KeyboardInterrupt:
@@ -1011,7 +1011,7 @@ def ground_multi_shot(
 ) -> GroundingOutput:
     """Ground the multi-shot encoding without solving."""
 
-    control = clingo.Control(["0", "--warn=none"])
+    control = _make_control(config)
     for program_path in _multi_shot_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
@@ -1080,7 +1080,7 @@ def ground_multi_shot_lazy(
 ) -> GroundingOutput:
     """Ground the lazy multi-shot encoding without solving."""
 
-    control = clingo.Control(["0", "--warn=none"])
+    control = _make_control(config)
     for program_path in _multi_shot_lazy_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)

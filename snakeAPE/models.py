@@ -215,6 +215,7 @@ class RunResult:
     solution_summary_path: Path | None
     workflow_signature_path: Path | None
     graph_paths: tuple[Path, ...]
+    raw_models_seen: int = 0
     raw_answer_sets_found: int = 0
     unique_solutions_found: int = 0
     timed_out: bool = False
@@ -274,6 +275,7 @@ class BenchmarkRecord:
     solving_sec: float
     rendering_sec: float
     total_sec: float
+    raw_models_seen: int
     fact_count: int
     solutions_found: int
     raw_solutions_found: int

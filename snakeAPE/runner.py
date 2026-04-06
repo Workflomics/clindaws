@@ -428,6 +428,8 @@ class _RunLogWriter:
         "setup_grounding_ms",
         "solving_ms",
         "memory_used_mb",
+        "raw_models_seen",
+        "raw_solutions_found",
         "solutions_found",
         "constraints_used",
         "timed_out",
@@ -447,6 +449,8 @@ class _RunLogWriter:
         timestamp_utc: str,
     ) -> None:
         self.csv_path = csv_path
+        self.cumulative_raw_models_seen = 0
+        self.cumulative_raw_solutions = 0
         self.cumulative_unique_solutions = 0
         self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
         self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
@@ -469,6 +473,8 @@ class _RunLogWriter:
         self.base_grounding_peak_rss_mb = base_grounding_peak_rss_mb
 
     def log_horizon(self, record: HorizonRecord) -> None:
+        self.cumulative_raw_models_seen += record.models_seen
+        self.cumulative_raw_solutions += record.models_stored
         self.cumulative_unique_solutions += record.unique_workflows_stored
         setup_grounding_ms = round(record.grounding_sec * 1000)
         memory_used_mb = record.peak_rss_mb or 0.0
@@ -484,6 +490,8 @@ class _RunLogWriter:
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
                 "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
+                "raw_models_seen": self.cumulative_raw_models_seen,
+                "raw_solutions_found": self.cumulative_raw_solutions,
                 "solutions_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
                 "timed_out": "false",
@@ -501,6 +509,8 @@ class _RunLogWriter:
                 "setup_grounding_ms": elapsed_ms,
                 "solving_ms": "",
                 "memory_used_mb": "",
+                "raw_models_seen": self.cumulative_raw_models_seen,
+                "raw_solutions_found": self.cumulative_raw_solutions,
                 "solutions_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
                 "timed_out": "true",
@@ -537,6 +547,7 @@ class _RunSummaryWriter:
         "solving_sec_total",
         "rendering_sec_total",
         "total_sec",
+        "raw_models_seen",
         "raw_solutions_found",
         "solutions_found",
         "grounded_horizons",
@@ -586,6 +597,7 @@ class _RunSummaryWriter:
         base_grounding_sec: float,
         base_grounding_peak_rss_mb: float,
         horizon_records: tuple[HorizonRecord, ...],
+        raw_models_seen: int,
         raw_solutions_found: int,
         solutions_found: int,
         grounded_horizons: tuple[int, ...] = (),
@@ -603,6 +615,7 @@ class _RunSummaryWriter:
             "solving_sec_total": f"{timings.solving_sec:.6f}",
             "rendering_sec_total": f"{timings.rendering_sec:.6f}",
             "total_sec": f"{timings.total_sec:.6f}",
+            "raw_models_seen": raw_models_seen,
             "raw_solutions_found": raw_solutions_found,
             "solutions_found": solutions_found,
             "grounded_horizons": grounded_horizons_text,
@@ -1130,7 +1143,7 @@ def run_once(
             mode=mode,
             config=config,
             fact_bundle=fact_bundle,
-            capture_raw_models=write_raw_answer_sets or config.debug_mode,
+            capture_raw_models=True,
             remaining_timeout=remaining_timeout,
             progress_callback=progress_callback,
         )
@@ -1143,6 +1156,10 @@ def run_once(
     for record in solve_output.horizon_records:
         csv_writers.step_writer.log_horizon(record)
 
+    candidate_solutions = tuple(
+        reconstruct_solution(index + 1, symbols, dict(fact_bundle.tool_labels))
+        for index, symbols in enumerate(solve_output.raw_solutions)
+    )
     solutions = tuple(
         reconstruct_solution(index + 1, symbols, dict(fact_bundle.tool_labels))
         for index, symbols in enumerate(solve_output.solutions)
@@ -1192,7 +1209,7 @@ def run_once(
             _named_asp_path = config.solutions_dir_path / f"solutions_{_config_stem}_ASP.txt"
             config.solutions_dir_path.mkdir(parents=True, exist_ok=True)
             _named_asp_path.write_text(_answer_set_content, encoding="utf-8")
-        summary_path = write_solution_summary(solution_dir / "solutions.txt", solutions)
+        summary_path = write_solution_summary(solution_dir / "solutions.txt", candidate_solutions)
         workflow_signature_path = write_workflow_signatures(
             solution_dir / "workflow_signatures.json",
             solutions,
@@ -1201,7 +1218,7 @@ def run_once(
         if render_graphs:
             figures_dir = solution_dir / "Figures"
             max_graphs = config.number_of_generated_graphs
-            for solution in solutions[:max_graphs]:
+            for solution in candidate_solutions[:max_graphs]:
                 graph_path_list.extend(render_solution_graphs(figures_dir, solution, graph_format))
         graph_paths = tuple(graph_path_list)
         rendering_sec = perf_counter() - render_start
@@ -1233,6 +1250,7 @@ def run_once(
         base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
         horizon_records=solve_output.horizon_records,
         raw_solutions_found=len(solve_output.raw_solutions),
+        raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
         solutions_found=len(solutions),
         grounded_horizons=tuple(record.horizon for record in solve_output.horizon_records),
     )
@@ -1260,6 +1278,7 @@ def run_once(
         solution_summary_path=summary_path,
         workflow_signature_path=workflow_signature_path,
         graph_paths=graph_paths,
+        raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
         raw_answer_sets_found=len(solve_output.raw_solutions),
         unique_solutions_found=len(solutions),
         timed_out=_timed_out,
@@ -1463,14 +1482,15 @@ def benchmark_grounding(
                     grounding_sec=result.timings.grounding_sec,
                     solving_sec=result.timings.solving_sec,
                     rendering_sec=result.timings.rendering_sec,
-                total_sec=result.timings.total_sec,
-                fact_count=result.fact_bundle.fact_count,
-                solutions_found=len(result.solutions),
-                raw_solutions_found=result.raw_answer_sets_found,
-                timed_out=result.timed_out,
-                lengths=tuple(solution.length for solution in result.solutions),
-                repetition=repetition,
-            )
+                    total_sec=result.timings.total_sec,
+                    raw_models_seen=result.raw_models_seen,
+                    fact_count=result.fact_bundle.fact_count,
+                    solutions_found=len(result.solutions),
+                    raw_solutions_found=result.raw_answer_sets_found,
+                    timed_out=result.timed_out,
+                    lengths=tuple(solution.length for solution in result.solutions),
+                    repetition=repetition,
+                )
             )
 
     output_path = benchmark_dir / "grounding_benchmark.csv"
@@ -1486,6 +1506,7 @@ def benchmark_grounding(
                 "solving_sec",
                 "rendering_sec",
                 "total_sec",
+                "raw_models_seen",
                 "fact_count",
                 "raw_solutions_found",
                 "solutions_found",
@@ -1504,6 +1525,7 @@ def benchmark_grounding(
                     f"{record.solving_sec:.6f}",
                     f"{record.rendering_sec:.6f}",
                     f"{record.total_sec:.6f}",
+                    record.raw_models_seen,
                     record.fact_count,
                     record.raw_solutions_found,
                     record.solutions_found,

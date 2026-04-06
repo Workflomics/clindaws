@@ -1266,6 +1266,96 @@ def _workflow_input_matches_lazy_port(
     return True
 
 
+def _compute_lazy_candidate_min_steps(
+    candidate_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+) -> dict[str, int]:
+    """Compute the earliest feasible step for each lazy candidate.
+
+    A candidate can run at step 1 if every input port can be bound from a
+    workflow input. Otherwise, each non-workflow-bound port must be fed by a
+    producer candidate from a strictly earlier step.
+    """
+    candidate_input_ports: dict[str, tuple[int, ...]] = {}
+    for record in candidate_records:
+        candidate_id = str(record["candidate_id"])
+        candidate_input_ports[candidate_id] = tuple(
+            int(port["port_idx"])
+            for port in tuple(record["input_ports"])
+        )
+
+    min_required_producers_by_candidate: dict[str, int] = {}
+    for candidate_id, input_ports in candidate_input_ports.items():
+        uncovered_ports = tuple(
+            port_idx
+            for port_idx in input_ports
+            if port_idx not in workflow_bindable_ports.get(candidate_id, set())
+        )
+        if not uncovered_ports:
+            min_required_producers_by_candidate[candidate_id] = 0
+            continue
+
+        port_bit_index = {port_idx: bit for bit, port_idx in enumerate(uncovered_ports)}
+        full_mask = (1 << len(uncovered_ports)) - 1
+        producer_to_mask: dict[str, int] = {}
+        for port_idx in uncovered_ports:
+            for producer_candidate in produced_bindable_ports.get(candidate_id, {}).get(port_idx, set()):
+                producer_to_mask[producer_candidate] = (
+                    producer_to_mask.get(producer_candidate, 0)
+                    | (1 << port_bit_index[port_idx])
+                )
+        producer_masks = {mask for mask in producer_to_mask.values() if mask}
+        best_cover = len(uncovered_ports)
+        frontier = {0: 0}
+        for producer_mask in sorted(producer_masks):
+            next_frontier = dict(frontier)
+            for covered_mask, used_count in frontier.items():
+                new_mask = covered_mask | producer_mask
+                new_count = used_count + 1
+                old_count = next_frontier.get(new_mask)
+                if old_count is None or new_count < old_count:
+                    next_frontier[new_mask] = new_count
+            frontier = next_frontier
+        best_cover = frontier.get(full_mask, best_cover)
+        min_required_producers_by_candidate[candidate_id] = best_cover
+
+    min_step_by_candidate: dict[str, int] = {}
+    changed = True
+    while changed:
+        changed = False
+        for candidate_id, input_ports in candidate_input_ports.items():
+            if not input_ports:
+                candidate_step = 1
+            else:
+                port_steps: list[int] = []
+                for port_idx in input_ports:
+                    feasible_steps: list[int] = []
+                    if port_idx in workflow_bindable_ports.get(candidate_id, set()):
+                        feasible_steps.append(1)
+                    for producer_candidate in produced_bindable_ports.get(candidate_id, {}).get(port_idx, set()):
+                        producer_step = min_step_by_candidate.get(producer_candidate)
+                        if producer_step is not None:
+                            feasible_steps.append(producer_step + 1)
+                    if not feasible_steps:
+                        port_steps = []
+                        break
+                    port_steps.append(min(feasible_steps))
+                if not port_steps:
+                    continue
+                candidate_step = max(
+                    max(port_steps),
+                    1 + min_required_producers_by_candidate.get(candidate_id, 0),
+                )
+
+            current_step = min_step_by_candidate.get(candidate_id)
+            if current_step is None or candidate_step < current_step:
+                min_step_by_candidate[candidate_id] = candidate_step
+                changed = True
+
+    return min_step_by_candidate
+
+
 def _lazy_output_matches_lazy_input(
     output_values_by_dimension: Mapping[str, tuple[str, ...]],
     input_values_by_dimension: Mapping[str, tuple[str, ...]],
@@ -1690,12 +1780,20 @@ def build_lazy_fact_bundle(
                 continue
             min_goal_distance_by_candidate[producer_candidate] = next_distance
             frontier.append(producer_candidate)
+    min_step_by_candidate = _compute_lazy_candidate_min_steps(
+        relevant_records,
+        workflow_bindable_ports,
+        produced_bindable_ports,
+    )
     allowed_candidates_by_step: dict[int, set[str]] = defaultdict(set)
     allowed_tools_by_step: dict[int, set[str]] = defaultdict(set)
     for record in relevant_records:
         candidate_id = str(record["candidate_id"])
         tool_id = str(record["tool"].mode_id)
-        for step_index in range(1, config.solution_length_max + 1):
+        min_step = min_step_by_candidate.get(candidate_id)
+        if min_step is None:
+            continue
+        for step_index in range(min_step, config.solution_length_max + 1):
             allowed_candidates_by_step[step_index].add(candidate_id)
             allowed_tools_by_step[step_index].add(tool_id)
     writer = _FactWriter()

@@ -21,24 +21,6 @@
 %   constraint_must_use(SelID)      -- handled by tool_inclusion.lp
 %   constraint_must_not_use(SelID)  -- handled by tool_inclusion.lp
 
-% Data-selector helpers are global: artifact_dim/3 already accumulates across
-% steps, so these heads must live in the base program rather than an
-% incremental block.
-constraint_artifact_dim(WF, V, Cat) :-
-    artifact_dim(WF, V, Cat).
-
-constraint_artifact_matches_selector(WF, Sel) :-
-    constraint_data_selector(Sel, Actual),
-    constraint_artifact_dim(WF, Actual, _).
-
-constraint_artifact_matches_selector(WF, Sel) :-
-    constraint_data_selector(Sel, Wanted),
-    constraint_artifact_dim(WF, Actual, _),
-    ancestor(Actual, Wanted).
-
-constraint_used_data(Sel) :-
-    constraint_artifact_matches_selector(_, Sel).
-
 % Per-step selector resolution.
 % Grounded once per horizon; constraint_selected_tool(T, Sel, Tool) and
 % constraint_selected_time(T, Sel) accumulate across all horizons so that
@@ -59,6 +41,31 @@ constraint_selected_time(t, Sel) :-
 % already enforces constraint_must_use / constraint_must_not_use in its own
 % check(t) block.
 #program check(t).
+
+constraint_artifact_dim_check(t, WF, V, Cat) :-
+    query(t),
+    holds(0, avail(WF)),
+    artifact_dim(WF, V, Cat).
+
+constraint_artifact_dim_check(t, out(TSel, Tool, Port), V, Cat) :-
+    query(t),
+    occurs(TSel, output(Tool, _, Port)),
+    artifact_dim(out(TSel, Tool, Port), V, Cat).
+
+constraint_artifact_matches_selector_check(t, WF, Sel) :-
+    query(t),
+    constraint_data_selector(Sel, Actual),
+    constraint_artifact_dim_check(t, WF, Actual, _).
+
+constraint_artifact_matches_selector_check(t, WF, Sel) :-
+    query(t),
+    constraint_data_selector(Sel, Wanted),
+    constraint_artifact_dim_check(t, WF, Actual, _),
+    ancestor(Actual, Wanted).
+
+constraint_used_data_check(t, Sel) :-
+    query(t),
+    constraint_artifact_matches_selector_check(t, _, Sel).
 
 % first_m: selector must appear at T=1 and nowhere else.
 :- query(t),
@@ -153,7 +160,7 @@ constraint_selected_time(t, Sel) :-
 % use_t: some artifact in the workflow must carry the selected data value.
 :- query(t),
    constraint_use_data(Sel),
-   not constraint_used_data(Sel).
+   not constraint_used_data_check(t, Sel).
 
 % operation_input: a matching tool run must bind an artifact carrying the
 % selected data value.
@@ -163,5 +170,5 @@ constraint_selected_time(t, Sel) :-
        T, Tool, WF :
            constraint_selected_tool(T, ModuleSel, Tool),
            occurs(T, bind(Tool, _, WF)),
-           constraint_artifact_matches_selector(WF, DataSel)
+           constraint_artifact_matches_selector_check(t, WF, DataSel)
    } = 0.

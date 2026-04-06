@@ -18,6 +18,12 @@ def _progress(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def _format_count_summary(*, workflows: int, raw_models: int) -> str:
+    """Format canonical workflow and raw model counts consistently."""
+
+    return f"workflows={workflows} raw_models={raw_models}"
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
 
@@ -46,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--solutions",
         type=int,
-        help="Override the number of solutions to search for.",
+        help="Override the solution limit used both for canonical workflow storage and the native clingo model cap.",
     )
     parser.add_argument(
         "--min-length",
@@ -148,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"grounding={record.grounding_sec:.3f}s "
                     f"solving={record.solving_sec:.3f}s "
                     f"total={record.total_sec:.3f}s "
-                    f"workflows={record.solutions_found} "
+                    f"{_format_count_summary(workflows=record.solutions_found, raw_models=record.raw_models_seen)} "
                     f"timed_out={'yes' if record.timed_out else 'no'}"
                 )
             return 0
@@ -249,12 +255,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Workflow signatures written to: {run_result.workflow_signature_path}")
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "
-            f"workflows={run_result.unique_solutions_found} "
+            f"{_format_count_summary(workflows=run_result.unique_solutions_found, raw_models=run_result.raw_models_seen)} "
             f"translation={run_result.timings.translation_sec:.3f}s "
             f"grounding={run_result.timings.grounding_sec:.3f}s "
             f"solving={run_result.timings.solving_sec:.3f}s "
             f"total={run_result.timings.total_sec:.3f}s"
         )
+        if run_result.raw_models_seen != run_result.unique_solutions_found:
+            print(
+                "Count basis: workflows are unique tool sequences; "
+                "raw_models are pre-canonical answer sets seen by clingo."
+            )
         for path in run_result.graph_paths:
             print(f"Graph artifact: {Path(path)}")
         return 0
