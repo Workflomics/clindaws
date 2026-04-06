@@ -163,36 +163,6 @@ is_root(t, Tool) :-
 
 reachable(t, Tool) :- is_root(t, Tool).
 
-goal_dim_match(t, GoalID, WF, GoalV, Category) :-
-    goal_output(GoalID, GoalV, Category),
-    holds(t, avail(WF)),
-    artifact_dim(WF, ActualV, Category),
-    compatible(ActualV, GoalV).
-
-goal_dim_missing(t, GoalID, WF) :-
-    goal_output(GoalID, GoalV, Category),
-    holds(t, avail(WF)),
-    not goal_dim_match(t, GoalID, WF, GoalV, Category).
-
-goal_satisfied_by(t, GoalID, WF) :-
-    holds(t, avail(WF)),
-    goal_output(GoalID, _, _),
-    goal_dim_match(t, GoalID, WF, _, _),
-    not goal_dim_missing(t, GoalID, WF).
-
-goal_satisfied_by_output(t, GoalID, WF) :-
-    goal_satisfied_by(t, GoalID, WF),
-    not holds(0, avail(WF)).
-
-goal_satisfied(t, GoalID) :-
-    goal_output(GoalID, _, _),
-    goal_satisfied_by_output(t, GoalID, WF).
-
-holds(t, goal) :-
-    goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).
-
-holds(t, goal) :- holds(t-1, goal).
-
 :- requirement_filtering_active, occurs(t, run(Tool)), not tool_req_compatible(Tool).
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
 

@@ -2441,6 +2441,7 @@ def build_lazy_fact_bundle(
     )
     allowed_candidates_by_step: dict[int, set[str]] = defaultdict(set)
     allowed_tools_by_step: dict[int, set[str]] = defaultdict(set)
+    max_step_by_candidate: dict[str, int] = {}
     for record in relevant_records:
         candidate_id = str(record["candidate_id"])
         tool_id = str(record["tool"].mode_id)
@@ -2452,11 +2453,12 @@ def build_lazy_fact_bundle(
             anchor_distance = min_anchor_distance_by_candidate.get(candidate_id)
             if anchor_distance is not None:
                 max_step = min(
-                    max_step,
-                    config.solution_length_max - anchor_distance,
-                )
+                max_step,
+                config.solution_length_max - anchor_distance,
+            )
         if max_step < min_step:
             continue
+        max_step_by_candidate[candidate_id] = max_step
         for step_index in range(min_step, max_step + 1):
             allowed_candidates_by_step[step_index].add(candidate_id)
             allowed_tools_by_step[step_index].add(tool_id)
@@ -2581,6 +2583,37 @@ def build_lazy_fact_bundle(
                     str(consumer_port),
                     _quote(producer_candidate),
                 )
+                consumer_min_step = min_step_by_candidate.get(consumer_candidate)
+                consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+                producer_min_step = min_step_by_candidate.get(producer_candidate)
+                producer_max_step = max_step_by_candidate.get(producer_candidate)
+                if (
+                    consumer_min_step is None
+                    or consumer_max_step is None
+                    or producer_min_step is None
+                    or producer_max_step is None
+                ):
+                    continue
+                has_valid_prior = False
+                for consumer_step in range(consumer_min_step, consumer_max_step + 1):
+                    latest_prior_step = min(producer_max_step, consumer_step - 1)
+                    if latest_prior_step < producer_min_step:
+                        continue
+                    if not has_valid_prior:
+                        writer.emit_fact(
+                            "lazy_bindable_prior_candidate",
+                            _quote(consumer_candidate),
+                            str(consumer_port),
+                            _quote(producer_candidate),
+                        )
+                        has_valid_prior = True
+                    writer.emit_fact(
+                        "lazy_bindable_prior_step",
+                        _quote(consumer_candidate),
+                        str(consumer_port),
+                        _quote(producer_candidate),
+                        str(consumer_step),
+                    )
     for signature_id, category_profiles in sorted(signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(

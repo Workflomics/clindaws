@@ -1,6 +1,39 @@
 #program check(t).
 #external query(t).
 
+goal_dim_match(t, GoalID, WF, GoalV, Category) :-
+    query(t),
+    goal_output(GoalID, GoalV, Category),
+    holds(t, avail(WF)),
+    artifact_dim(WF, ActualV, Category),
+    compatible(ActualV, GoalV).
+
+goal_dim_missing(t, GoalID, WF) :-
+    query(t),
+    goal_output(GoalID, GoalV, Category),
+    holds(t, avail(WF)),
+    not goal_dim_match(t, GoalID, WF, GoalV, Category).
+
+goal_satisfied_by(t, GoalID, WF) :-
+    query(t),
+    holds(t, avail(WF)),
+    goal_output(GoalID, _, _),
+    goal_dim_match(t, GoalID, WF, _, _),
+    not goal_dim_missing(t, GoalID, WF).
+
+goal_satisfied_by_output(t, GoalID, WF) :-
+    goal_satisfied_by(t, GoalID, WF),
+    not holds(0, avail(WF)).
+
+goal_satisfied(t, GoalID) :-
+    query(t),
+    goal_output(GoalID, _, _),
+    goal_satisfied_by_output(t, GoalID, WF).
+
+holds(t, goal) :-
+    query(t),
+    goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).
+
 :- query(t), not holds(t, goal).
 1 { chosen_goal_output(t, GoalID, WF) : goal_satisfied_by_output(t, GoalID, WF) } 1 :-
     query(t),

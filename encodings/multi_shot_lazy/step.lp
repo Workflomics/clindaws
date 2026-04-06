@@ -18,23 +18,76 @@ occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
 1 {
     occurs(t, bind(Tool, Port, WF)) : eligible(Candidate, Port, WF);
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))) :
-        occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
-        lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
-        lazy_candidate_bindable_producer(Candidate, Port, ProducerCandidate),
-        occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
-        TPrev < t,
-        lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port)
+        produced_bind_option(
+            t,
+            Candidate,
+            Port,
+            TPrev,
+            ToolPrev,
+            ProducerCandidate,
+            ProducerPort
+        )
 } 1 :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_input_port(Candidate, Port).
 
-bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
-    occurs(t, use_lazy_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+produced_bind_option(
+    t,
+    Candidate,
+    Port,
+    TPrev,
+    ToolPrev,
+    ProducerCandidate,
+    ProducerPort
+) :-
+    lazy_bindable_prior_step(Candidate, Port, ProducerCandidate, t),
     occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
     lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
     lazy_candidate_bindable_producer(Candidate, Port, ProducerCandidate),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t,
+    lazy_candidate_port_bindable(ProducerCandidate, ProducerPort, Candidate, Port),
+    not same_producer_equivalent_bind_option(
+        ProducerCandidate,
+        ProducerPort,
+        Candidate,
+        Port,
+        _
+    ).
+
+chosen_produced_bind(
+    t,
+    Tool,
+    Candidate,
+    Port,
+    TPrev,
+    ToolPrev,
+    ProducerCandidate,
+    ProducerPort
+) :-
+    occurs(t, use_lazy_candidate(Tool, Candidate)),
+    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+    produced_bind_option(
+        t,
+        Candidate,
+        Port,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort
+    ).
+
+bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
+    chosen_produced_bind(
+        t,
+        Tool,
+        Candidate,
+        Port,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort
+    ),
     lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
     lazy_signature_profile(SignatureId, Category, ProfileId),
     artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
@@ -62,11 +115,16 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     artifact_ancestor(t, Mid, Ancestor).
 
 smaller_equivalent_producer_port_available(t, Tool, Candidate, Port, TPrev, ToolPrev, ProducerPort, SmallerPort) :-
-    occurs(t, use_lazy_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
-    occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
-    lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
-    lazy_candidate_bindable_producer(Candidate, Port, ProducerCandidate),
+    chosen_produced_bind(
+        t,
+        Tool,
+        Candidate,
+        Port,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort
+    ),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, SmallerPort)),
     same_producer_equivalent_bind_option(ProducerCandidate, ProducerPort, Candidate, Port, SmallerPort).
 
@@ -191,36 +249,6 @@ reachable(t, Tool2) :-
     T1 < t.
 
 :- occurs(t, run(Tool)), not reachable(t, Tool).
-
-goal_dim_match(t, GoalID, WF, GoalV, Category) :-
-    goal_output(GoalID, GoalV, Category),
-    holds(t, avail(WF)),
-    artifact_dim(WF, ActualV, Category),
-    compatible(ActualV, GoalV).
-
-goal_dim_missing(t, GoalID, WF) :-
-    goal_output(GoalID, GoalV, Category),
-    holds(t, avail(WF)),
-    not goal_dim_match(t, GoalID, WF, GoalV, Category).
-
-goal_satisfied_by(t, GoalID, WF) :-
-    holds(t, avail(WF)),
-    goal_output(GoalID, _, _),
-    goal_dim_match(t, GoalID, WF, _, _),
-    not goal_dim_missing(t, GoalID, WF).
-
-goal_satisfied_by_output(t, GoalID, WF) :-
-    goal_satisfied_by(t, GoalID, WF),
-    not holds(0, avail(WF)).
-
-goal_satisfied(t, GoalID) :-
-    goal_output(GoalID, _, _),
-    goal_satisfied_by_output(t, GoalID, WF).
-
-holds(t, goal) :-
-    goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).
-
-holds(t, goal) :- holds(t-1, goal).
 
 :- requirement_filtering_active, occurs(t, run(Tool)), not tool_req_compatible(Tool).
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
