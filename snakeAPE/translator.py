@@ -1253,6 +1253,10 @@ def _workflow_input_matches_lazy_port(
 ) -> bool:
     for dim, accepted_values in port_values_by_dimension.items():
         actual_values = workflow_input.get(dim, ())
+        # A workflow input that omits a dimension leaves that dimension
+        # unconstrained rather than making the port incompatible.
+        if not actual_values:
+            continue
         if not any(
             actual_value in ontology.ancestors_of(required_value)
             for actual_value in actual_values
