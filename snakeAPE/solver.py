@@ -289,32 +289,6 @@ def _lazy_horizon_parts(
     return tuple(parts)
 
 
-def _lazy_prefix_horizon_parts(
-    horizon: int,
-    *,
-    initial_step_program: str | None,
-    initial_seed_program: str | None,
-    include_constraint_step: bool,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    """Lean lazy horizon parts for prefix horizons below solution_length.min.
-
-    Prefix horizons still need to build the reachable workflow state for later
-    solved horizons, but they do not need query-time validation. Constraint
-    summaries only need to be accumulated here when translated constraints are
-    present.
-    """
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
-    if initial_step_program is not None and horizon == 1:
-        parts.append((initial_step_program, (clingo.Number(horizon),)))
-    else:
-        if initial_seed_program is not None and horizon > 1:
-            parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
-        parts.append(("step", (clingo.Number(horizon),)))
-    if include_constraint_step:
-        parts.append(("constraint_step", (clingo.Number(horizon),)))
-    return tuple(parts)
-
-
 def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
     parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
     if horizon == 1:
@@ -354,14 +328,6 @@ def _lazy_grounding_horizon_parts(
             parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
         parts.append(("step", (clingo.Number(horizon),)))
     return tuple(parts)
-
-
-def _has_translated_constraints(facts: FactBundle) -> bool:
-    """Return whether the translated fact bundle contains any constraint facts."""
-    return any(
-        count > 0 and predicate.startswith("constraint_")
-        for predicate, count in facts.predicate_counts.items()
-    )
 
 
 def _solve_multi_shot_with_programs(
@@ -1038,8 +1004,6 @@ def solve_multi_shot_lazy(
 ) -> SolveOutput:
     """Solve using the lazy multi-shot encoding."""
 
-    has_translated_constraints = _has_translated_constraints(facts)
-
     return _solve_multi_shot_with_programs(
         config,
         facts,
@@ -1050,19 +1014,10 @@ def solve_multi_shot_lazy(
         initial_step_program="step_initial",
         solve_all_horizons=False,
         stop_on_solution=False,
-        horizon_parts_builder=lambda horizon: (
-            _lazy_prefix_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-                include_constraint_step=has_translated_constraints,
-            )
-            if horizon < config.solution_length_min
-            else _lazy_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-            )
+        horizon_parts_builder=lambda horizon: _lazy_horizon_parts(
+            horizon,
+            initial_step_program="step_initial",
+            initial_seed_program=None,
         ),
         capture_raw_models=capture_raw_models,
     )
