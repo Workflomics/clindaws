@@ -108,6 +108,10 @@ class FactBundle:
     cache_stats: Mapping[str, int]
     emit_stats: Mapping[str, int]
     earliest_solution_step: int = 1
+    python_precomputed_facts: str = ""
+    python_precompute_enabled: bool = False
+    python_precompute_fact_count: int = 0
+    python_precompute_stats: Mapping[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

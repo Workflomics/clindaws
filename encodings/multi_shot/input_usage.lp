@@ -21,7 +21,7 @@
 
 :- query(t),
    enable_all_inputs_used,
-   workflow_input_slot(WF, _, _),
+   planner_workflow_input(WF),
    #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } = 0.
 
 % ----------------------------------------------------------------
@@ -30,7 +30,7 @@
 
 :- query(t),
    enable_some_input_used,
-   #count { WF : workflow_input_slot(WF, _, _),
+   #count { WF : planner_workflow_input(WF),
                  occurs(T, bind(Tool, Port, WF)) } = 0.
 
 % ----------------------------------------------------------------
@@ -40,5 +40,5 @@
 
 :- query(t),
    enable_inputs_consumed,
-   workflow_input_slot(WF, _, _),
+   planner_workflow_input(WF),
    #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } > 1.

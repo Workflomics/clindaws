@@ -223,8 +223,16 @@ workflow_input_class_member(Rep, WF) :-
     canonical_workflow_input(Rep),
     equivalent_workflow_input_pair(WF, Rep).
 
-workflow_input_slot(slot(Rep, WF), Rep, Rank) :-
+workflow_input_class_repeated(Rep) :-
     canonical_workflow_input(Rep),
+    1 < #count { WF : workflow_input_class_member(Rep, WF) }.
+
+workflow_input_collapsed_member(WF) :-
+    workflow_input_class_member(Rep, WF),
+    workflow_input_class_repeated(Rep).
+
+workflow_input_slot(slot(Rep, WF), Rep, Rank) :-
+    workflow_input_class_repeated(Rep),
     workflow_input_class_member(Rep, WF),
     Rank = #count {
         Other : workflow_input_class_member(Rep, Other), Other <= WF
@@ -234,8 +242,15 @@ workflow_input_slot_source(slot(Rep, WF), WF) :-
     workflow_input_slot(slot(Rep, WF), Rep, _).
 
 workflow_input_slot_class_size(Rep, N) :-
-    canonical_workflow_input(Rep),
+    workflow_input_class_repeated(Rep),
     N = #count { Slot : workflow_input_slot(Slot, Rep, _) }.
+
+planner_workflow_input(WF) :-
+    base_workflow_input(WF),
+    not workflow_input_collapsed_member(WF).
+
+planner_workflow_input(Slot) :-
+    workflow_input_slot(Slot, _, _).
 
 workflow_input(WF) :-
     base_workflow_input(WF).

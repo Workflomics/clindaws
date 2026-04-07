@@ -97,13 +97,13 @@ class GroundingOutput:
     horizon_records: tuple[HorizonRecord, ...]
 
 
-def _single_shot_program_paths() -> tuple[Path, ...]:
+def _single_shot_program_paths(*, python_precompute_direct: bool = False) -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "single_shot"
     return (
         base / "show.lp",
-        base / "pre_compute.lp",
+        base / ("pre_compute_python.lp" if python_precompute_direct else "pre_compute.lp"),
         base / "propagation.lp",
-        base / "tool_choice.lp",
+        base / ("tool_choice_python.lp" if python_precompute_direct else "tool_choice.lp"),
         base / "output_production.lp",
         base / "reachability.lp",
         base / "goal.lp",
@@ -119,12 +119,12 @@ def _single_shot_program_paths() -> tuple[Path, ...]:
     )
 
 
-def _multi_shot_program_paths() -> tuple[Path, ...]:
+def _multi_shot_program_paths(*, python_precompute_direct: bool = False) -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot"
     return (
-        base / "base.lp",
-        base / "init.lp",
-        base / "step.lp",
+        base / ("base_python.lp" if python_precompute_direct else "base.lp"),
+        base / ("init_python.lp" if python_precompute_direct else "init.lp"),
+        base / ("step_python.lp" if python_precompute_direct else "step.lp"),
         base / "constraints.lp",
         base / "check.lp",
         base / "ape_extract.lp",
@@ -153,13 +153,17 @@ def _multi_shot_lazy_program_paths() -> tuple[Path, ...]:
     )
 
 
-def program_paths_for_mode(mode: str) -> tuple[Path, ...]:
+def program_paths_for_mode(
+    mode: str,
+    *,
+    python_precompute_direct: bool = False,
+) -> tuple[Path, ...]:
     """Return encoding program paths for a solver mode."""
 
     if mode == "single-shot":
-        return _single_shot_program_paths()
+        return _single_shot_program_paths(python_precompute_direct=python_precompute_direct)
     if mode == "multi-shot":
-        return _multi_shot_program_paths()
+        return _multi_shot_program_paths(python_precompute_direct=python_precompute_direct)
     if mode == "multi-shot-lazy":
         return _multi_shot_lazy_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")
@@ -323,6 +327,18 @@ def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Sym
     return tuple(parts)
 
 
+def _multi_shot_prefix_horizon_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    """Lean legacy multi-shot horizon parts below the first solvable horizon."""
+
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if horizon == 1:
+        parts.append(("init", ()))
+    parts.append(("step", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
 def _multi_shot_grounding_horizon_parts(
     horizon: int,
 ) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
@@ -388,6 +404,8 @@ def _solve_multi_shot_with_programs(
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    if facts.python_precomputed_facts:
+        control.add("base", [], facts.python_precomputed_facts)
 
     total_grounding = 0.0
     total_solving = 0.0
@@ -766,6 +784,8 @@ def _solve_single_shot_once(
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    if facts.python_precomputed_facts:
+        control.add("base", [], facts.python_precomputed_facts)
     control.add("base", [], f"time(1..{horizon}).\n")
     control.add("base", [], static_overlay)
 
@@ -897,7 +917,7 @@ def solve_single_shot(
     return _solve_single_shot_once(
         config,
         facts,
-        _single_shot_program_paths(),
+        _single_shot_program_paths(python_precompute_direct=facts.python_precompute_enabled),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -1004,17 +1024,28 @@ def solve_multi_shot(
     project_models: bool = False,
 ) -> SolveOutput:
     """Solve using the multi-shot encoding."""
+    effective_solve_start = max(config.solution_length_min, facts.earliest_solution_step)
+    if effective_solve_start > config.solution_length_min:
+        _report(
+            progress_callback,
+            f"Lower-bound solve start: skipping query/check before horizon {effective_solve_start}.",
+        )
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _multi_shot_program_paths(),
+        _multi_shot_program_paths(python_precompute_direct=facts.python_precompute_enabled),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         solve_all_horizons=False,
         stop_on_solution=False,
-        horizon_parts_builder=_multi_shot_horizon_parts,
+        horizon_parts_builder=lambda horizon: (
+            _multi_shot_prefix_horizon_parts(horizon)
+            if horizon < effective_solve_start
+            else _multi_shot_horizon_parts(horizon)
+        ),
         capture_raw_models=capture_raw_models,
+        solve_start_horizon=effective_solve_start,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )
@@ -1032,9 +1063,11 @@ def ground_multi_shot(
     """Ground the multi-shot encoding without solving."""
 
     control = _make_grounding_control()
-    for program_path in _multi_shot_program_paths():
+    for program_path in _multi_shot_program_paths(python_precompute_direct=facts.python_precompute_enabled):
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    if facts.python_precomputed_facts:
+        control.add("base", [], facts.python_precomputed_facts)
     return _ground_multi_shot_control(
         control,
         config,

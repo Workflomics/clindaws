@@ -17,13 +17,13 @@ holds(0, unit(Slot, U)) :-
 
 port_cat_ok(0, Port, WF, Cat) :-
     holds(0, avail(WF)),
-    not base_workflow_input(WF),
+    not workflow_input_collapsed_member(WF),
     port_requires(Port, ReqV, Cat),
     holds(0, dim(WF, V, Cat)),
     compatible(V, ReqV).
 
 eligible(0, Port, WF) :-
     holds(0, avail(WF)),
-    not base_workflow_input(WF),
+    not workflow_input_collapsed_member(WF),
     input_port(_, Port),
     port_cat_ok(0, Port, WF, Cat) : port_requires(Port, _, Cat).

@@ -70,8 +70,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--project",
+        dest="project",
         action="store_true",
+        default=None,
         help="Enable clingo model projection on the encoding's declared projection predicates during solving.",
+    )
+    parser.add_argument(
+        "--no-project",
+        dest="project",
+        action="store_false",
+        help="Disable clingo model projection during solving. Multi-shot enables projection by default.",
     )
     parser.add_argument(
         "--graph-format",
@@ -88,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-raw-answer-sets",
         action="store_true",
         help="Write raw witness-level answer sets for debugging.",
+    )
+    parser.add_argument(
+        "--python-precompute-direct",
+        action="store_true",
+        help="For direct modes, precompute selected static helper relations and bindability facts in Python before grounding.",
     )
     parser.add_argument(
         "--benchmark-grounding",
@@ -156,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
                 render_graphs=not args.no_graphs,
                 repetitions=args.benchmark_repetitions,
                 progress_callback=_progress,
+                python_precompute_direct=args.python_precompute_direct,
             )
             print(f"Benchmark written to: {result.output_path}")
             for record in result.records:
@@ -182,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 summary_top_tools=args.summary_top_tools,
                 progress_callback=_progress,
+                python_precompute_direct=args.python_precompute_direct,
             )
             if grounding_result.translation_path is not None:
                 print(f"Translation written to: {grounding_result.translation_path}")
@@ -216,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 summary_top_tools=args.summary_top_tools,
                 progress_callback=_progress,
+                python_precompute_direct=args.python_precompute_direct,
             )
             if translation_result.translation_path is not None:
                 print(f"Translation written to: {translation_result.translation_path}")
@@ -246,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
             render_graphs=not args.no_graphs,
             write_raw_answer_sets=args.write_raw_answer_sets,
             progress_callback=_progress,
+            python_precompute_direct=args.python_precompute_direct,
         )
         if run_result.translation_path is not None:
             print(f"Translation written to: {run_result.translation_path}")

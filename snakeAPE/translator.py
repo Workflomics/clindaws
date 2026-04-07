@@ -452,6 +452,178 @@ def _build_common_facts(
     return roots
 
 
+def _terminal_values_for_declared_values(
+    ontology: Ontology,
+    roots: Mapping[str, frozenset[str]],
+    dimension: str,
+    values: Iterable[str],
+) -> frozenset[str]:
+    """Return all terminal values an input/output declaration may realize."""
+
+    allowed = roots.get(dimension)
+    terminals: set[str] = set()
+    for value in values:
+        terminals.update(
+            ontology.terminal_descendants_of(
+                value,
+                within=allowed if allowed else None,
+            )
+        )
+    return frozenset(terminals)
+
+
+def _artifact_profile_terminal_sets(
+    ontology: Ontology,
+    roots: Mapping[str, frozenset[str]],
+    dimensions: Mapping[str, Iterable[str]],
+) -> dict[str, frozenset[str]]:
+    """Convert declared artifact dimensions into terminal-value capability sets."""
+
+    normalized = _normalize_dim_map(dimensions)
+    return {
+        dimension: _terminal_values_for_declared_values(ontology, roots, dimension, values)
+        for dimension, values in normalized.items()
+    }
+
+
+def _port_requirement_terminal_sets(
+    ontology: Ontology,
+    roots: Mapping[str, frozenset[str]],
+    dimensions: Mapping[str, Iterable[str]],
+) -> dict[str, tuple[frozenset[str], ...]]:
+    """Convert an input/goal declaration into satisfiable terminal requirement sets."""
+
+    normalized = _normalize_dim_map(dimensions)
+    return {
+        dimension: tuple(
+            _terminal_values_for_declared_values(ontology, roots, dimension, (value,))
+            for value in values
+        )
+        for dimension, values in normalized.items()
+    }
+
+
+def _artifact_profile_key(profile: Mapping[str, frozenset[str]]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Return a stable key for a terminalized artifact capability profile."""
+
+    return tuple(
+        sorted((dimension, tuple(sorted(values))) for dimension, values in profile.items())
+    )
+
+
+def _artifact_satisfies_port_requirements(
+    artifact_profile: Mapping[str, frozenset[str]],
+    port_requirements: Mapping[str, tuple[frozenset[str], ...]],
+) -> bool:
+    """Return whether an optimistic artifact profile can satisfy a port/goal."""
+
+    for dimension, required_value_sets in port_requirements.items():
+        artifact_values = artifact_profile.get(dimension, frozenset())
+        if not artifact_values:
+            return False
+        if not any(artifact_values.intersection(required_values) for required_values in required_value_sets):
+            return False
+    return True
+
+
+def _compute_ape_multi_shot_earliest_solution_step(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+    roots: Mapping[str, frozenset[str]],
+) -> int:
+    """Compute a safe optimistic lower bound for the first solvable horizon."""
+
+    input_requirements_by_tool = {
+        tool.mode_id: tuple(
+            _port_requirement_terminal_sets(ontology, roots, port.dimensions)
+            for port in tool.inputs
+        )
+        for tool in tools
+    }
+    output_profiles_by_tool = {
+        tool.mode_id: tuple(
+            _artifact_profile_terminal_sets(ontology, roots, port.dimensions)
+            for port in tool.outputs
+        )
+        for tool in tools
+    }
+    goal_requirements = tuple(
+        _port_requirement_terminal_sets(ontology, roots, goal_dimensions)
+        for goal_dimensions in config.outputs
+    )
+
+    profile_steps: dict[tuple[tuple[str, tuple[str, ...]], ...], int] = {}
+    profiles_by_key: dict[tuple[tuple[str, tuple[str, ...]], ...], dict[str, frozenset[str]]] = {}
+
+    def _register_profile(profile: Mapping[str, frozenset[str]], step: int) -> bool:
+        key = _artifact_profile_key(profile)
+        current = profile_steps.get(key)
+        if current is not None and current <= step:
+            return False
+        profile_steps[key] = step
+        profiles_by_key[key] = dict(profile)
+        return True
+
+    for workflow_input in config.inputs:
+        _register_profile(
+            _artifact_profile_terminal_sets(ontology, roots, workflow_input),
+            0,
+        )
+
+    changed = True
+    while changed:
+        changed = False
+        available_profiles = tuple(
+            (profiles_by_key[key], step)
+            for key, step in profile_steps.items()
+        )
+        for tool in tools:
+            input_requirements = input_requirements_by_tool[tool.mode_id]
+            if not input_requirements:
+                tool_step = 1
+            else:
+                port_steps: list[int] = []
+                for requirements in input_requirements:
+                    earliest_port_step = min(
+                        (
+                            step
+                            for profile, step in available_profiles
+                            if _artifact_satisfies_port_requirements(profile, requirements)
+                        ),
+                        default=config.solution_length_max + 1,
+                    )
+                    if earliest_port_step > config.solution_length_max:
+                        port_steps = []
+                        break
+                    port_steps.append(earliest_port_step)
+                if not port_steps:
+                    continue
+                tool_step = max(port_steps) + 1
+
+            if tool_step > config.solution_length_max:
+                continue
+            for output_profile in output_profiles_by_tool[tool.mode_id]:
+                changed = _register_profile(output_profile, tool_step) or changed
+
+    earliest_goal_step = 1
+    for requirements in goal_requirements:
+        goal_step = min(
+            (
+                step
+                for profile, step in (
+                    (profiles_by_key[key], step)
+                    for key, step in profile_steps.items()
+                )
+                if _artifact_satisfies_port_requirements(profile, requirements)
+            ),
+            default=config.solution_length_max + 1,
+        )
+        earliest_goal_step = max(earliest_goal_step, goal_step)
+
+    return max(1, earliest_goal_step)
+
+
 _SELECTOR_SINGLE_ARG_CONSTRAINTS = {
     "use_m",
     "nuse_m",
@@ -2852,7 +3024,7 @@ def build_fact_bundle_ape_multi_shot(
     """
 
     writer = _FactWriter()
-    _build_common_facts(writer, config, ontology, tools)
+    roots = _build_common_facts(writer, config, ontology, tools)
     tool_stats: list[ToolExpansionStat] = []
 
     for tool in tools:
@@ -2895,10 +3067,17 @@ def build_fact_bundle_ape_multi_shot(
                     )
 
     _emit_lazy_constraints(writer, config, ontology, tools)
+    earliest_solution_step = _compute_ape_multi_shot_earliest_solution_step(
+        config,
+        ontology,
+        tools,
+        roots,
+    )
     return _finalize_fact_bundle(
         writer,
         config=config,
         tools=tools,
         tool_stats=tool_stats,
         cache_stats=dict(ontology.cache_stats()),
+        earliest_solution_step=earliest_solution_step,
     )

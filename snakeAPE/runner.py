@@ -20,6 +20,7 @@ from uuid import uuid4
 import clingo
 
 from .config import load_config
+from .direct_python_precompute import apply_direct_python_precompute
 from .models import (
     BenchmarkRecord,
     BenchmarkResult,
@@ -703,8 +704,15 @@ def _translation_schema(fact_bundle) -> str:
     return "unknown"
 
 
-def _encoding_schema_summary(mode: str) -> dict[str, object]:
-    program_paths = program_paths_for_mode(mode)
+def _encoding_schema_summary(
+    mode: str,
+    *,
+    python_precompute_direct: bool = False,
+) -> dict[str, object]:
+    program_paths = program_paths_for_mode(
+        mode,
+        python_precompute_direct=python_precompute_direct,
+    )
     predicate_presence: dict[str, bool] = {}
     for predicate in SCHEMA_PREDICATES:
         predicate_presence[predicate] = False
@@ -824,7 +832,10 @@ def _translation_summary_payload(
     translation_sec: float,
     summary_top_tools: int,
 ) -> dict[str, object]:
-    encoding_summary = _encoding_schema_summary(mode)
+    encoding_summary = _encoding_schema_summary(
+        mode,
+        python_precompute_direct=fact_bundle.python_precompute_enabled,
+    )
     schema_presence = {
         predicate: fact_bundle.predicate_counts.get(predicate, 0) > 0
         for predicate in SCHEMA_PREDICATES
@@ -849,6 +860,10 @@ def _translation_summary_payload(
         "tool_count": len(fact_bundle.tool_stats),
         "goal_count": fact_bundle.goal_count,
         "workflow_input_count": len(fact_bundle.workflow_input_ids),
+        "earliest_solution_step": fact_bundle.earliest_solution_step,
+        "python_precompute_enabled": fact_bundle.python_precompute_enabled,
+        "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
+        "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
         "translation_path": str(translation_path) if translation_path else None,
         "translation_sec": translation_sec,
         "predicate_counts": dict(sorted(fact_bundle.predicate_counts.items())),
@@ -919,6 +934,14 @@ def _default_solution_dir(config: SnakeConfig) -> Path:
     return config.solutions_dir_path
 
 
+def _effective_project_models(mode: str, project_models: bool | None) -> bool:
+    """Resolve the effective projection policy for one run."""
+
+    if project_models is not None:
+        return project_models
+    return mode == "multi-shot"
+
+
 def _validate_run_config(config: SnakeConfig) -> None:
     """Validate derived run bounds before translation/solving."""
 
@@ -942,10 +965,13 @@ def _prepare_run_context(
     min_length: int | None = None,
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
+    python_precompute_direct: bool = False,
 ) -> tuple:
     """Load config and build the fact bundle for a run."""
 
     mode_config = _mode_config(mode)
+    if python_precompute_direct and mode not in {"single-shot", "multi-shot"}:
+        raise ValueError("--python-precompute-direct supports only single-shot and multi-shot.")
     config = load_config(config_path)
     config = replace(
         config,
@@ -978,6 +1004,20 @@ def _prepare_run_context(
         raise ValueError(
             f"Unsupported translation pathway: {mode_config.translation_pathway}"
         )
+    if python_precompute_direct:
+        _report(progress_callback, "Step 1b: Python direct precompute started.")
+        fact_bundle = apply_direct_python_precompute(
+            mode,
+            config,
+            ontology,
+            tools,
+            fact_bundle,
+        )
+        _report(
+            progress_callback,
+            "Step 1b complete: Python direct precompute emitted "
+            f"{fact_bundle.python_precompute_fact_count} helper facts.",
+        )
     translation_sec = perf_counter() - start
     _report(progress_callback, f"Step 1 complete: translation finished after {translation_sec:.3f}s.")
 
@@ -1003,6 +1043,7 @@ def run_translate_only(
     max_length: int | None = None,
     summary_top_tools: int = 20,
     progress_callback: ProgressCallback = None,
+    python_precompute_direct: bool = False,
 ) -> TranslationRunResult:
     """Run translation only and write translation diagnostics."""
 
@@ -1023,6 +1064,7 @@ def run_translate_only(
         min_length=min_length,
         max_length=max_length,
         progress_callback=progress_callback,
+        python_precompute_direct=python_precompute_direct,
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
@@ -1100,11 +1142,12 @@ def run_once(
     min_length: int | None = None,
     max_length: int | None = None,
     parallel_mode: str | None = None,
-    project_models: bool = False,
+    project_models: bool | None = None,
     graph_format: str = "png",
     render_graphs: bool = True,
     write_raw_answer_sets: bool = False,
     progress_callback: ProgressCallback = None,
+    python_precompute_direct: bool = False,
 ) -> RunResult:
     """Run one snakeAPE execution."""
 
@@ -1125,6 +1168,7 @@ def run_once(
         min_length=min_length,
         max_length=max_length,
         progress_callback=progress_callback,
+        python_precompute_direct=python_precompute_direct,
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
@@ -1141,6 +1185,7 @@ def run_once(
         translation_peak_rss_mb=translation_peak_rss_mb,
     )
 
+    effective_project_models = _effective_project_models(mode, project_models)
     remaining_timeout = config.timeout_sec - translation_sec
     _timed_out = False
     _solve_start = perf_counter()
@@ -1160,7 +1205,7 @@ def run_once(
             fact_bundle=fact_bundle,
             capture_raw_models=True,
             parallel_mode=parallel_mode,
-            project_models=project_models,
+            project_models=effective_project_models,
             remaining_timeout=remaining_timeout,
             progress_callback=progress_callback,
         )
@@ -1194,6 +1239,14 @@ def run_once(
             {
                 "mode": mode,
                 "grounding_strategy": grounding_strategy,
+                "earliest_solution_step": fact_bundle.earliest_solution_step,
+                "effective_solve_start_horizon": max(
+                    config.solution_length_min,
+                    fact_bundle.earliest_solution_step,
+                ),
+                "python_precompute_enabled": fact_bundle.python_precompute_enabled,
+                "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
+                "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
                 "base_grounding_sec": solve_output.base_grounding_sec,
@@ -1317,6 +1370,7 @@ def run_ground_only(
     max_length: int | None = None,
     summary_top_tools: int = 20,
     progress_callback: ProgressCallback = None,
+    python_precompute_direct: bool = False,
 ) -> GroundingRunResult:
     """Run translation plus grounding without solving."""
 
@@ -1337,6 +1391,7 @@ def run_ground_only(
         min_length=min_length,
         max_length=max_length,
         progress_callback=progress_callback,
+        python_precompute_direct=python_precompute_direct,
     )
     translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
@@ -1394,8 +1449,12 @@ def run_ground_only(
                 "grounding_strategy": grounding_strategy,
                 "stage": stage,
                 "fact_count": fact_bundle.fact_count,
-        "translation_path": None,
+                "translation_path": None,
                 "translation_summary_path": str(translation_summary_path),
+                "earliest_solution_step": fact_bundle.earliest_solution_step,
+                "python_precompute_enabled": fact_bundle.python_precompute_enabled,
+                "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
+                "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
                 "grounded_horizons": list(grounding_output.grounded_horizons),
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": grounding_output.base_grounding_peak_rss_mb,
@@ -1465,11 +1524,12 @@ def benchmark_grounding(
     min_length: int | None = None,
     max_length: int | None = None,
     parallel_mode: str | None = None,
-    project_models: bool = False,
+    project_models: bool | None = None,
     graph_format: str = "png",
     render_graphs: bool = False,
     repetitions: int = 1,
     progress_callback: ProgressCallback = None,
+    python_precompute_direct: bool = False,
 ) -> BenchmarkResult:
     """Benchmark all three grounding strategies."""
 
@@ -1495,6 +1555,7 @@ def benchmark_grounding(
                 graph_format=graph_format,
                 render_graphs=render_graphs,
                 progress_callback=progress_callback,
+                python_precompute_direct=python_precompute_direct,
             )
             records.append(
                 BenchmarkRecord(
