@@ -5,8 +5,17 @@
 % CHECK — volatile goal and usefulness check at horizon t
 % ================================================================
 
+goal_id(GoalID) :- goal_output(GoalID, _, _).
+
 % Hard goal constraint
 :- query(t), not holds(t, goal).
+
+% Only accept workflows at the first horizon where the goal is reached.
+:- query(t), t > 1, holds(t-1, goal).
+
+1 { chosen_goal_output(t, GoalID, WF) : goal_satisfied_by_output(t, GoalID, WF) } 1 :-
+    query(t),
+    goal_id(GoalID).
 
 % ----------------------------------------------------------------
 % Output-dimension canonicalization
@@ -21,9 +30,14 @@ output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V),
-    occurs(TUse, bind(ToolUse, PortIn, out(TProd, ToolProd, Port))),
+    output_used_by(TProd, ToolProd, Port, TUse, ToolUse, PortIn),
     port_requires(PortIn, ReqV, Cat),
     not compatible(V, ReqV).
+
+chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
+    query(t),
+    chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
+    goal_output(GoalID, GoalV, Cat).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
@@ -32,8 +46,7 @@ output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V),
-    goal_satisfied_by_output(t, GoalID, out(TProd, ToolProd, Port)),
-    goal_output(GoalID, GoalV, Cat),
+    chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
@@ -67,14 +80,13 @@ useful_check(t, T, Tool) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, output(Tool, _, Port)),
-    goal_satisfied_by(t, _, out(T, Tool, Port)).
+    chosen_goal_output(t, _, out(T, Tool, Port)).
 
 % Backward — output consumed by a useful tool
 useful_check(t, T1, Tool1) :-
     query(t),
     occurs(T1, run(Tool1)),
-    occurs(T1, output(Tool1, _, Port)),
-    occurs(T2, bind(Tool2, _, out(T1, Tool1, Port))),
+    output_used_by(T1, Tool1, Port, T2, Tool2, ConsumerPort),
     useful_check(t, T2, Tool2),
     T2 > T1.
 

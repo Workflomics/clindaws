@@ -32,34 +32,12 @@ SINGLE_SHOT_OVERLAY_PREFIX = """
 #show tool_at_time/2.
 #show ape_bind/3.
 #show ape_holds_dim/3.
-#show ape_goal_out/3.
 
 ape_bind(T, Port, WF) :- occurs(T, bind(_, Port, WF)).
 ape_holds_dim(WF, V, Cat) :- holds(0, avail(WF)), holds(0, dim(WF, V, Cat)).
 ape_holds_dim(out(T, Tool, Port), V, Cat) :-
     occurs(T, output(Tool, _, Port)),
     holds(T, dim(out(T, Tool, Port), V, Cat)).
-
-goal_dim_match_at(T, GoalID, WF, GoalV, Cat) :-
-    holds(T, goal_time(T)),
-    goal_output(GoalID, GoalV, Cat),
-    holds(T, avail(WF)),
-    holds(T, dim(WF, ActualV, Cat)),
-    compatible(ActualV, GoalV).
-
-goal_dim_missing_at(T, GoalID, WF) :-
-    holds(T, goal_time(T)),
-    goal_output(GoalID, GoalV, Cat),
-    holds(T, avail(WF)),
-    not goal_dim_match_at(T, GoalID, WF, GoalV, Cat).
-
-ape_goal_out(T, GoalID, WF) :-
-    holds(T, goal_time(T)),
-    goal_output(GoalID, _, _),
-    holds(T, avail(WF)),
-    not holds(0, avail(WF)),
-    goal_dim_match_at(T, GoalID, WF, _, _),
-    not goal_dim_missing_at(T, GoalID, WF).
 """
 
 
@@ -483,54 +461,56 @@ def _solve_multi_shot_with_programs(
                     start = perf_counter()
 
                     def _solve() -> None:
-                        with control.solve(yield_=True) as handle:
-                            for model in handle:
-                                nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
-                                models_seen += 1
-                                shown_symbols = tuple(model.symbols(shown=True))
-                                workflow_key = extract_workflow_signature_key(shown_symbols)
-                                workflow_length = workflow_signature_length(workflow_key)
-                                in_length_window = (
-                                    config.solution_length_min
-                                    <= workflow_length
-                                    <= config.solution_length_max
-                                )
-                                if workflow_key not in seen_unique_keys:
-                                    seen_unique_keys.add(workflow_key)
-                                    unique_workflows_seen += 1
-                                store_raw = (
-                                    in_length_window
-                                    and
-                                    capture_raw_models
-                                    and len(raw_collected) < config.solutions
-                                )
-                                store_unique = (
-                                    in_length_window
-                                    and
-                                    workflow_key not in stored_unique_keys
-                                    and len(unique_collected) < config.solutions
-                                )
-                                canonical_shown: tuple[clingo.Symbol, ...] | None = None
-                                if store_unique:
-                                    canonical_shown = canonicalize_shown_symbols(
-                                        shown_symbols,
-                                        tool_input_signatures,
+                        while True:
+                            with control.solve(yield_=True) as handle:
+                                for model in handle:
+                                    nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
+                                    models_seen += 1
+                                    shown_symbols = tuple(model.symbols(shown=True))
+                                    workflow_key = extract_workflow_signature_key(shown_symbols)
+                                    workflow_length = workflow_signature_length(workflow_key)
+                                    in_length_window = (
+                                        config.solution_length_min
+                                        <= workflow_length
+                                        <= config.solution_length_max
                                     )
-                                if store_raw:
-                                    raw_collected.append(shown_symbols)
-                                    models_stored += 1
-                                if store_unique:
-                                    stored_unique_keys.add(workflow_key)
-                                    unique_collected.append(canonical_shown if canonical_shown is not None else shown_symbols)
-                                    unique_workflows_stored += 1
-                                elif (
-                                    solve_all_horizons
-                                    and (not capture_raw_models or len(raw_collected) >= config.solutions)
-                                    and len(unique_collected) >= config.solutions
-                                ):
-                                    break
-                                if not solve_all_horizons and len(unique_collected) >= config.solutions:
-                                    break
+                                    if workflow_key not in seen_unique_keys:
+                                        seen_unique_keys.add(workflow_key)
+                                        unique_workflows_seen += 1
+                                    store_raw = (
+                                        in_length_window
+                                        and
+                                        capture_raw_models
+                                        and len(raw_collected) < config.solutions
+                                    )
+                                    store_unique = (
+                                        in_length_window
+                                        and
+                                        workflow_key not in stored_unique_keys
+                                        and len(unique_collected) < config.solutions
+                                    )
+                                    canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                                    if store_unique:
+                                        canonical_shown = canonicalize_shown_symbols(
+                                            shown_symbols,
+                                            tool_input_signatures,
+                                        )
+                                    if store_raw:
+                                        raw_collected.append(shown_symbols)
+                                        models_stored += 1
+                                    if store_unique:
+                                        stored_unique_keys.add(workflow_key)
+                                        unique_collected.append(canonical_shown if canonical_shown is not None else shown_symbols)
+                                        unique_workflows_stored += 1
+                                    elif (
+                                        solve_all_horizons
+                                        and (not capture_raw_models or len(raw_collected) >= config.solutions)
+                                        and len(unique_collected) >= config.solutions
+                                    ):
+                                        break
+                                    if not solve_all_horizons and len(unique_collected) >= config.solutions:
+                                        break
+                                break
 
                     _run_interruptible(_solve, is_interrupted)
                     solve_elapsed = perf_counter() - start

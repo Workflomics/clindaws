@@ -5,7 +5,7 @@
 useful(T, Tool) :-
     occurs(T, run(Tool)),
     occurs(T, output(Tool, _, Port)),
-    goal_satisfied_by(T, _, out(T, Tool, Port)).
+    chosen_goal_output(_, _, out(T, Tool, Port)).
 
 % --- Indirect usefulness: backward propagation from goal ---
 useful(T1, Tool1) :-

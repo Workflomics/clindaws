@@ -19,8 +19,8 @@
 :- query(t),
    enable_all_outputs_consumed,
    occurs(T, output(Tool, _, Port)),
-   not goal_satisfied_by(t, _, out(T, Tool, Port)),
-   #count { T2, Tool2, Port2 : occurs(T2, bind(Tool2, Port2, out(T, Tool, Port))) } = 0.
+   not chosen_goal_output(t, _, out(T, Tool, Port)),
+   #count { T2, Tool2, Port2 : output_used_by(T, Tool, Port, T2, Tool2, Port2) } = 0.
 
 % ----------------------------------------------------------------
 % enable_primary_output_consumed — at least one output per step used
@@ -33,7 +33,7 @@
    % no output of this tool-run reaches any subsequent bind
    #count { Port, T2, Tool2, Port2 :
        occurs(T, output(Tool, _, Port)),
-       occurs(T2, bind(Tool2, Port2, out(T, Tool, Port))) } = 0,
+       output_used_by(T, Tool, Port, T2, Tool2, Port2) } = 0,
    % and no output of this tool-run satisfies the goal
    #count { Port : occurs(T, output(Tool, _, Port)),
-                   goal_satisfied_by(t, _, out(T, Tool, Port)) } = 0.
+                   chosen_goal_output(t, _, out(T, Tool, Port)) } = 0.

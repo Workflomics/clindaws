@@ -1,0 +1,15 @@
+test,mode,horizon,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+metaCascabel,multi-shot-lazy,17,13,870,2055,669.06,18,18,18,true,false
+metaCascabel,single-shot,17,7,6365,2983,2448.80,72,72,18,true,false
+metaCascabel,multi-shot,17,7,2265,11006,4313.53,72,72,18,true,false
+metaCascabel,multi-shot,17,7,1389,5685,2380.95,72,72,18,true,false
+metaCascabel,multi-shot,17,7,1227,5449,2320.45,72,72,18,true,false
+metaCascabel,multi-shot,17,7,2384,12310,6129.31,72,72,18,true,false
+metaCascabel,multi-shot,17,6,2379,12802,6072.72,72,72,18,true,false
+metaCascabel,multi-shot,17,6,2473,12462,6060.05,72,72,18,true,false
+metaCascabel,multi-shot,17,6,26083,12496,6097.61,72,72,18,true,false
+metaCascabel,multi-shot,17,8,26681,13368,6116.83,72,72,18,true,false
+metaCascabel,multi-shot,17,7,26082,12316,6084.20,72,72,18,true,false
+metaCascabel,multi-shot,17,7,26490,12496,6093.47,72,72,18,true,false
+metaCascabel,multi-shot,17,7,25697,11867,6109.47,72,72,18,true,false
+metaCascabel,multi-shot,17,7,5160,12900,6319.02,72,72,18,true,false

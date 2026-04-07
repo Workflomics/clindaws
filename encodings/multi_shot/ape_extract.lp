@@ -12,7 +12,12 @@ tool_at_time(t, Tool) :- occurs(t, run(Tool)).
 #show tool_at_time/2.
 
 % Input bindings at this step: (step, port-id, workflow-artifact).
-ape_bind(t, Port, WF) :- occurs(t, bind(_, Port, WF)).
+ape_bind(t, Port, WF) :-
+    occurs(t, bind(_, Port, WF)),
+    not workflow_input_slot(WF, _, _).
+ape_bind(t, Port, WF) :-
+    occurs(t, bind(_, Port, Slot)),
+    workflow_input_slot_source(Slot, WF).
 #show ape_bind/3.
 
 % Type annotations for tool outputs created at THIS step only.
@@ -22,7 +27,6 @@ ape_bind(t, Port, WF) :- occurs(t, bind(_, Port, WF)).
 ape_holds_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
 #show ape_holds_dim/3.
 
-% Workflow outputs — t in the head prevents redefinition when the goal
-% remains satisfied across multiple steps.
-ape_goal_out(t, GoalID, WF) :- goal_satisfied_by(t, GoalID, WF).
+% Workflow outputs are emitted from the chosen goal-satisfying artifacts only.
+ape_goal_out(t, GoalID, WF) :- chosen_goal_output(t, GoalID, WF).
 #show ape_goal_out/3.

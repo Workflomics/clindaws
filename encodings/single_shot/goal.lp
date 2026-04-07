@@ -15,6 +15,8 @@ goal_dim_missing(T, GoalID, WF) :-
     not goal_dim_match(T, GoalID, WF, GoalV, Cat).
 
 % --- Goal satisfaction at timestep T ---
+goal_id(GoalID) :- goal_output(GoalID, _, _).
+
 goal_satisfied_by(T, GoalID, WF) :-
     holds(T, avail(WF)),
     goal_output(GoalID, _, _),
@@ -29,6 +31,10 @@ goal_satisfied_by_output(T, GoalID, WF) :-
 goal_satisfied(T, GoalID) :-
     goal_output(GoalID, _, _),
     goal_satisfied_by_output(T, GoalID, WF).
+
+1 { chosen_goal_output(T, GoalID, WF) : goal_satisfied_by_output(T, GoalID, WF) } 1 :-
+    holds(T, goal_time(T)),
+    goal_id(GoalID).
 
 % --- Goal holds at T when all GoalIDs are satisfied ---
 holds(T, goal) :-
@@ -57,15 +63,18 @@ output_dim_violates_consumer(TProd, ToolProd, Port, V, Cat) :-
     port_requires(PortIn, ReqV, Cat),
     not compatible(V, ReqV).
 
+chosen_output_goal_requirement(TGoal, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
+    holds(TGoal, goal_time(TGoal)),
+    chosen_goal_output(TGoal, GoalID, out(TProd, ToolProd, Port)),
+    goal_output(GoalID, GoalV, Cat).
+
 output_dim_violates_goal(TProd, ToolProd, Port, V, Cat) :-
     occurs(TProd, output(ToolProd, _, Port)),
     dimension(Port, (BaseV, Cat)),
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V),
-    holds(TGoal, goal_time(TGoal)),
-    goal_satisfied_by_output(TGoal, GoalID, out(TProd, ToolProd, Port)),
-    goal_output(GoalID, GoalV, Cat),
+    chosen_output_goal_requirement(TGoal, TProd, ToolProd, Port, GoalID, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(TProd, ToolProd, Port, V, Cat) :-

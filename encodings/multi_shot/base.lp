@@ -27,6 +27,7 @@ tool_has_output(Tool) :- tool_output(Tool, _).
 tool_input_variant(Tool, TI_ID) :- tool_input(Tool, TI_ID).
 tool_input_port(Tool, Port) :- tool_input(Tool, TI_ID), input_port(TI_ID, Port).
 tool_single_input(Tool) :- tool(Tool), 1 = #count { Port : tool_input_port(Tool, Port) }.
+variant_single_input(TI_ID) :- tool_input_variant(_, TI_ID), 1 = #count { Port : input_port(TI_ID, Port) }.
 
 % Static port requirements
 port_requires(Port, PortValue, Category) :-
@@ -44,6 +45,16 @@ same_input_signature(PortA, PortB) :-
     input_port(_, PortB),
     not port_signature_mismatch(PortA, PortB),
     not port_signature_mismatch(PortB, PortA).
+
+variant_sym_ports(TI_ID, PortHigh, PortLow) :-
+    input_port(TI_ID, PortHigh),
+    input_port(TI_ID, PortLow),
+    PortLow < PortHigh,
+    same_input_signature(PortHigh, PortLow).
+
+variant_has_repeated_signature_inputs(TI_ID) :-
+    variant_sym_ports(TI_ID, _, _).
+
 
 % ----------------------------------------------------------------
 % From tool_taxonomy_logic.lp
@@ -165,21 +176,69 @@ tool_req_incompatible(Tool) :-
 % (unit carry-forward and production are in step.lp)
 % ----------------------------------------------------------------
 
-workflow_input(WF) :-
+base_workflow_input(WF) :-
     holds(0, avail(WF)).
 
 workflow_input_profile_mismatch(WF1, WF2) :-
-    workflow_input(WF1),
-    workflow_input(WF2),
+    base_workflow_input(WF1),
+    base_workflow_input(WF2),
     holds(0, dim(WF1, V, Cat)),
     not holds(0, dim(WF2, V, Cat)).
 
+workflow_input_unit_mismatch(WF1, WF2) :-
+    base_workflow_input(WF1),
+    base_workflow_input(WF2),
+    holds(0, unit(WF1, U)),
+    not holds(0, unit(WF2, U)).
+
 equivalent_workflow_inputs(WF1, WF2) :-
-    workflow_input(WF1),
-    workflow_input(WF2),
+    base_workflow_input(WF1),
+    base_workflow_input(WF2),
     WF1 < WF2,
     not workflow_input_profile_mismatch(WF1, WF2),
-    not workflow_input_profile_mismatch(WF2, WF1).
+    not workflow_input_profile_mismatch(WF2, WF1),
+    not workflow_input_unit_mismatch(WF1, WF2),
+    not workflow_input_unit_mismatch(WF2, WF1).
+
+equivalent_workflow_input_pair(WF1, WF2) :-
+    equivalent_workflow_inputs(WF1, WF2).
+
+equivalent_workflow_input_pair(WF1, WF2) :-
+    equivalent_workflow_inputs(WF2, WF1).
+
+smaller_equivalent_workflow_input(WF, Smaller) :-
+    base_workflow_input(WF),
+    base_workflow_input(Smaller),
+    equivalent_workflow_input_pair(WF, Smaller),
+    Smaller < WF.
+
+canonical_workflow_input(WF) :-
+    base_workflow_input(WF),
+    not smaller_equivalent_workflow_input(WF, _).
+
+workflow_input_class_member(Rep, Rep) :-
+    canonical_workflow_input(Rep).
+
+workflow_input_class_member(Rep, WF) :-
+    canonical_workflow_input(Rep),
+    equivalent_workflow_input_pair(WF, Rep).
+
+workflow_input_slot(slot(Rep, WF), Rep, Rank) :-
+    canonical_workflow_input(Rep),
+    workflow_input_class_member(Rep, WF),
+    Rank = #count {
+        Other : workflow_input_class_member(Rep, Other), Other <= WF
+    }.
+
+workflow_input_slot_source(slot(Rep, WF), WF) :-
+    workflow_input_slot(slot(Rep, WF), Rep, _).
+
+workflow_input_slot_class_size(Rep, N) :-
+    canonical_workflow_input(Rep),
+    N = #count { Slot : workflow_input_slot(Slot, Rep, _) }.
+
+workflow_input(WF) :-
+    base_workflow_input(WF).
 
 unit_ancestor(U, U) :- unit_is_a(U, _).
 unit_ancestor(U, U) :- unit_is_a(_, U).

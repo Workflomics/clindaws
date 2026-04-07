@@ -73,6 +73,7 @@ occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 % Port satisfaction per category
 port_cat_ok(t, Port, WF, Cat) :-
     holds(t, avail(WF)),
+    not base_workflow_input(WF),
     port_requires(Port, ReqV, Cat),
     holds(t, dim(WF, V, Cat)),
     compatible(V, ReqV).
@@ -80,6 +81,7 @@ port_cat_ok(t, Port, WF, Cat) :-
 % Eligible item: all categories satisfied
 eligible(t, Port, WF) :-
     holds(t, avail(WF)),
+    not base_workflow_input(WF),
     input_port(_, Port),
     port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
 
@@ -88,56 +90,162 @@ eligible(t, Port, WF) :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
-% Canonicalize equivalent workflow-input bindings for same-signature ports.
+% Canonical artifact order for same-signature ports. This removes duplicate
+% witnesses where identical ports are filled by the same artifacts in a
+% different order, including mixed workflow-input / produced-output swaps.
+artifact_precedes(t, WF1, WF2) :-
+    workflow_input(WF1),
+    workflow_input(WF2),
+    WF1 < WF2.
+
+artifact_precedes(t, Slot1, Slot2) :-
+    workflow_input_slot(Slot1, Rep1, Rank1),
+    workflow_input_slot(Slot2, Rep2, Rank2),
+    Rep1 < Rep2.
+
+artifact_precedes(t, Slot1, Slot2) :-
+    workflow_input_slot(Slot1, Rep, Rank1),
+    workflow_input_slot(Slot2, Rep, Rank2),
+    Rank1 < Rank2.
+
+artifact_precedes(t, Slot, out(T, Tool, Port)) :-
+    workflow_input_slot(Slot, _, _),
+    occurs(T, output(Tool, _, Port)).
+
+artifact_precedes(t, WF, out(T, Tool, Port)) :-
+    workflow_input(WF),
+    occurs(T, output(Tool, _, Port)).
+
+artifact_precedes(t, out(T1, Tool1, Port1), out(T2, Tool2, Port2)) :-
+    occurs(T1, output(Tool1, _, Port1)),
+    occurs(T2, output(Tool2, _, Port2)),
+    T1 < T2.
+
+artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
+    occurs(T, output(Tool, _, Port1)),
+    occurs(T, output(Tool, _, Port2)),
+    Port1 < Port2,
+    occurs(T, run(Tool)).
+
 :- occurs(t, use_variant(Tool, TI_ID)),
-   occurs(t, bind(Tool, Port1, WF1)),
-   occurs(t, bind(Tool, Port2, WF2)),
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(t, bind(Tool, PortLow, ArtifactLow)),
+   occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
+   artifact_precedes(t, ArtifactHigh, ArtifactLow).
+
+% If symmetric same-signature ports both consume the same workflow input, use a
+% different equivalent workflow input when one is available.
+:- occurs(t, use_variant(Tool, TI_ID)),
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(t, bind(Tool, PortLow, WF)),
+   occurs(t, bind(Tool, PortHigh, WF)),
+   workflow_input_slot(WF, Rep, _),
+   eligible(t-1, PortHigh, WFAlt),
+   workflow_input_slot(WFAlt, Rep, _),
+   WFAlt != WF.
+
+% Within one step, interchangeable slots of the same workflow-input class are
+% assigned canonically to ascending port ids.
+:- occurs(t, use_variant(Tool, TI_ID)),
+   occurs(t, bind(Tool, Port1, Slot1)),
+   occurs(t, bind(Tool, Port2, Slot2)),
    Port1 < Port2,
-   input_port(TI_ID, Port1),
-   input_port(TI_ID, Port2),
-   same_input_signature(Port1, Port2),
-   equivalent_workflow_inputs(WF2, WF1).
+   workflow_input_slot(Slot1, Rep, Rank1),
+   workflow_input_slot(Slot2, Rep, Rank2),
+   Rank1 > Rank2.
+
+slot_used_before(t, Rep, Rank) :-
+    workflow_input_slot(Slot, Rep, Rank),
+    occurs(TPrev, bind(_, _, Slot)),
+    TPrev < t.
+
+slot_used_at_step(t, Rep, Rank) :-
+    workflow_input_slot(Slot, Rep, Rank),
+    occurs(t, bind(_, _, Slot)).
+
+% Across steps, use slots in prefix order within each equivalence class.
+:- slot_used_at_step(t, Rep, Rank),
+   workflow_input_slot(_, Rep, SmallerRank),
+   SmallerRank < Rank,
+   not slot_used_before(t, Rep, SmallerRank),
+   not slot_used_at_step(t, Rep, SmallerRank).
 
 % Artifact ancestry over committed runs.
 artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, WF)).
 
+% Carry forward ancestors from previous steps; the artifact graph is monotone.
 artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Ancestor).
+    artifact_ancestor(t-1, Artifact, Ancestor).
 
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Mid),
+% Only compute fresh ancestry for artifacts produced at THIS step.
+artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+    artifact_parent(out(t, Tool, PortOut), Ancestor).
+
+artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+    artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
 
-% Symmetry breaking for duplicate input signatures on the same join tool.
-:- occurs(t, bind(Tool, Port1, out(T1, Tool1, _))),
-   occurs(t, bind(Tool, Port2, out(T2, Tool2, _))),
-   Port1 < Port2,
-   same_input_signature(Port1, Port2),
-   T1 < T2.
+% When the same variant is used in a chain and the later run consumes the
+% earlier output, keep workflow-input bindings on the repeated ports ordered by
+% input id across time. This collapses branch-swapped repeated-tool chains.
+same_variant_chain(t, TPrev, Tool, TI_ID) :-
+    TPrev < t,
+    occurs(TPrev, use_variant(Tool, TI_ID)),
+    occurs(t, use_variant(Tool, TI_ID)),
+    occurs(t, bind(Tool, _, out(TPrev, Tool, _))).
+
+:- same_variant_chain(t, TPrev, Tool, TI_ID),
+   input_port(TI_ID, Port),
+   occurs(TPrev, bind(Tool, Port, PrevArtifact)),
+   occurs(t, bind(Tool, Port, Artifact)),
+   artifact_precedes(t, Artifact, PrevArtifact).
 
 % When two single-input producer runs with the same input signature later feed a
 % symmetric join, keep the earlier producer on the more-derived source and the
 % later producer on the older source. This removes the extra branch-swapped
 % variants while preserving the SAT-aligned one.
-paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2) :-
+paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2) :-
     T1 < T2,
-    tool_single_input(Tool1),
-    tool_single_input(Tool2),
+    occurs(T1, use_variant(Tool1, TI1)),
+    occurs(T2, use_variant(Tool2, TI2)),
+    variant_single_input(TI1),
+    variant_single_input(TI2),
     occurs(T1, bind(Tool1, Port1, WF1)),
     occurs(T2, bind(Tool2, Port2, WF2)),
     same_input_signature(Port1, Port2),
+    occurs(TJ, use_variant(JoinTool, JoinTI)),
+    variant_sym_ports(JoinTI, JoinPort1, JoinPort2),
     occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
     occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
     TJ > T2,
-    JoinPort2 < JoinPort1,
-    same_input_signature(JoinPort1, JoinPort2).
+    JoinPort2 < JoinPort1.
 
-:- paired_symmetric_producers(t, T1, Tool1, Port1, WF, T2, Tool2, Port2, WF).
+:- paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF, T2, Tool2, TI2, Port2, WF).
 
-:- paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2),
+:- paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2),
    artifact_ancestor(t, WF1, WF2).
+
+% When repeated runs of the same single-input variant later feed the two
+% symmetric inputs of the same join, order the producer inputs canonically.
+repeated_same_variant_symmetric_join_input_swap(
+    t, T1, Tool, TI_ID, WF1, T2, WF2, JoinTool, JoinTI, JoinPortHigh, JoinPortLow
+) :-
+    T1 < T2,
+    occurs(T1, use_variant(Tool, TI_ID)),
+    occurs(T2, use_variant(Tool, TI_ID)),
+    variant_single_input(TI_ID),
+    occurs(T1, bind(Tool, Port1, WF1)),
+    occurs(T2, bind(Tool, Port2, WF2)),
+    occurs(TJ, use_variant(JoinTool, JoinTI)),
+    variant_sym_ports(JoinTI, JoinPortHigh, JoinPortLow),
+    occurs(TJ, bind(JoinTool, JoinPortLow, out(T1, Tool, _))),
+    occurs(TJ, bind(JoinTool, JoinPortHigh, out(T2, Tool, _))),
+    artifact_precedes(t, WF2, WF1).
+
+:- repeated_same_variant_symmetric_join_input_swap(
+       t, T1, Tool, TI_ID, WF1, T2, WF2, JoinTool, JoinTI, JoinPortHigh, JoinPortLow).
 
 % ----------------------------------------------------------------
 % From output_production.lp — output port selection and dimensions
@@ -224,6 +332,10 @@ holds(t, unit(out(t, Tool, Port), U)) :-
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
 
+output_used_by(TPrev, ToolPrev, Port, t, Tool, ConsumerPort) :-
+    occurs(t, bind(Tool, ConsumerPort, out(TPrev, ToolPrev, Port))),
+    TPrev < t.
+
 % Root: no-input tools
 is_root(t, Tool) :-
     occurs(t, run(Tool)),
@@ -239,9 +351,8 @@ reachable(t, Tool) :- is_root(t, Tool).
 
 reachable(t, Tool2) :-
     reachable(T1, Tool1),
-    occurs(T1, output(Tool1, _, Port)),
-    occurs(t, bind(Tool2, _, out(T1, Tool1, Port))),
-    t > T1.
+    output_used_by(T1, Tool1, Port, t, Tool2, ConsumerPort),
+    T1 < t.
 
 :- occurs(t, run(Tool)), not reachable(t, Tool).
 
