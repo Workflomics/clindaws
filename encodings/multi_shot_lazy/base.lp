@@ -250,7 +250,8 @@ symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
 
 lazy_candidate_bindable_producer(ConsumerCandidate, ConsumerPort, ProducerCandidate) :-
     lazy_candidate_input_signature_id(ConsumerCandidate, ConsumerPort, SignatureId),
-    lazy_signature_bindable_producer_port(SignatureId, ProducerCandidate, _).
+    lazy_signature_support_class(SignatureId, SupportClassId),
+    lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, _).
 
 join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
     JoinPort2 < JoinPort1,

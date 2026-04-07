@@ -2192,7 +2192,11 @@ def build_lazy_fact_bundle(
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
 ) -> FactBundle:
-    """Build a diagnostic lazy candidate bundle without full variant expansion."""
+    """Compatibility wrapper for the lazy builder implementation."""
+    from .translator_lazy import build_lazy_fact_bundle as _impl
+
+    return _impl(config, ontology, tools)
+
     roots = _build_roots(config, ontology)
     resolver = _ExpansionResolver(ontology, roots, "python")
     tool_stats: list[ToolExpansionStat] = []

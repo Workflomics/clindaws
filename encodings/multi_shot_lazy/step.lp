@@ -41,9 +41,9 @@ produced_bind_option(
     ProducerPort
 ) :-
     lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
-    lazy_signature_bindable_producer_port(SignatureId, ProducerCandidate, ProducerPort),
+    lazy_signature_support_class(SignatureId, SupportClassId),
+    lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
     occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
-    lazy_candidate_allowed_at_step(ProducerCandidate, TPrev),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     TPrev < t.
 
