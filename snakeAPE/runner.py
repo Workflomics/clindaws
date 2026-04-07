@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import os
 import queue
+import re
 import signal
 import threading
 import traceback
@@ -34,15 +35,16 @@ from .models import (
 from .ontology import Ontology
 from .rendering import (
     render_solution_graphs,
-    write_solution_summary,
     write_workflow_signatures,
 )
 from .runtime_stats import current_peak_rss_mb
 from .solver import (
     ground_multi_shot,
+    ground_multi_shot_compressed_candidate,
     ground_multi_shot_lazy,
     program_paths_for_mode,
     solve_multi_shot,
+    solve_multi_shot_compressed_candidate,
     solve_multi_shot_lazy,
     solve_single_shot,
 )
@@ -54,6 +56,7 @@ from .translator_direct import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
 )
+from .translator_compressed_candidate import build_compressed_candidate_fact_bundle
 from .translator_lazy import build_lazy_fact_bundle
 from .workflow import reconstruct_solution
 
@@ -83,6 +86,7 @@ SCHEMA_PREDICATES = (
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 LAZY_TRANSLATION_BUILDER = "candidate_lazy"
+COMPRESSED_CANDIDATE_TRANSLATION_BUILDER = "candidate_compressed"
 ProgressCallback = Callable[[str], None] | None
 
 
@@ -112,9 +116,16 @@ _MODE_CONFIGS = {
     ),
     "multi-shot-lazy": _ModeConfig(
         solver_family="multi-shot",
-        solver_approach="lazy",
+        solver_approach="compressed_candidate",
         translation_pathway="lazy",
         translation_builder=LAZY_TRANSLATION_BUILDER,
+        supports_ground_only=True,
+    ),
+    "multi-shot-compressed-candidate": _ModeConfig(
+        solver_family="multi-shot",
+        solver_approach="compressed_candidate",
+        translation_pathway="compressed_candidate",
+        translation_builder=COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
 }
@@ -123,11 +134,13 @@ _SOLVER_DISPATCH = {
     "single-shot": solve_single_shot,
     "multi-shot": solve_multi_shot,
     "multi-shot-lazy": solve_multi_shot_lazy,
+    "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
 
 _GROUNDER_DISPATCH = {
     "multi-shot": ground_multi_shot,
     "multi-shot-lazy": ground_multi_shot_lazy,
+    "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
 
 
@@ -140,7 +153,7 @@ def _mode_config(mode: str) -> _ModeConfig:
 
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     translation_pathway = _mode_config(mode).translation_pathway
-    if translation_pathway == "lazy":
+    if translation_pathway in {"lazy", "compressed_candidate"}:
         return "python"
     if translation_pathway == "ape_multi_shot":
         return "ape_clingo_legacy"
@@ -148,7 +161,7 @@ def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
 
 
 def _load_tools_for_mode(config, translation_pathway: str):
-    if translation_pathway == "lazy":
+    if translation_pathway in {"lazy", "compressed_candidate"}:
         return load_lazy_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     return load_direct_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
 
@@ -396,6 +409,34 @@ def _run_metadata_payload(*, config, ontology, tools) -> dict[str, object]:
     }
 
 
+def _compressed_candidate_engaged(fact_bundle) -> bool:
+    return fact_bundle.internal_schema == "compressed_candidate_fallback"
+
+
+def _sanitize_filename_token(value: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    sanitized = re.sub(r"_+", "_", sanitized).strip("._-")
+    return sanitized or "default"
+
+
+def _answer_sets_filename(
+    *,
+    config,
+    mode: str,
+    python_precompute_direct_enabled: bool,
+    effective_parallel_mode: str | None,
+) -> str:
+    parts = [
+        "answer_sets",
+        _sanitize_filename_token(config.config_path.stem),
+        _sanitize_filename_token(mode),
+        "opt" if python_precompute_direct_enabled else "noopt",
+    ]
+    if effective_parallel_mode:
+        parts.append(f"parallel_{_sanitize_filename_token(effective_parallel_mode)}")
+    return "__".join(parts) + ".txt"
+
+
 def _horizon_record_payload(records: tuple[HorizonRecord, ...]) -> list[dict[str, object]]:
     return [asdict(record) for record in records]
 
@@ -434,6 +475,9 @@ class _RunLogWriter:
         "test",
         "mode",
         "horizon",
+        "python_precompute_direct_enabled",
+        "effective_parallel_mode",
+        "compressed_candidate_engaged",
         "translation_ms",
         "setup_grounding_ms",
         "solving_ms",
@@ -457,6 +501,9 @@ class _RunLogWriter:
         translation_schema: str,
         run_id: str,
         timestamp_utc: str,
+        python_precompute_direct_enabled: bool,
+        effective_parallel_mode: str | None,
+        compressed_candidate_engaged: bool,
     ) -> None:
         self.csv_path = csv_path
         self.cumulative_raw_models_seen = 0
@@ -465,6 +512,9 @@ class _RunLogWriter:
         self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
         self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
         self.mode = mode
+        self.python_precompute_direct_enabled = python_precompute_direct_enabled
+        self.effective_parallel_mode = effective_parallel_mode or ""
+        self.compressed_candidate_engaged = str(compressed_candidate_engaged).lower()
         self.base_grounding_ms = 0
         self.base_grounding_peak_rss_mb = 0.0
         self._translation_ms = 0
@@ -496,6 +546,9 @@ class _RunLogWriter:
                 "test": self.test_name,
                 "mode": self.mode,
                 "horizon": record.horizon,
+                "python_precompute_direct_enabled": str(self.python_precompute_direct_enabled).lower(),
+                "effective_parallel_mode": self.effective_parallel_mode,
+                "compressed_candidate_engaged": self.compressed_candidate_engaged,
                 "translation_ms": self._translation_ms,
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
@@ -515,6 +568,9 @@ class _RunLogWriter:
                 "test": self.test_name,
                 "mode": self.mode,
                 "horizon": "timeout",
+                "python_precompute_direct_enabled": str(self.python_precompute_direct_enabled).lower(),
+                "effective_parallel_mode": self.effective_parallel_mode,
+                "compressed_candidate_engaged": self.compressed_candidate_engaged,
                 "translation_ms": self._translation_ms,
                 "setup_grounding_ms": elapsed_ms,
                 "solving_ms": "",
@@ -562,7 +618,9 @@ class _RunSummaryWriter:
         "solutions_found",
         "grounded_horizons",
         "first_satisfiable_horizon",
+        "python_precompute_direct_enabled",
         "effective_parallel_mode",
+        "compressed_candidate_engaged",
     ]
 
     def __init__(
@@ -577,6 +635,8 @@ class _RunSummaryWriter:
         translation_schema: str,
         run_id: str,
         timestamp_utc: str,
+        python_precompute_direct_enabled: bool,
+        compressed_candidate_engaged: bool,
     ) -> None:
         self.csv_path = csv_path
         self.base_row = {
@@ -596,6 +656,8 @@ class _RunSummaryWriter:
             "translation_builder": translation_builder,
             "translation_schema": translation_schema,
             "fact_count": fact_count,
+            "python_precompute_direct_enabled": str(python_precompute_direct_enabled).lower(),
+            "compressed_candidate_engaged": str(compressed_candidate_engaged).lower(),
         }
         _ensure_csv_header(self.csv_path, self.fieldnames)
 
@@ -651,6 +713,9 @@ class _RunCsvWriters:
         run_metadata: dict[str, object],
         translation_builder: TranslationBuilder,
         translation_schema: str,
+        python_precompute_direct_enabled: bool,
+        effective_parallel_mode: str | None,
+        compressed_candidate_engaged: bool,
     ) -> None:
         run_id = str(uuid4())
         timestamp_utc = datetime.now(timezone.utc).isoformat()
@@ -665,6 +730,9 @@ class _RunCsvWriters:
             translation_schema=translation_schema,
             run_id=run_id,
             timestamp_utc=timestamp_utc,
+            python_precompute_direct_enabled=python_precompute_direct_enabled,
+            effective_parallel_mode=effective_parallel_mode,
+            compressed_candidate_engaged=compressed_candidate_engaged,
         )
         self.summary_writer = _RunSummaryWriter(
             csv_path=csv_dir / "asp_run_summary.csv",
@@ -676,6 +744,8 @@ class _RunCsvWriters:
             translation_schema=translation_schema,
             run_id=run_id,
             timestamp_utc=timestamp_utc,
+            python_precompute_direct_enabled=python_precompute_direct_enabled,
+            compressed_candidate_engaged=compressed_candidate_engaged,
         )
 
     @property
@@ -699,7 +769,7 @@ def _translation_schema(fact_bundle) -> str:
             "lazy_candidate_output_choice_value",
         )
     ):
-        return "lazy_candidate"
+        return "compressed_candidate"
     if any(fact_bundle.predicate_counts.get(name, 0) for name in ("tool_candidate", "candidate_in", "candidate_out")):
         return "candidate"
     if any(fact_bundle.predicate_counts.get(name, 0) for name in ("tool_input", "input_port", "tool_output", "output_port")):
@@ -730,7 +800,7 @@ def _encoding_schema_summary(
         "program_paths": [str(path) for path in program_paths],
         "predicate_presence": predicate_presence,
         "schema": (
-            "lazy_candidate"
+            "compressed_candidate"
             if any(
                 predicate_presence[name]
                 for name in (
@@ -763,13 +833,13 @@ def _translation_warnings(
     encoding_presence = encoding_summary["predicate_presence"]
     translation_pathway = _mode_config(mode).translation_pathway
 
-    if translation_pathway == "lazy" and translation_schema != "lazy_candidate":
+    if translation_pathway in {"lazy", "compressed_candidate"} and translation_schema != "compressed_candidate":
         warnings.append(
-            f"{mode} expects lazy candidate translation, but the emitted translation schema is {translation_schema}."
+            f"{mode} expects compressed-candidate translation, but the emitted translation schema is {translation_schema}."
         )
-    if translation_schema == "lazy_candidate" and encoding_summary["schema"] != "lazy_candidate":
+    if translation_schema == "compressed_candidate" and encoding_summary["schema"] != "compressed_candidate":
         warnings.append(
-            "Lazy candidate translation is not compatible with the selected encoding."
+            "Compressed-candidate translation is not compatible with the selected encoding."
         )
 
     if translation_schema == "candidate" and not any(
@@ -779,7 +849,7 @@ def _translation_warnings(
             "Translated facts use candidate predicates, but the selected encoding does not reference candidate predicates."
         )
 
-    if translation_schema == "lazy_candidate" and not any(
+    if translation_schema == "compressed_candidate" and not any(
         encoding_presence[name]
         for name in (
             "lazy_tool_candidate",
@@ -791,7 +861,7 @@ def _translation_warnings(
         )
     ):
         warnings.append(
-            "Translated facts use lazy candidate predicates, but the selected encoding does not reference lazy candidate predicates."
+            "Translated facts use compressed-candidate predicates, but the selected encoding does not reference the compressed-candidate predicate family."
         )
 
     if translation_schema == "legacy" and not any(
@@ -959,7 +1029,7 @@ def _effective_parallel_mode(
         return parallel_mode
     if mode != "multi-shot" or fact_bundle.internal_schema not in {
         "direct_precompute_legacy",
-        "direct_candidate_fallback",
+        "compressed_candidate_fallback",
     }:
         return None
     cpu_count = os.cpu_count() or 1
@@ -981,15 +1051,15 @@ def _legacy_direct_bundle(
     )
 
 
-def _lazy_internal_bundle(
+def _compressed_candidate_internal_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools,
 ):
     return replace(
-        build_lazy_fact_bundle(config, ontology, tools),
-        internal_schema="direct_candidate_fallback",
-        internal_solver_mode="multi-shot-lazy",
+        build_compressed_candidate_fact_bundle(config, ontology, tools),
+        internal_schema="compressed_candidate_fallback",
+        internal_solver_mode="multi-shot-compressed-candidate",
     )
 
 
@@ -1070,7 +1140,7 @@ def _prepare_run_context(
                 ontology,
                 tools,
             ),
-            internal_schema="lazy_candidate",
+            internal_schema="compressed_candidate",
             internal_solver_mode="multi-shot-lazy",
         )
     elif mode_config.translation_pathway == "ape_multi_shot":
@@ -1085,21 +1155,21 @@ def _prepare_run_context(
                 python_precompute_direct=python_precompute_direct,
                 tools=tools,
             ):
-                lazy_tools = load_lazy_tool_annotations(
+                compressed_candidate_tools = load_lazy_tool_annotations(
                     config.tool_annotations_path,
                     config.ontology_prefix,
                 )
                 if _should_force_direct_candidate_fallback(tools):
-                    _report(progress_callback, "Step 1b: forcing lazy-style internal fallback for heavy direct run.")
-                    fact_bundle = _lazy_internal_bundle(
+                    _report(progress_callback, "Step 1b: forcing compressed-candidate internal fallback for heavy direct run.")
+                    fact_bundle = _compressed_candidate_internal_bundle(
                         config,
                         ontology,
-                        lazy_tools,
+                        compressed_candidate_tools,
                     )
-                    resolved_translation_builder = LAZY_TRANSLATION_BUILDER
+                    resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
                     _report(
                         progress_callback,
-                        "Step 1b complete: selected lazy-style internal schema "
+                        "Step 1b complete: selected compressed-candidate internal schema "
                         f"with {fact_bundle.fact_count} facts.",
                     )
                 else:
@@ -1117,25 +1187,25 @@ def _prepare_run_context(
                         f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
                     )
                     fact_bundle = optimized_direct_bundle
-                    _report(progress_callback, "Step 1c: evaluating lazy-style internal fallback.")
-                    lazy_bundle = _lazy_internal_bundle(
+                    _report(progress_callback, "Step 1c: evaluating compressed-candidate internal fallback.")
+                    compressed_candidate_bundle = _compressed_candidate_internal_bundle(
                         config,
                         ontology,
-                        lazy_tools,
+                        compressed_candidate_tools,
                     )
-                    if lazy_bundle.fact_count < fact_bundle.fact_count:
-                        fact_bundle = lazy_bundle
-                        resolved_translation_builder = LAZY_TRANSLATION_BUILDER
+                    if compressed_candidate_bundle.fact_count < fact_bundle.fact_count:
+                        fact_bundle = compressed_candidate_bundle
+                        resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
                         _report(
                             progress_callback,
-                            "Step 1c complete: selected lazy-style internal schema "
-                            f"({lazy_bundle.fact_count} facts vs {optimized_direct_bundle.fact_count}).",
+                            "Step 1c complete: selected compressed-candidate internal schema "
+                            f"({compressed_candidate_bundle.fact_count} facts vs {optimized_direct_bundle.fact_count}).",
                         )
                     else:
                         _report(
                             progress_callback,
                             "Step 1c complete: kept legacy direct optimization path "
-                            f"({optimized_direct_bundle.fact_count} facts vs {lazy_bundle.fact_count}).",
+                            f"({optimized_direct_bundle.fact_count} facts vs {compressed_candidate_bundle.fact_count}).",
                         )
             else:
                 _report(progress_callback, "Step 1b: Python direct precompute started.")
@@ -1233,6 +1303,9 @@ def run_translate_only(
         run_metadata=run_metadata,
         translation_builder=resolved_translation_builder,
         translation_schema=_translation_schema(fact_bundle),
+        python_precompute_direct_enabled=python_precompute_direct,
+        effective_parallel_mode=None,
+        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
     )
     csv_writers.step_writer.log_translation(
         translation_sec=translation_sec,
@@ -1341,6 +1414,9 @@ def run_once(
         run_metadata=run_metadata,
         translation_builder=_translation_builder,
         translation_schema=_translation_schema(fact_bundle),
+        python_precompute_direct_enabled=python_precompute_direct,
+        effective_parallel_mode=effective_parallel_mode,
+        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
     )
     csv_writers.step_writer.log_translation(
         translation_sec=translation_sec,
@@ -1430,7 +1506,12 @@ def run_once(
         _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
         render_start = perf_counter()
         if write_raw_answer_sets or config.debug_mode:
-            answer_set_path = solution_dir / "answer_sets.txt"
+            answer_set_path = solution_dir / _answer_sets_filename(
+                config=config,
+                mode=mode,
+                python_precompute_direct_enabled=python_precompute_direct,
+                effective_parallel_mode=effective_parallel_mode,
+            )
             if solve_output.raw_solutions:
                 _answer_set_content = "".join(
                     f"Answer Set {index}\n"
@@ -1442,11 +1523,6 @@ def run_once(
             else:
                 _answer_set_content = "No answer sets found.\n"
                 answer_set_path.write_text(_answer_set_content, encoding="utf-8")
-            _config_stem = config.config_path.stem
-            _named_asp_path = config.solutions_dir_path / f"solutions_{_config_stem}_ASP.txt"
-            config.solutions_dir_path.mkdir(parents=True, exist_ok=True)
-            _named_asp_path.write_text(_answer_set_content, encoding="utf-8")
-        summary_path = write_solution_summary(solution_dir / "solutions.txt", candidate_solutions)
         workflow_signature_path = write_workflow_signatures(
             solution_dir / "workflow_signatures.json",
             solutions,
@@ -1513,7 +1589,7 @@ def run_once(
         horizon_records=solve_output.horizon_records,
         translation_path=None,
         answer_set_path=answer_set_path,
-        solution_summary_path=summary_path,
+        solution_summary_path=None,
         workflow_signature_path=workflow_signature_path,
         graph_paths=graph_paths,
         raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
@@ -1570,6 +1646,9 @@ def run_ground_only(
         run_metadata=run_metadata,
         translation_builder=translation_builder,
         translation_schema=_translation_schema(fact_bundle),
+        python_precompute_direct_enabled=python_precompute_direct,
+        effective_parallel_mode=None,
+        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
     )
     csv_writers.step_writer.log_translation(
         translation_sec=translation_sec,

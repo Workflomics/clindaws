@@ -1,3 +1,1 @@
-Answer Set 1
-ape_bind(1,0,"wf_input_0") ape_bind(2,0,out(1,"sim",0)) ape_bind(3,0,out(2,"taxonomy_summary",0)) ape_holds_dim("wf_input_0","data_0943","data_0006") ape_holds_dim("wf_input_0","format_3712","format_1915") ape_holds_dim(out(1,"sim",0),"data_3756","data_0006") ape_holds_dim(out(1,"sim",0),"format_3162","format_1915") ape_holds_dim(out(2,"taxonomy_summary",0),"data_0945","data_0006") ape_holds_dim(out(2,"taxonomy_summary",0),"format_3162","format_1915") ape_holds_dim(out(3,"rt",0),"data_1449","data_0006") ape_holds_dim(out(3,"rt",0),"format_1504","format_1915") tool_at_time(1,"sim") tool_at_time(2,"taxonomy_summary") tool_at_time(3,"rt")
-
+No answer sets found.
