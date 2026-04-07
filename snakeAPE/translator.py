@@ -1816,15 +1816,31 @@ def _compress_duplicate_output_ports(
         group_key = _output_port_group_key(output_port)
         existing = grouped_by_key.get(group_key)
         multiplicity = int(output_port.get("multiplicity", 1))
+        source_port_indices = tuple(
+            sorted(
+                int(port_idx)
+                for port_idx in output_port.get(
+                    "source_port_indices",
+                    (int(output_port["port_idx"]),),
+                )
+            )
+        )
         if existing is None:
             grouped_port = {
                 **output_port,
                 "multiplicity": multiplicity,
+                "source_port_indices": source_port_indices,
             }
             grouped.append(grouped_port)
             grouped_by_key[group_key] = grouped_port
         else:
             existing["multiplicity"] = int(existing.get("multiplicity", 1)) + multiplicity
+            existing["source_port_indices"] = tuple(
+                sorted(
+                    set(int(port_idx) for port_idx in existing.get("source_port_indices", ()))
+                    | set(source_port_indices)
+                )
+            )
 
     return tuple(grouped)
 
@@ -2055,6 +2071,108 @@ def _compress_lazy_output_choice_values(
         compressed[dim] = tuple(representatives.values())
 
     return compressed
+
+
+def _compressed_output_supports_signature(
+    output_fsets: Mapping[str, frozenset[str]],
+    signature_id: int,
+    signature_profiles_by_id: Mapping[int, Mapping[str, tuple[int, tuple[str, ...]]]],
+    profile_accepts_by_id: Mapping[int, tuple[str, ...]],
+) -> bool:
+    category_profiles = signature_profiles_by_id.get(signature_id, {})
+    for dim, (profile_id, _values) in category_profiles.items():
+        produced_fset = output_fsets.get(dim)
+        if not produced_fset:
+            return False
+        if produced_fset.isdisjoint(profile_accepts_by_id.get(profile_id, ())):
+            return False
+    return True
+
+
+def _collect_compressed_lazy_bindability_surface(
+    bindable_pairs: Iterable[tuple[str, int, str, int]],
+    *,
+    relevant_records: Iterable[Mapping[str, object]],
+    signature_profiles_by_id: Mapping[int, Mapping[str, tuple[int, tuple[str, ...]]]],
+    profile_accepts_by_id: Mapping[int, tuple[str, ...]],
+) -> tuple[
+    dict[str, set[str]],
+    dict[str, dict[int, set[str]]],
+    dict[tuple[int, str], int],
+    dict[str, int],
+]:
+    relevant_candidate_ids = {
+        str(record["candidate_id"])
+        for record in relevant_records
+    }
+    input_signature_by_port: dict[tuple[str, int], int] = {}
+    output_port_by_source: dict[tuple[str, int], Mapping[str, object]] = {}
+
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            input_signature_by_port[(candidate_id, int(input_port["port_idx"]))] = int(input_port["signature_id"])
+        for output_port in tuple(record["output_ports"]):
+            for source_port_idx in output_port.get(
+                "source_port_indices",
+                (int(output_port["port_idx"]),),
+            ):
+                output_port_by_source[(candidate_id, int(source_port_idx))] = output_port
+
+    reverse_edges: dict[str, set[str]] = defaultdict(set)
+    produced_bindable_ports: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
+    signature_bindable_ports: dict[tuple[int, str], int] = {}
+    considered_pairs = 0
+    dropped_pairs = 0
+
+    for producer_candidate, producer_port, consumer_candidate, consumer_port in bindable_pairs:
+        if (
+            producer_candidate not in relevant_candidate_ids
+            or consumer_candidate not in relevant_candidate_ids
+        ):
+            continue
+        considered_pairs += 1
+        retained_output_port = output_port_by_source.get((producer_candidate, producer_port))
+        if retained_output_port is None:
+            dropped_pairs += 1
+            continue
+        signature_id = input_signature_by_port.get((consumer_candidate, consumer_port))
+        if signature_id is None:
+            dropped_pairs += 1
+            continue
+        output_fsets = retained_output_port["port_values_fset"]
+        assert isinstance(output_fsets, Mapping)
+        if not _compressed_output_supports_signature(
+            output_fsets,
+            signature_id,
+            signature_profiles_by_id,
+            profile_accepts_by_id,
+        ):
+            dropped_pairs += 1
+            continue
+        retained_producer_port = int(retained_output_port["port_idx"])
+        produced_bindable_ports[consumer_candidate][consumer_port].add(producer_candidate)
+        reverse_edges[consumer_candidate].add(producer_candidate)
+        signature_key = (signature_id, producer_candidate)
+        existing_port = signature_bindable_ports.get(signature_key)
+        if existing_port is None or retained_producer_port < existing_port:
+            signature_bindable_ports[signature_key] = retained_producer_port
+
+    return (
+        reverse_edges,
+        produced_bindable_ports,
+        signature_bindable_ports,
+        {
+            "lazy_bindable_pairs_considered": considered_pairs,
+            "lazy_bindable_candidate_edges_internal": sum(
+                len(producer_candidates)
+                for ports_by_source in produced_bindable_ports.values()
+                for producer_candidates in ports_by_source.values()
+            ),
+            "lazy_signature_bindable_ports_emitted": len(signature_bindable_ports),
+            "lazy_bindable_pairs_dropped": dropped_pairs,
+        },
+    )
 
 
 def _lazy_dim_values_cache_key(
@@ -2350,6 +2468,15 @@ def build_lazy_fact_bundle(
             )
         record["output_ports"] = _compress_duplicate_output_ports(tuple(compressed_output_ports))
 
+    compressed_reverse_edges, compressed_produced_bindable_ports, signature_bindable_ports, bindability_stats = (
+        _collect_compressed_lazy_bindability_surface(
+            bindable_pairs,
+            relevant_records=relevant_records,
+            signature_profiles_by_id=signature_profiles_by_id,
+            profile_accepts_by_id=profile_accepts_by_id,
+        )
+    )
+
     _t4 = perf_counter()
     relevant_tools = tuple(record["tool"] for record in relevant_records)
     relevant_records_by_candidate = {
@@ -2402,7 +2529,7 @@ def build_lazy_fact_bundle(
     while frontier:
         consumer_candidate = frontier.popleft()
         next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
-        for producer_candidate in sorted(reverse_edges.get(consumer_candidate, set())):
+        for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
             if producer_candidate in min_goal_distance_by_candidate:
                 continue
             if producer_candidate not in relevant_candidates:
@@ -2412,7 +2539,7 @@ def build_lazy_fact_bundle(
     min_step_by_candidate = _compute_lazy_candidate_min_steps(
         relevant_records,
         workflow_bindable_ports,
-        produced_bindable_ports,
+        compressed_produced_bindable_ports,
     )
     tool_min_steps: dict[str, int] = {}
     for record in relevant_records:
@@ -2436,7 +2563,7 @@ def build_lazy_fact_bundle(
         tools,
         candidate_records=relevant_records,
         workflow_bindable_ports=workflow_bindable_ports,
-        produced_bindable_ports=produced_bindable_ports,
+        produced_bindable_ports=compressed_produced_bindable_ports,
         query_goal_candidates=query_goal_candidates,
     )
     allowed_candidates_by_step: dict[int, set[str]] = defaultdict(set)
@@ -2560,53 +2687,13 @@ def build_lazy_fact_bundle(
             str(sum(int(output_port.get("multiplicity", 1)) for output_port in tuple(record["output_ports"]))),
         )
 
-    canonical_bindable_ports: dict[tuple[str, int, str], int] = {}
-    for producer_candidate, producer_port, consumer_candidate, consumer_port in bindable_pairs:
-        if producer_candidate not in relevant_candidates or consumer_candidate not in relevant_candidates:
-            continue
-        key = (consumer_candidate, consumer_port, producer_candidate)
-        current_port = canonical_bindable_ports.get(key)
-        if current_port is None or producer_port < current_port:
-            canonical_bindable_ports[key] = producer_port
-    for consumer_candidate, ports_by_source in sorted(produced_bindable_ports.items()):
-        if consumer_candidate not in relevant_candidates:
-            continue
-        for consumer_port, producer_candidates in sorted(ports_by_source.items()):
-            for producer_candidate in sorted(producer_candidates):
-                if producer_candidate not in relevant_candidates:
-                    continue
-                producer_port = canonical_bindable_ports.get(
-                    (consumer_candidate, consumer_port, producer_candidate)
-                )
-                if producer_port is None:
-                    continue
-                consumer_min_step = min_step_by_candidate.get(consumer_candidate)
-                consumer_max_step = max_step_by_candidate.get(consumer_candidate)
-                producer_min_step = min_step_by_candidate.get(producer_candidate)
-                producer_max_step = max_step_by_candidate.get(producer_candidate)
-                if (
-                    consumer_min_step is None
-                    or consumer_max_step is None
-                    or producer_min_step is None
-                    or producer_max_step is None
-                ):
-                    continue
-                has_valid_prior = False
-                for consumer_step in range(consumer_min_step, consumer_max_step + 1):
-                    latest_prior_step = min(producer_max_step, consumer_step - 1)
-                    if latest_prior_step < producer_min_step:
-                        continue
-                    has_valid_prior = True
-                    break
-                if not has_valid_prior:
-                    continue
-                writer.emit_fact(
-                    "lazy_bindable_producer_port",
-                    _quote(consumer_candidate),
-                    str(consumer_port),
-                    _quote(producer_candidate),
-                    str(producer_port),
-                )
+    for (signature_id, producer_candidate), producer_port in sorted(signature_bindable_ports.items()):
+        writer.emit_fact(
+            "lazy_signature_bindable_producer_port",
+            str(signature_id),
+            _quote(producer_candidate),
+            str(producer_port),
+        )
     for signature_id, category_profiles in sorted(signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(
@@ -2661,7 +2748,7 @@ def build_lazy_fact_bundle(
         config=config,
         tools=relevant_tools,
         tool_stats=tool_stats,
-        cache_stats={**ontology.cache_stats(), **resolver.stats(), **lazy_schema_stats},
+        cache_stats={**ontology.cache_stats(), **resolver.stats(), **lazy_schema_stats, **bindability_stats},
         earliest_solution_step=earliest_solution_step,
     )
 

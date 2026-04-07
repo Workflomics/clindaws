@@ -1419,6 +1419,7 @@ def run_ground_only(
         base_grounding_sec=grounding_output.base_grounding_sec,
         base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
         horizon_records=grounding_output.horizon_records,
+        raw_models_seen=0,
         raw_solutions_found=0,
         solutions_found=0,
         grounded_horizons=grounding_output.grounded_horizons,
