@@ -1,0 +1,4 @@
+test,mode,horizon,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+biotools,multi-shot,timeout,11701,1189543,,,0,0,0,true,true
+biotools,multi-shot,1,10723,9837,875,3274.78,0,0,0,true,false
+biotools,multi-shot,2,10723,122443,47340,15747.19,0,0,0,true,false

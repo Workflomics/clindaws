@@ -126,7 +126,7 @@ def _multi_shot_program_paths(*, python_precompute_direct: bool = False) -> tupl
         base / ("init_python.lp" if python_precompute_direct else "init.lp"),
         base / ("step_python.lp" if python_precompute_direct else "step.lp"),
         base / "constraints.lp",
-        base / "check.lp",
+        base / ("check_python.lp" if python_precompute_direct else "check.lp"),
         base / "ape_extract.lp",
         base / "tool_inclusion.lp",
         base / "tool_dependency.lp",

@@ -1,0 +1,79 @@
+{
+  "mode": "multi-shot",
+  "grounding_strategy": "hybrid",
+  "earliest_solution_step": 1,
+  "effective_solve_start_horizon": 1,
+  "python_precompute_enabled": true,
+  "python_precompute_fact_count": 137140,
+  "python_precompute_stats": {
+    "precompute_base_artifact_bindable": 25,
+    "precompute_compact_output_bindable_estimate": 38558,
+    "precompute_compact_output_compatibility_mode_selected": 1,
+    "precompute_dense_output_bindable_estimate": 1016696,
+    "precompute_goal_distance_entries": 1674,
+    "precompute_port_requires": 6435,
+    "precompute_repeated_workflow_input_classes": 0,
+    "precompute_same_input_signature": 83677,
+    "precompute_signature_support_classes": 728,
+    "precompute_support_class_profiles": 31821,
+    "precompute_tool_allowed_at_step": 354,
+    "precompute_tool_min_step_entries": 1650,
+    "precompute_unique_input_signatures": 928,
+    "precompute_unique_output_profiles": 1037,
+    "precompute_variant_repeated_signature_inputs": 101,
+    "precompute_workflow_input_classes": 1,
+    "precompute_workflow_input_slots": 0
+  },
+  "translation_peak_rss_mb": 240.140625,
+  "base_grounding_peak_rss_mb": 2812.5625,
+  "base_grounding_sec": 5.340590541949496,
+  "timed_out": false,
+  "horizons": [
+    {
+      "horizon": 1,
+      "grounding_sec": 4.495844958000816,
+      "solving_sec": 0.8746320839272812,
+      "peak_rss_mb": 3274.78125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "init",
+          0.0005087499739602208
+        ],
+        [
+          "step",
+          1.876709165982902
+        ],
+        [
+          "check",
+          2.618627042043954
+        ]
+      ]
+    },
+    {
+      "horizon": 2,
+      "grounding_sec": 122.4433012510417,
+      "solving_sec": 47.34018870792352,
+      "peak_rss_mb": 15747.1875,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step",
+          59.28179904201534
+        ],
+        [
+          "check",
+          63.16150220902637
+        ]
+      ]
+    }
+  ]
+}

@@ -53,6 +53,13 @@ class _ParsedDirectFacts:
     workflow_input_units: Mapping[str, tuple[str, ...]]
 
 
+@dataclass(frozen=True)
+class _PortSignatureFacts:
+    signature_by_port: Mapping[str, str]
+    signature_dimensions_by_id: Mapping[str, Mapping[str, tuple[str, ...]]]
+    stats: Mapping[str, int]
+
+
 def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
     tool_input_variants: dict[str, list[str]] = defaultdict(list)
     variant_tool_by_id: dict[str, str] = {}
@@ -177,22 +184,48 @@ def _profile_key(
 def _emit_port_signature_facts(
     writer: _FactWriter,
     parsed: _ParsedDirectFacts,
-) -> dict[str, int]:
+) -> _PortSignatureFacts:
     repeated_variants = 0
     signature_pairs = 0
 
-    signature_by_port = {
+    signature_key_by_port = {
         port_id: _signature_key(dimensions)
         for port_id, dimensions in parsed.input_dimensions_by_port.items()
     }
+    signature_id_by_key: dict[tuple[tuple[str, tuple[str, ...]], ...], str] = {}
+    signature_dimensions_by_id: dict[str, Mapping[str, tuple[str, ...]]] = {}
+    signature_by_port: dict[str, str] = {}
+
+    for index, signature_key in enumerate(sorted(set(signature_key_by_port.values())), start=1):
+        signature_id = f"sig_{index}"
+        signature_id_by_key[signature_key] = signature_id
+        signature_dimensions_by_id[signature_id] = {
+            category: tuple(values)
+            for category, values in signature_key
+        }
+        writer.emit_fact("direct_signature", _quote(signature_id))
+        for category, values in signature_key:
+            writer.emit_fact("direct_signature_category", _quote(signature_id), _quote(category))
+            for value in values:
+                writer.emit_fact(
+                    "direct_signature_requires",
+                    _quote(signature_id),
+                    _quote(value),
+                    _quote(category),
+                )
+
+    for port_id, signature_key in sorted(signature_key_by_port.items()):
+        signature_id = signature_id_by_key[signature_key]
+        signature_by_port[port_id] = signature_id
+        writer.emit_fact("direct_port_signature", _quote(port_id), _quote(signature_id))
 
     for port_id, dimensions in sorted(parsed.input_dimensions_by_port.items()):
         for category, values in sorted(dimensions.items()):
             for value in values:
                 writer.emit_fact("port_requires", _quote(port_id), _quote(value), _quote(category))
 
-    for port_a, signature_a in sorted(signature_by_port.items()):
-        for port_b, signature_b in sorted(signature_by_port.items()):
+    for port_a, signature_a in sorted(signature_key_by_port.items()):
+        for port_b, signature_b in sorted(signature_key_by_port.items()):
             if signature_a == signature_b:
                 writer.emit_fact("same_input_signature", _quote(port_a), _quote(port_b))
                 signature_pairs += 1
@@ -202,7 +235,7 @@ def _emit_port_signature_facts(
             writer.emit_fact("variant_single_input", _quote(variant_id))
         has_repeated_signature = False
         for port_low, port_high in combinations(sorted(ports), 2):
-            if signature_by_port[port_low] == signature_by_port[port_high]:
+            if signature_key_by_port[port_low] == signature_key_by_port[port_high]:
                 writer.emit_fact(
                     "variant_sym_ports",
                     _quote(variant_id),
@@ -214,11 +247,20 @@ def _emit_port_signature_facts(
             writer.emit_fact("variant_has_repeated_signature_inputs", _quote(variant_id))
             repeated_variants += 1
 
-    return {
-        "precompute_port_requires": sum(len(values) for dimensions in parsed.input_dimensions_by_port.values() for values in dimensions.values()),
-        "precompute_same_input_signature": signature_pairs,
-        "precompute_variant_repeated_signature_inputs": repeated_variants,
-    }
+    return _PortSignatureFacts(
+        signature_by_port=dict(sorted(signature_by_port.items())),
+        signature_dimensions_by_id=dict(sorted(signature_dimensions_by_id.items())),
+        stats={
+            "precompute_port_requires": sum(
+                len(values)
+                for dimensions in parsed.input_dimensions_by_port.values()
+                for values in dimensions.values()
+            ),
+            "precompute_same_input_signature": signature_pairs,
+            "precompute_variant_repeated_signature_inputs": repeated_variants,
+            "precompute_unique_input_signatures": len(signature_dimensions_by_id),
+        },
+    )
 
 
 def _emit_single_shot_workflow_input_facts(
@@ -331,6 +373,132 @@ def _emit_bindability_facts(
     return {
         "precompute_base_artifact_bindable": base_bindable_count,
         "precompute_output_port_bindable": output_bindable_count,
+    }
+
+
+def _emit_multi_shot_signature_compatibility_facts(
+    writer: _FactWriter,
+    *,
+    config: SnakeConfig,
+    ontology: Ontology,
+    planner_artifact_profiles: Mapping[str, Mapping[str, tuple[str, ...]]],
+    parsed: _ParsedDirectFacts,
+    port_signatures: _PortSignatureFacts,
+) -> dict[str, int]:
+    roots = _build_roots(config, ontology)
+    signature_requirements = {
+        signature_id: _port_requirement_terminal_sets(ontology, roots, dimensions)
+        for signature_id, dimensions in port_signatures.signature_dimensions_by_id.items()
+    }
+    base_profiles = {
+        artifact_id: _artifact_profile_terminal_sets(ontology, roots, dimensions)
+        for artifact_id, dimensions in planner_artifact_profiles.items()
+    }
+
+    output_profile_dimensions: dict[
+        tuple[tuple[str, tuple[str, ...]], ...],
+        Mapping[str, tuple[str, ...]],
+    ] = {}
+    output_profile_ports: dict[tuple[tuple[str, tuple[str, ...]], ...], list[str]] = defaultdict(list)
+    for port_id, dimensions in sorted(parsed.output_dimensions_by_port.items()):
+        profile_key = _signature_key(dimensions)
+        output_profile_dimensions[profile_key] = dimensions
+        output_profile_ports[profile_key].append(port_id)
+
+    output_profile_id_by_key: dict[tuple[tuple[str, tuple[str, ...]], ...], str] = {}
+    output_profile_terminal_sets: dict[str, Mapping[str, frozenset[str]]] = {}
+    output_profile_port_counts: dict[str, int] = {}
+    output_profile_by_port: dict[str, str] = {}
+    signature_port_counts: dict[str, int] = defaultdict(int)
+    for signature_id in port_signatures.signature_by_port.values():
+        signature_port_counts[signature_id] += 1
+
+    for index, profile_key in enumerate(sorted(output_profile_dimensions), start=1):
+        profile_id = f"profile_{index}"
+        output_profile_id_by_key[profile_key] = profile_id
+        output_profile_terminal_sets[profile_id] = _artifact_profile_terminal_sets(
+            ontology,
+            roots,
+            output_profile_dimensions[profile_key],
+        )
+        output_profile_port_counts[profile_id] = len(output_profile_ports[profile_key])
+        writer.emit_fact("direct_output_profile", _quote(profile_id))
+        for port_id in sorted(output_profile_ports[profile_key]):
+            output_profile_by_port[port_id] = profile_id
+            writer.emit_fact(
+                "direct_output_port_profile",
+                _quote(port_id),
+                _quote(profile_id),
+            )
+
+    compatible_profiles_by_signature: dict[str, tuple[str, ...]] = {}
+    dense_output_bindable_estimate = 0
+    base_bindable_count = 0
+
+    for signature_id, requirements in sorted(signature_requirements.items()):
+        compatible_profiles = tuple(
+            sorted(
+                profile_id
+                for profile_id, profile in output_profile_terminal_sets.items()
+                if _artifact_satisfies_port_requirements(profile, requirements)
+            )
+        )
+        compatible_profiles_by_signature[signature_id] = compatible_profiles
+        dense_output_bindable_estimate += sum(
+            output_profile_port_counts[profile_id]
+            for profile_id in compatible_profiles
+        ) * signature_port_counts[signature_id]
+        for artifact_id, profile in sorted(base_profiles.items()):
+            if _artifact_satisfies_port_requirements(profile, requirements):
+                writer.emit_fact(
+                    "direct_signature_initial_artifact",
+                    _quote(signature_id),
+                    _artifact_term(artifact_id),
+                )
+                base_bindable_count += 1
+
+    support_class_id_by_profiles: dict[tuple[str, ...], str] = {}
+    support_class_profiles: dict[str, tuple[str, ...]] = {}
+    for signature_id, compatible_profiles in sorted(compatible_profiles_by_signature.items()):
+        support_class_id = support_class_id_by_profiles.get(compatible_profiles)
+        if support_class_id is None:
+            support_class_id = f"support_class_{len(support_class_id_by_profiles) + 1}"
+            support_class_id_by_profiles[compatible_profiles] = support_class_id
+            support_class_profiles[support_class_id] = compatible_profiles
+        writer.emit_fact(
+            "direct_signature_support_class",
+            _quote(signature_id),
+            _quote(support_class_id),
+        )
+
+    support_class_profile_count = 0
+    for support_class_id, compatible_profiles in sorted(support_class_profiles.items()):
+        writer.emit_fact("direct_support_class", _quote(support_class_id))
+        for profile_id in compatible_profiles:
+            writer.emit_fact(
+                "direct_support_class_profile",
+                _quote(support_class_id),
+                _quote(profile_id),
+            )
+            support_class_profile_count += 1
+
+    compact_fact_count = (
+        len(port_signatures.signature_by_port)
+        + len(port_signatures.signature_dimensions_by_id)
+        + len(output_profile_by_port)
+        + len(support_class_profiles)
+        + support_class_profile_count
+        + base_bindable_count
+    )
+
+    return {
+        "precompute_base_artifact_bindable": base_bindable_count,
+        "precompute_unique_output_profiles": len(output_profile_terminal_sets),
+        "precompute_signature_support_classes": len(support_class_profiles),
+        "precompute_support_class_profiles": support_class_profile_count,
+        "precompute_dense_output_bindable_estimate": dense_output_bindable_estimate,
+        "precompute_compact_output_bindable_estimate": compact_fact_count,
+        "precompute_compact_output_compatibility_mode_selected": 1,
     }
 
 
@@ -536,7 +704,8 @@ def apply_direct_python_precompute(
     parsed = _parse_direct_facts(fact_bundle.facts)
     writer = _FactWriter()
     stats: dict[str, int] = {}
-    stats.update(_emit_port_signature_facts(writer, parsed))
+    port_signatures = _emit_port_signature_facts(writer, parsed)
+    stats.update(port_signatures.stats)
 
     if mode == "single-shot":
         stats.update(_emit_single_shot_workflow_input_facts(writer, parsed))
@@ -545,15 +714,27 @@ def apply_direct_python_precompute(
         planner_artifact_profiles, workflow_stats = _emit_multi_shot_workflow_input_facts(writer, parsed)
         stats.update(workflow_stats)
 
-    stats.update(
-        _emit_bindability_facts(
-            writer,
-            config=config,
-            ontology=ontology,
-            planner_artifact_profiles=planner_artifact_profiles,
-            parsed=parsed,
+    if mode == "single-shot":
+        stats.update(
+            _emit_bindability_facts(
+                writer,
+                config=config,
+                ontology=ontology,
+                planner_artifact_profiles=planner_artifact_profiles,
+                parsed=parsed,
+            )
         )
-    )
+    else:
+        stats.update(
+            _emit_multi_shot_signature_compatibility_facts(
+                writer,
+                config=config,
+                ontology=ontology,
+                planner_artifact_profiles=planner_artifact_profiles,
+                parsed=parsed,
+                port_signatures=port_signatures,
+            )
+        )
     min_step_by_tool, goal_distance_by_tool, producer_support_by_tool = _compute_tool_step_windows(
         config=config,
         ontology=ontology,

@@ -15,14 +15,14 @@ holds(0, unit(Slot, U)) :-
     workflow_input_slot_source(Slot, WF),
     holds(0, unit(WF, U)).
 
-port_cat_ok(0, Port, WF, Cat) :-
-    precomputed_base_artifact_bindable(Port, WF),
-    holds(0, avail(WF)),
-    port_requires(Port, ReqV, Cat),
-    holds(0, dim(WF, V, Cat)),
-    compatible(V, ReqV).
-
 eligible(0, Port, WF) :-
-    precomputed_base_artifact_bindable(Port, WF),
+    direct_port_signature(Port, Signature),
+    direct_signature_initial_artifact(Signature, WF),
     holds(0, avail(WF)),
-    port_cat_ok(0, Port, WF, Cat) : port_requires(Port, _, Cat).
+    workflow_input(WF).
+
+eligible(0, Port, Slot) :-
+    direct_port_signature(Port, Signature),
+    direct_signature_initial_artifact(Signature, Slot),
+    holds(0, avail(Slot)),
+    workflow_input_slot(Slot, _, _).

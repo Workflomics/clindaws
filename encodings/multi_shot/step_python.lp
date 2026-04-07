@@ -70,31 +70,40 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Port satisfaction per category
-port_cat_ok(t, Port, WF, Cat) :-
-    precomputed_base_artifact_bindable(Port, WF),
-    holds(t, avail(WF)),
-    port_requires(Port, ReqV, Cat),
-    holds(t, dim(WF, V, Cat)),
-    compatible(V, ReqV).
+% Signature-level eligibility keeps the grounding surface proportional to the
+% number of unique input signatures instead of concrete consumer/producer-port
+% pairs. Produced outputs are statically filtered by support-class/profile
+% compatibility and then checked against the actual chosen terminal dimensions.
+eligible_signature(t, Signature, WF) :-
+    direct_signature_initial_artifact(Signature, WF),
+    workflow_input(WF),
+    holds(t, avail(WF)).
 
-port_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
-    precomputed_output_port_bindable(Port, ProducerPort),
-    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))),
-    port_requires(Port, ReqV, Cat),
+eligible_signature(t, Signature, Slot) :-
+    direct_signature_initial_artifact(Signature, Slot),
+    workflow_input_slot(Slot, _, _),
+    holds(t, avail(Slot)).
+
+output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
+    direct_signature_support_class(Signature, SupportClass),
+    direct_output_port_profile(ProducerPort, Profile),
+    direct_support_class_profile(SupportClass, Profile),
+    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))).
+
+signature_cat_ok(t, Signature, out(TPrev, ToolPrev, ProducerPort), Cat) :-
+    output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)),
+    direct_signature_requires(Signature, ReqV, Cat),
     holds(t, dim(out(TPrev, ToolPrev, ProducerPort), V, Cat)),
     compatible(V, ReqV).
 
-% Eligible item: all categories satisfied
-eligible(t, Port, WF) :-
-    precomputed_base_artifact_bindable(Port, WF),
-    holds(t, avail(WF)),
-    port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
+eligible_signature(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
+    output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)),
+    signature_cat_ok(t, Signature, out(TPrev, ToolPrev, ProducerPort), Cat) :
+        direct_signature_category(Signature, Cat).
 
-eligible(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
-    precomputed_output_port_bindable(Port, ProducerPort),
-    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))),
-    port_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) : port_requires(Port, _, Cat).
+eligible(t, Port, Artifact) :-
+    direct_port_signature(Port, Signature),
+    eligible_signature(t, Signature, Artifact).
 
 % Port binding: exactly one eligible item per port
 1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Port, WF) } 1 :-

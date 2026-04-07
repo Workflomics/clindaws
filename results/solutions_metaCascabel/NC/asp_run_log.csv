@@ -1,0 +1,9 @@
+test,mode,horizon,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+metaCascabel,multi-shot,13,35,701,1475,945.78,0,0,0,true,false
+metaCascabel,multi-shot,14,35,822,502,1396.02,1,1,1,true,false
+metaCascabel,multi-shot,13,46,843,1709,932.39,0,0,0,true,false
+metaCascabel,multi-shot,14,46,933,638,1352.22,1,1,1,true,false
+metaCascabel,multi-shot,13,40,875,1996,788.30,0,0,0,true,false
+metaCascabel,multi-shot,14,40,1077,925,1162.62,1,1,1,true,false
+metaCascabel,multi-shot,13,37,735,1490,923.89,0,0,0,true,false
+metaCascabel,multi-shot,14,37,951,525,1417.03,1,1,1,true,false

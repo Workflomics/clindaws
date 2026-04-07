@@ -27,6 +27,7 @@ tool_has_output(Tool) :- tool_output(Tool, _).
 tool_input_variant(Tool, TI_ID) :- tool_input(Tool, TI_ID).
 tool_input_port(Tool, Port) :- tool_input(Tool, TI_ID), input_port(TI_ID, Port).
 tool_single_input(Tool) :- tool(Tool), 1 = #count { Port : tool_input_port(Tool, Port) }.
+variant_single_input(TI_ID) :- tool_input_variant(_, TI_ID), 1 = #count { Port : input_port(TI_ID, Port) }.
 
 
 % ----------------------------------------------------------------
