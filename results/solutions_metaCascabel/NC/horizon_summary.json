@@ -1,39 +1,24 @@
 {
   "mode": "multi-shot",
   "grounding_strategy": "hybrid",
+  "internal_schema": "legacy_direct",
+  "internal_solver_mode": "multi-shot",
   "earliest_solution_step": 13,
   "effective_solve_start_horizon": 13,
-  "python_precompute_enabled": true,
-  "python_precompute_fact_count": 1491,
-  "python_precompute_stats": {
-    "precompute_base_artifact_bindable": 4,
-    "precompute_compact_output_bindable_estimate": 292,
-    "precompute_compact_output_compatibility_mode_selected": 1,
-    "precompute_dense_output_bindable_estimate": 139,
-    "precompute_goal_distance_entries": 23,
-    "precompute_port_requires": 164,
-    "precompute_repeated_workflow_input_classes": 0,
-    "precompute_same_input_signature": 259,
-    "precompute_signature_support_classes": 38,
-    "precompute_support_class_profiles": 46,
-    "precompute_tool_allowed_at_step": 461,
-    "precompute_tool_min_step_entries": 38,
-    "precompute_unique_input_signatures": 41,
-    "precompute_unique_output_profiles": 80,
-    "precompute_variant_repeated_signature_inputs": 0,
-    "precompute_workflow_input_classes": 4,
-    "precompute_workflow_input_slots": 0
-  },
-  "translation_peak_rss_mb": 23.03125,
-  "base_grounding_peak_rss_mb": 27.765625,
-  "base_grounding_sec": 0.005059708026237786,
+  "python_precompute_enabled": false,
+  "python_precompute_fact_count": 0,
+  "python_precompute_stats": {},
+  "effective_parallel_mode": null,
+  "translation_peak_rss_mb": 21.578125,
+  "base_grounding_peak_rss_mb": 29.46875,
+  "base_grounding_sec": 0.007960415910929441,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 13,
-      "grounding_sec": 0.7346117090201005,
-      "solving_sec": 1.4899147920077667,
-      "peak_rss_mb": 923.890625,
+      "grounding_sec": 2.131493541994132,
+      "solving_sec": 4.266512500005774,
+      "peak_rss_mb": 2728.078125,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -42,19 +27,19 @@
       "grounding_parts": [
         [
           "step",
-          0.6790746670449153
+          2.0270040419418365
         ],
         [
           "check",
-          0.055537041975185275
+          0.10448950005229563
         ]
       ]
     },
     {
       "horizon": 14,
-      "grounding_sec": 0.9507855830015615,
-      "solving_sec": 0.5253217500867322,
-      "peak_rss_mb": 1417.03125,
+      "grounding_sec": 1.2759172089863569,
+      "solving_sec": 0.54858416703064,
+      "peak_rss_mb": 3520.046875,
       "satisfiable": true,
       "models_seen": 1,
       "models_stored": 1,
@@ -63,11 +48,11 @@
       "grounding_parts": [
         [
           "step",
-          0.9130829999921843
+          1.240419292007573
         ],
         [
           "check",
-          0.03770258300937712
+          0.035497916978783906
         ]
       ]
     }

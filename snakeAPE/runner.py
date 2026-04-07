@@ -562,6 +562,7 @@ class _RunSummaryWriter:
         "solutions_found",
         "grounded_horizons",
         "first_satisfiable_horizon",
+        "effective_parallel_mode",
     ]
 
     def __init__(
@@ -611,6 +612,7 @@ class _RunSummaryWriter:
         raw_solutions_found: int,
         solutions_found: int,
         grounded_horizons: tuple[int, ...] = (),
+        effective_parallel_mode: str | None = None,
     ) -> None:
         first_satisfiable = next((record.horizon for record in horizon_records if record.satisfiable), None)
         grounded_horizons_text = ",".join(str(horizon) for horizon in grounded_horizons)
@@ -630,6 +632,7 @@ class _RunSummaryWriter:
             "solutions_found": solutions_found,
             "grounded_horizons": grounded_horizons_text,
             "first_satisfiable_horizon": first_satisfiable if first_satisfiable is not None else "",
+            "effective_parallel_mode": effective_parallel_mode or "",
         }
         with self.csv_path.open("a", encoding="utf-8", newline="") as handle:
             csv.DictWriter(handle, fieldnames=self.fieldnames).writerow(row)
@@ -832,8 +835,9 @@ def _translation_summary_payload(
     translation_sec: float,
     summary_top_tools: int,
 ) -> dict[str, object]:
+    internal_mode = fact_bundle.internal_solver_mode or mode
     encoding_summary = _encoding_schema_summary(
-        mode,
+        internal_mode,
         python_precompute_direct=fact_bundle.python_precompute_enabled,
     )
     schema_presence = {
@@ -852,6 +856,8 @@ def _translation_summary_payload(
         "mode": mode,
         "solver_family": _solver_family(mode),
         "solver_approach": _solver_approach(mode),
+        "internal_solver_mode": internal_mode,
+        "internal_schema": fact_bundle.internal_schema,
         "grounding_strategy": grounding_strategy,
         "translation_builder": translation_builder,
         "effective_translation_strategy": effective_translation_strategy,
@@ -891,7 +897,7 @@ def _translation_summary_payload(
         ],
         "top_expansion_tools": _top_tool_stats(fact_bundle, summary_top_tools),
         "warnings": _translation_warnings(
-            mode=mode,
+            mode=internal_mode,
             fact_bundle=fact_bundle,
             encoding_summary=encoding_summary,
         ),
@@ -942,6 +948,72 @@ def _effective_project_models(mode: str, project_models: bool | None) -> bool:
     return mode == "multi-shot"
 
 
+def _effective_parallel_mode(
+    mode: str,
+    parallel_mode: str | None,
+    fact_bundle,
+) -> str | None:
+    """Resolve the effective solve parallel mode for one run."""
+
+    if parallel_mode is not None:
+        return parallel_mode
+    if mode != "multi-shot" or fact_bundle.internal_schema not in {
+        "direct_precompute_legacy",
+        "direct_candidate_fallback",
+    }:
+        return None
+    cpu_count = os.cpu_count() or 1
+    if cpu_count < 2 or len(fact_bundle.tool_labels) < 200:
+        return None
+    workers = min(cpu_count, 4)
+    return f"{workers},compete"
+
+
+def _legacy_direct_bundle(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools,
+):
+    return replace(
+        build_fact_bundle_ape_multi_shot(config, ontology, tools),
+        internal_schema="legacy_direct",
+        internal_solver_mode="multi-shot",
+    )
+
+
+def _lazy_internal_bundle(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools,
+):
+    return replace(
+        build_lazy_fact_bundle(config, ontology, tools),
+        internal_schema="direct_candidate_fallback",
+        internal_solver_mode="multi-shot-lazy",
+    )
+
+
+def _should_consider_direct_candidate_fallback(
+    mode: str,
+    *,
+    python_precompute_direct: bool,
+    tools,
+) -> bool:
+    return (
+        mode == "multi-shot"
+        and python_precompute_direct
+        and len(tools) >= 200
+    )
+
+
+def _should_force_direct_candidate_fallback(tools) -> bool:
+    return len(tools) >= 500
+
+
+def _effective_internal_solver_mode(mode: str, fact_bundle) -> str:
+    return fact_bundle.internal_solver_mode or mode
+
+
 def _validate_run_config(config: SnakeConfig) -> None:
     """Validate derived run bounds before translation/solving."""
 
@@ -989,34 +1061,120 @@ def _prepare_run_context(
     start = perf_counter()
     ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
     tools = _load_tools_for_mode(config, mode_config.translation_pathway)
+    resolved_translation_builder = mode_config.translation_builder
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
     if mode_config.translation_pathway == "lazy":
-        fact_bundle = build_lazy_fact_bundle(
+        fact_bundle = replace(
+            build_lazy_fact_bundle(
+                config,
+                ontology,
+                tools,
+            ),
+            internal_schema="lazy_candidate",
+            internal_solver_mode="multi-shot-lazy",
+        )
+    elif mode_config.translation_pathway == "ape_multi_shot":
+        fact_bundle = _legacy_direct_bundle(
             config,
             ontology,
             tools,
         )
-    elif mode_config.translation_pathway == "ape_multi_shot":
-        fact_bundle = build_fact_bundle_ape_multi_shot(config, ontology, tools)
+        if python_precompute_direct:
+            if _should_consider_direct_candidate_fallback(
+                mode,
+                python_precompute_direct=python_precompute_direct,
+                tools=tools,
+            ):
+                lazy_tools = load_lazy_tool_annotations(
+                    config.tool_annotations_path,
+                    config.ontology_prefix,
+                )
+                if _should_force_direct_candidate_fallback(tools):
+                    _report(progress_callback, "Step 1b: forcing lazy-style internal fallback for heavy direct run.")
+                    fact_bundle = _lazy_internal_bundle(
+                        config,
+                        ontology,
+                        lazy_tools,
+                    )
+                    resolved_translation_builder = LAZY_TRANSLATION_BUILDER
+                    _report(
+                        progress_callback,
+                        "Step 1b complete: selected lazy-style internal schema "
+                        f"with {fact_bundle.fact_count} facts.",
+                    )
+                else:
+                    _report(progress_callback, "Step 1b: Python direct precompute started.")
+                    optimized_direct_bundle = apply_direct_python_precompute(
+                        mode,
+                        config,
+                        ontology,
+                        tools,
+                        fact_bundle,
+                    )
+                    _report(
+                        progress_callback,
+                        "Step 1b complete: Python direct precompute emitted "
+                        f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
+                    )
+                    fact_bundle = optimized_direct_bundle
+                    _report(progress_callback, "Step 1c: evaluating lazy-style internal fallback.")
+                    lazy_bundle = _lazy_internal_bundle(
+                        config,
+                        ontology,
+                        lazy_tools,
+                    )
+                    if lazy_bundle.fact_count < fact_bundle.fact_count:
+                        fact_bundle = lazy_bundle
+                        resolved_translation_builder = LAZY_TRANSLATION_BUILDER
+                        _report(
+                            progress_callback,
+                            "Step 1c complete: selected lazy-style internal schema "
+                            f"({lazy_bundle.fact_count} facts vs {optimized_direct_bundle.fact_count}).",
+                        )
+                    else:
+                        _report(
+                            progress_callback,
+                            "Step 1c complete: kept legacy direct optimization path "
+                            f"({optimized_direct_bundle.fact_count} facts vs {lazy_bundle.fact_count}).",
+                        )
+            else:
+                _report(progress_callback, "Step 1b: Python direct precompute started.")
+                optimized_direct_bundle = apply_direct_python_precompute(
+                    mode,
+                    config,
+                    ontology,
+                    tools,
+                    fact_bundle,
+                )
+                _report(
+                    progress_callback,
+                    "Step 1b complete: Python direct precompute emitted "
+                    f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
+                )
+                fact_bundle = optimized_direct_bundle
     elif mode_config.translation_pathway == "normal":
-        fact_bundle = build_fact_bundle(config, ontology, tools, effective_translation_strategy)
+        fact_bundle = replace(
+            build_fact_bundle(config, ontology, tools, effective_translation_strategy),
+            internal_schema="legacy_direct",
+            internal_solver_mode="single-shot",
+        )
+        if python_precompute_direct:
+            _report(progress_callback, "Step 1b: Python direct precompute started.")
+            fact_bundle = apply_direct_python_precompute(
+                mode,
+                config,
+                ontology,
+                tools,
+                fact_bundle,
+            )
+            _report(
+                progress_callback,
+                "Step 1b complete: Python direct precompute emitted "
+                f"{fact_bundle.python_precompute_fact_count} helper facts.",
+            )
     else:
         raise ValueError(
             f"Unsupported translation pathway: {mode_config.translation_pathway}"
-        )
-    if python_precompute_direct:
-        _report(progress_callback, "Step 1b: Python direct precompute started.")
-        fact_bundle = apply_direct_python_precompute(
-            mode,
-            config,
-            ontology,
-            tools,
-            fact_bundle,
-        )
-        _report(
-            progress_callback,
-            "Step 1b complete: Python direct precompute emitted "
-            f"{fact_bundle.python_precompute_fact_count} helper facts.",
         )
     translation_sec = perf_counter() - start
     _report(progress_callback, f"Step 1 complete: translation finished after {translation_sec:.3f}s.")
@@ -1027,7 +1185,7 @@ def _prepare_run_context(
         fact_bundle,
         translation_sec,
         effective_translation_strategy,
-        mode_config.translation_builder,
+        resolved_translation_builder,
         run_metadata,
     )
 
@@ -1107,6 +1265,7 @@ def run_translate_only(
         raw_solutions_found=0,
         raw_models_seen=0,
         solutions_found=0,
+        effective_parallel_mode=None,
     )
     run_log_path = csv_writers.run_log_path
     run_summary_path = csv_writers.run_summary_path
@@ -1171,6 +1330,9 @@ def run_once(
         python_precompute_direct=python_precompute_direct,
     )
     translation_peak_rss_mb = current_peak_rss_mb()
+    effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
+    internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
+
     csv_writers = _RunCsvWriters(
         csv_dir=config.solutions_dir_path,
         mode=mode,
@@ -1186,6 +1348,8 @@ def run_once(
     )
 
     effective_project_models = _effective_project_models(mode, project_models)
+    if effective_parallel_mode:
+        _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
     remaining_timeout = config.timeout_sec - translation_sec
     _timed_out = False
     _solve_start = perf_counter()
@@ -1200,11 +1364,11 @@ def run_once(
         solve_output = _empty_solve_output()
     else:
         solve_output, _timed_out = _run_solve_in_worker(
-            mode=mode,
+            mode=internal_solver_mode,
             config=config,
             fact_bundle=fact_bundle,
             capture_raw_models=True,
-            parallel_mode=parallel_mode,
+            parallel_mode=effective_parallel_mode,
             project_models=effective_project_models,
             remaining_timeout=remaining_timeout,
             progress_callback=progress_callback,
@@ -1239,6 +1403,8 @@ def run_once(
             {
                 "mode": mode,
                 "grounding_strategy": grounding_strategy,
+                "internal_schema": fact_bundle.internal_schema,
+                "internal_solver_mode": internal_solver_mode,
                 "earliest_solution_step": fact_bundle.earliest_solution_step,
                 "effective_solve_start_horizon": max(
                     config.solution_length_min,
@@ -1247,6 +1413,7 @@ def run_once(
                 "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                 "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                 "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                "effective_parallel_mode": effective_parallel_mode,
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
                 "base_grounding_sec": solve_output.base_grounding_sec,
@@ -1323,6 +1490,7 @@ def run_once(
         raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
         solutions_found=len(solutions),
         grounded_horizons=tuple(record.horizon for record in solve_output.horizon_records),
+        effective_parallel_mode=effective_parallel_mode,
     )
     run_log_path = csv_writers.run_log_path
     run_summary_path = csv_writers.run_summary_path
@@ -1424,7 +1592,9 @@ def run_ground_only(
     if not mode_config.supports_ground_only:
         raise ValueError("Ground-only runs support only multi-shot and multi-shot-lazy modes.")
 
-    grounding_output = _GROUNDER_DISPATCH[mode](
+    internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
+
+    grounding_output = _GROUNDER_DISPATCH[internal_solver_mode](
         config,
         fact_bundle,
         stage=stage,
@@ -1448,6 +1618,8 @@ def run_ground_only(
                 "mode": mode,
                 "grounding_strategy": grounding_strategy,
                 "stage": stage,
+                "internal_schema": fact_bundle.internal_schema,
+                "internal_solver_mode": internal_solver_mode,
                 "fact_count": fact_bundle.fact_count,
                 "translation_path": None,
                 "translation_summary_path": str(translation_summary_path),
@@ -1486,6 +1658,7 @@ def run_ground_only(
         raw_solutions_found=0,
         solutions_found=0,
         grounded_horizons=grounding_output.grounded_horizons,
+        effective_parallel_mode=None,
     )
     run_log_path = csv_writers.run_log_path
     run_summary_path = csv_writers.run_summary_path

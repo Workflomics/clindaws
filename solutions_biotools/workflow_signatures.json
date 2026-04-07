@@ -1,3 +1,19 @@
 {
-  "workflow_signatures": []
+  "workflow_signatures": [
+    {
+      "index": 1,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "taxonomy_summary",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    }
+  ]
 }

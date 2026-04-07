@@ -2,3 +2,8 @@ test,mode,horizon,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,ra
 biotools,multi-shot,timeout,11701,1189543,,,0,0,0,true,true
 biotools,multi-shot,1,10723,9837,875,3274.78,0,0,0,true,false
 biotools,multi-shot,2,10723,122443,47340,15747.19,0,0,0,true,false
+biotools,multi-shot,1,14245,10369,951,4702.34,0,0,0,true,false
+biotools,multi-shot,2,14245,118006,50658,16413.36,0,0,0,true,false
+biotools,multi-shot-lazy,2,12902,10746,3545,2191.56,0,0,0,true,false
+biotools,multi-shot,2,15640,11001,3743,2716.73,0,0,0,true,false
+biotools,multi-shot,3,17088,256525,69974,26797.89,1,1,1,true,false

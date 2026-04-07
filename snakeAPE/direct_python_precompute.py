@@ -35,6 +35,14 @@ def _symbol_string(symbol: clingo.Symbol) -> str:
     return str(symbol.string)
 
 
+def _symbol_text(symbol: clingo.Symbol) -> str:
+    if symbol.type == clingo.SymbolType.Number:
+        return str(symbol.number)
+    if symbol.type == clingo.SymbolType.String:
+        return str(symbol.string)
+    return str(symbol)
+
+
 def _tuple_value(symbol: clingo.Symbol) -> tuple[str, str]:
     return (_symbol_string(symbol.arguments[0]), _symbol_string(symbol.arguments[1]))
 
@@ -51,6 +59,7 @@ class _ParsedDirectFacts:
     output_dimensions_by_port: Mapping[str, Mapping[str, tuple[str, ...]]]
     workflow_input_dims: Mapping[str, Mapping[str, tuple[str, ...]]]
     workflow_input_units: Mapping[str, tuple[str, ...]]
+    goal_dimensions_by_id: Mapping[str, Mapping[str, tuple[str, ...]]]
 
 
 @dataclass(frozen=True)
@@ -70,6 +79,7 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
     all_dimensions_by_port: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     workflow_input_dims: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     workflow_input_units: dict[str, list[str]] = defaultdict(list)
+    goal_dimensions_by_id: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
 
     input_port_ids: set[str] = set()
     output_port_ids: set[str] = set()
@@ -107,6 +117,12 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
             port_id = _symbol_string(atom.arguments[0])
             value, category = _tuple_value(atom.arguments[1])
             all_dimensions_by_port[port_id][category].append(value)
+            continue
+        if atom.name == "goal_output":
+            goal_id = _symbol_text(atom.arguments[0])
+            value = _symbol_string(atom.arguments[1])
+            category = _symbol_string(atom.arguments[2])
+            goal_dimensions_by_id[goal_id][category].append(value)
             continue
         if atom.name != "holds" or atom.arguments[0].number != 0:
             continue
@@ -166,6 +182,13 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
         workflow_input_units={
             wf: tuple(sorted(dict.fromkeys(units)))
             for wf, units in sorted(workflow_input_units.items())
+        },
+        goal_dimensions_by_id={
+            goal_id: {
+                category: tuple(sorted(dict.fromkeys(values)))
+                for category, values in sorted(dimensions.items())
+            }
+            for goal_id, dimensions in sorted(goal_dimensions_by_id.items())
         },
     )
 
@@ -390,6 +413,10 @@ def _emit_multi_shot_signature_compatibility_facts(
         signature_id: _port_requirement_terminal_sets(ontology, roots, dimensions)
         for signature_id, dimensions in port_signatures.signature_dimensions_by_id.items()
     }
+    goal_requirements = {
+        goal_id: _port_requirement_terminal_sets(ontology, roots, dimensions)
+        for goal_id, dimensions in parsed.goal_dimensions_by_id.items()
+    }
     base_profiles = {
         artifact_id: _artifact_profile_terminal_sets(ontology, roots, dimensions)
         for artifact_id, dimensions in planner_artifact_profiles.items()
@@ -434,6 +461,26 @@ def _emit_multi_shot_signature_compatibility_facts(
     compatible_profiles_by_signature: dict[str, tuple[str, ...]] = {}
     dense_output_bindable_estimate = 0
     base_bindable_count = 0
+    output_profile_candidate_count = 0
+    profile_signature_candidate_support_count = 0
+    profile_goal_candidate_support_count = 0
+    goal_category_count = 0
+
+    for goal_id, requirements in sorted(goal_requirements.items()):
+        for category in sorted(requirements):
+            writer.emit_fact("direct_goal_category", goal_id, _quote(category))
+            goal_category_count += 1
+
+    for profile_id, profile in sorted(output_profile_terminal_sets.items()):
+        for category, terminal_values in sorted(profile.items()):
+            for terminal_value in sorted(terminal_values):
+                writer.emit_fact(
+                    "direct_output_profile_candidate",
+                    _quote(profile_id),
+                    _quote(terminal_value),
+                    _quote(category),
+                )
+                output_profile_candidate_count += 1
 
     for signature_id, requirements in sorted(signature_requirements.items()):
         compatible_profiles = tuple(
@@ -456,6 +503,41 @@ def _emit_multi_shot_signature_compatibility_facts(
                     _artifact_term(artifact_id),
                 )
                 base_bindable_count += 1
+        for profile_id in compatible_profiles:
+            profile = output_profile_terminal_sets[profile_id]
+            for category, requirement_sets in sorted(requirements.items()):
+                supported_values = {
+                    terminal_value
+                    for terminal_value in profile.get(category, frozenset())
+                    if any(terminal_value in requirement_set for requirement_set in requirement_sets)
+                }
+                for terminal_value in sorted(supported_values):
+                    writer.emit_fact(
+                        "direct_output_profile_candidate_supports_signature",
+                        _quote(profile_id),
+                        _quote(signature_id),
+                        _quote(terminal_value),
+                        _quote(category),
+                    )
+                    profile_signature_candidate_support_count += 1
+
+    for goal_id, requirements in sorted(goal_requirements.items()):
+        for profile_id, profile in sorted(output_profile_terminal_sets.items()):
+            for category, requirement_sets in sorted(requirements.items()):
+                supported_values = {
+                    terminal_value
+                    for terminal_value in profile.get(category, frozenset())
+                    if any(terminal_value in requirement_set for requirement_set in requirement_sets)
+                }
+                for terminal_value in sorted(supported_values):
+                    writer.emit_fact(
+                        "direct_output_profile_candidate_supports_goal",
+                        _quote(profile_id),
+                        goal_id,
+                        _quote(terminal_value),
+                        _quote(category),
+                    )
+                    profile_goal_candidate_support_count += 1
 
     support_class_id_by_profiles: dict[tuple[str, ...], str] = {}
     support_class_profiles: dict[str, tuple[str, ...]] = {}
@@ -496,6 +578,11 @@ def _emit_multi_shot_signature_compatibility_facts(
         "precompute_unique_output_profiles": len(output_profile_terminal_sets),
         "precompute_signature_support_classes": len(support_class_profiles),
         "precompute_support_class_profiles": support_class_profile_count,
+        "precompute_output_profile_candidates": output_profile_candidate_count,
+        "precompute_profile_signature_candidate_support": profile_signature_candidate_support_count,
+        "precompute_profile_goal_candidate_support": profile_goal_candidate_support_count,
+        "precompute_goal_requirement_sets": len(goal_requirements),
+        "precompute_goal_categories": goal_category_count,
         "precompute_dense_output_bindable_estimate": dense_output_bindable_estimate,
         "precompute_compact_output_bindable_estimate": compact_fact_count,
         "precompute_compact_output_compatibility_mode_selected": 1,
@@ -755,7 +842,11 @@ def apply_direct_python_precompute(
     )
 
     if writer.fact_count == 0:
-        return fact_bundle
+        return replace(
+            fact_bundle,
+            internal_schema="direct_precompute_legacy",
+            internal_solver_mode="multi-shot" if mode == "multi-shot" else mode,
+        )
 
     merged_predicates = dict(fact_bundle.predicate_counts)
     for name, count in writer.predicate_counts.items():
@@ -774,4 +865,6 @@ def apply_direct_python_precompute(
         python_precompute_enabled=True,
         python_precompute_fact_count=writer.fact_count,
         python_precompute_stats=dict(sorted(stats.items())),
+        internal_schema="direct_precompute_legacy",
+        internal_solver_mode="multi-shot" if mode == "multi-shot" else mode,
     )

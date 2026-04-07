@@ -112,6 +112,8 @@ class FactBundle:
     python_precompute_enabled: bool = False
     python_precompute_fact_count: int = 0
     python_precompute_stats: Mapping[str, int] = field(default_factory=dict)
+    internal_schema: str = ""
+    internal_solver_mode: str = ""
 
 
 @dataclass(frozen=True)

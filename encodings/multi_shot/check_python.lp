@@ -28,37 +28,27 @@ goal_id(GoalID) :- goal_output(GoalID, _, _).
 output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
+    direct_output_port_profile(Port, Profile),
+    direct_output_profile_candidate(Profile, V, Cat),
     output_used_by(TProd, ToolProd, Port, TUse, ToolUse, PortIn),
     direct_port_signature(PortIn, Signature),
-    direct_signature_requires(Signature, ReqV, Cat),
-    not compatible(V, ReqV).
-
-chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
-    query(t),
-    chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
-    goal_output(GoalID, GoalV, Cat).
+    direct_signature_category(Signature, Cat),
+    not direct_output_profile_candidate_supports_signature(Profile, Signature, V, Cat).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
-    chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat),
-    not compatible(V, GoalV).
+    direct_output_port_profile(Port, Profile),
+    direct_output_profile_candidate(Profile, V, Cat),
+    chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
+    direct_goal_category(GoalID, Cat),
+    not direct_output_profile_candidate_supports_goal(Profile, GoalID, V, Cat).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
+    direct_output_port_profile(Port, Profile),
+    direct_output_profile_candidate(Profile, V, Cat),
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat).
 
