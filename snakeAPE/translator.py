@@ -15,6 +15,8 @@ from typing import Any
 from .models import FactBundle, SnakeConfig, ToolExpansionStat, ToolMode
 from .ontology import Ontology
 
+ConstraintDataSelectorSpec = tuple[tuple[str, tuple[str, ...]], ...]
+
 
 def _quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -642,6 +644,7 @@ _SELECTOR_DOUBLE_ARG_CONSTRAINTS = {
     "depend_m",
     "itn_m",
     "next_m",
+    "prev_m",
     "used_iff_used",
     "mutex_tools",
     "connected_op",
@@ -706,6 +709,7 @@ _CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE: dict[str, str] = {
     "depend_m": "transitive",
     "itn_m": "transitive",
     "next_m": "transitive",
+    "prev_m": "transitive",
     "used_iff_used": "transitive",
     "max_uses": "transitive",
     "mutex_tools": "transitive",
@@ -745,6 +749,77 @@ def _extract_constraint_selector(
                 return _strip_constraint_value(str(raw_value), prefix)
         break
     raise ValueError("parameter did not contain a selector value")
+
+
+def _extract_constraint_data_selector_spec(
+    parameter: Mapping[str, Any],
+    *,
+    prefix: str,
+) -> ConstraintDataSelectorSpec:
+    if not parameter:
+        raise ValueError("empty parameter")
+
+    dims: list[tuple[str, tuple[str, ...]]] = []
+    for raw_category, raw_values in parameter.items():
+        category = _strip_constraint_value(str(raw_category), prefix).strip()
+        if not category:
+            raise ValueError("parameter contained an empty category")
+        if isinstance(raw_values, str):
+            values_iter: Iterable[str] = (raw_values,)
+        elif isinstance(raw_values, Iterable):
+            values_iter = (str(raw_value) for raw_value in raw_values)
+        else:
+            raise ValueError("parameter category did not contain selector values")
+        values = _dedupe_stable(
+            normalized
+            for raw_value in values_iter
+            if (normalized := _strip_constraint_value(str(raw_value), prefix).strip())
+        )
+        if not values:
+            raise ValueError(f"parameter category {category} did not contain selector values")
+        dims.append((category, values))
+    if not dims:
+        raise ValueError("parameter did not contain any categories")
+    return tuple(dims)
+
+
+def _is_constraint_data_selector_spec(value: object) -> bool:
+    if not isinstance(value, tuple) or not value:
+        return False
+    for item in value:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 2
+            or not isinstance(item[0], str)
+            or not isinstance(item[1], tuple)
+            or not all(isinstance(selector_value, str) for selector_value in item[1])
+        ):
+            return False
+    return True
+
+
+def _parse_template_constraint_args(
+    config: SnakeConfig,
+    constraint_id: str,
+    raw_parameters: Iterable[Mapping[str, Any]],
+) -> tuple[Any, ...]:
+    base_constraint_name, _selector_policies = _resolve_constraint_template_name(constraint_id)
+    parsed_args: list[Any] = []
+    for index, parameter in enumerate(raw_parameters):
+        if base_constraint_name == "use_t":
+            parsed_args.append(
+                _extract_constraint_data_selector_spec(parameter, prefix=config.ontology_prefix)
+            )
+            continue
+        if base_constraint_name in {"operation_input", "operationInput"} and index == 1:
+            parsed_args.append(
+                _extract_constraint_data_selector_spec(parameter, prefix=config.ontology_prefix)
+            )
+            continue
+        parsed_args.append(
+            _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
+        )
+    return tuple(parsed_args)
 
 
 def _constraint_selector_kind(
@@ -883,16 +958,34 @@ def _data_selector_aliases(value: str, *, prefix: str) -> tuple[str, ...]:
     return tuple(alias for alias in aliases if alias)
 
 
+def _infer_constraint_data_selector_category(
+    config: SnakeConfig,
+    ontology: Ontology,
+    raw_selector: str,
+) -> str | None:
+    selector = _strip_constraint_value(raw_selector, prefix=config.ontology_prefix).strip()
+    if not selector:
+        return None
+    matching_roots = tuple(
+        root
+        for root in config.data_dimensions_taxonomy_roots
+        if selector == root or root in ontology.ancestors_of(selector)
+    )
+    if len(matching_roots) != 1:
+        return None
+    return matching_roots[0]
+
+
 def _emit_lazy_constraint(
     writer: _FactWriter,
     *,
     config: SnakeConfig,
     constraint_name: str,
-    args: tuple[str | int, ...],
+    args: tuple[Any, ...],
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
     selector_ids: dict[tuple[str, str], str],
-    data_selector_ids: dict[str, str],
+    data_selector_ids: dict[object, str],
     tool_ids: set[str],
     operation_ids: set[str],
     source_name: str,
@@ -933,13 +1026,34 @@ def _emit_lazy_constraint(
             )
         return selector_id
 
-    def _data_selector_id_for(raw_selector: str) -> str:
-        selector_id = data_selector_ids.get(raw_selector)
+    def _data_selector_id_for(raw_selector: str | ConstraintDataSelectorSpec) -> str:
+        selector_key: object
+        if isinstance(raw_selector, str):
+            selector_key = ("flat", raw_selector)
+        else:
+            selector_key = ("composite", raw_selector)
+        selector_id = data_selector_ids.get(selector_key)
         if selector_id is None:
             selector_id = f"constraint_data_selector_{len(data_selector_ids)}"
-            data_selector_ids[raw_selector] = selector_id
-            for alias in _data_selector_aliases(raw_selector, prefix=config.ontology_prefix):
-                writer.emit_fact("constraint_data_selector", _quote(selector_id), _quote(alias))
+            data_selector_ids[selector_key] = selector_id
+            if isinstance(raw_selector, str):
+                for alias in _data_selector_aliases(raw_selector, prefix=config.ontology_prefix):
+                    writer.emit_fact("constraint_data_selector", _quote(selector_id), _quote(alias))
+            else:
+                for category, values in raw_selector:
+                    writer.emit_fact(
+                        "constraint_data_selector_category",
+                        _quote(selector_id),
+                        _quote(category),
+                    )
+                    for value in values:
+                        for alias in _data_selector_aliases(value, prefix=config.ontology_prefix):
+                            writer.emit_fact(
+                                "constraint_data_selector_dim",
+                                _quote(selector_id),
+                                _quote(category),
+                                _quote(alias),
+                            )
         return selector_id
 
     def _selector_arg(position: int) -> str | None:
@@ -975,23 +1089,21 @@ def _emit_lazy_constraint(
             return None
         return selector
 
-    def _data_selector_arg(position: int) -> str | None:
+    def _data_selector_arg(position: int) -> str | ConstraintDataSelectorSpec | None:
         if position >= len(args):
             _skip(f"{constraint_name} is missing data selector argument {position + 1}")
             return None
         raw_value = args[position]
-        if not isinstance(raw_value, str):
+        if isinstance(raw_value, str):
+            selector = raw_value.strip()
+            if not selector:
+                _skip(f"{constraint_name} has an empty data selector argument")
+                return None
+            return selector
+        if not _is_constraint_data_selector_spec(raw_value):
             _skip(f"{constraint_name} expects data selector argument {position + 1}")
             return None
-        selector = raw_value.strip()
-        if not selector:
-            _skip(f"{constraint_name} has an empty data selector argument")
-            return None
-        aliases = _data_selector_aliases(selector, prefix=config.ontology_prefix)
-        if not any(alias in allowed_data_selectors for alias in aliases):
-            _skip(f"unknown data selector {selector}")
-            return None
-        return selector
+        return raw_value
 
     def _int_arg(position: int, *, minimum: int | None = None) -> int | None:
         if position >= len(args):
@@ -1135,6 +1247,8 @@ def _emit_lazy_constraint(
         writer.emit_fact("constraint_forbid_later", selector_a_id, selector_b_id)
     elif base_constraint_name == "next_m":
         writer.emit_fact("constraint_next", selector_a_id, selector_b_id)
+    elif base_constraint_name == "prev_m":
+        writer.emit_fact("constraint_prev", selector_a_id, selector_b_id)
     elif base_constraint_name == "used_iff_used":
         writer.emit_fact("constraint_used_iff_used", selector_a_id, selector_b_id)
     elif base_constraint_name == "mutex_tools":
@@ -1154,7 +1268,7 @@ def _emit_lazy_template_constraints(
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
     selector_ids: dict[tuple[str, str], str],
-    data_selector_ids: dict[str, str],
+    data_selector_ids: dict[object, str],
     tool_ids: set[str],
     operation_ids: set[str],
 ) -> None:
@@ -1182,10 +1296,7 @@ def _emit_lazy_template_constraints(
 
         raw_parameters = raw_constraint.get("parameters") or []
         try:
-            selectors = tuple(
-                _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
-                for parameter in raw_parameters
-            )
+            selectors = _parse_template_constraint_args(config, constraint_id, raw_parameters)
         except ValueError as exc:
             writer.emit_comment(
                 f"skipping {constraints_path.name} constraint {index}: invalid parameters ({exc})"
@@ -1212,12 +1323,13 @@ def _emit_lazy_native_constraints(
     writer: _FactWriter,
     *,
     config: SnakeConfig,
+    ontology: Ontology,
     constraints_path,
     constraints: list[str],
     allowed_selectors: set[str],
     allowed_data_selectors: set[str],
     selector_ids: dict[tuple[str, str], str],
-    data_selector_ids: dict[str, str],
+    data_selector_ids: dict[object, str],
     tool_ids: set[str],
     operation_ids: set[str],
 ) -> None:
@@ -1225,6 +1337,7 @@ def _emit_lazy_native_constraints(
         f"lazy native constraint translation from {constraints_path.name}"
     )
 
+    parsed_constraints: list[tuple[int, str, tuple[str | int, ...]]] = []
     for index, raw_constraint in enumerate(constraints):
         if not isinstance(raw_constraint, str):
             writer.emit_comment(
@@ -1242,6 +1355,50 @@ def _emit_lazy_native_constraints(
             writer.emit_comment(
                 f"skipping {constraints_path.name} constraint {index}: unsupported native atom {constraint_name}"
             )
+            continue
+        parsed_constraints.append((index, constraint_name, args))
+
+    grouped_use_t_indices: set[int] = set()
+    grouped_use_t_selector: ConstraintDataSelectorSpec | None = None
+    native_use_t_entries = [
+        (index, args[0])
+        for index, constraint_name, args in parsed_constraints
+        if constraint_name == "use_t" and len(args) == 1 and isinstance(args[0], str)
+    ]
+    if len(native_use_t_entries) == len(config.data_dimensions_taxonomy_roots):
+        grouped_values_by_category: dict[str, str] = {}
+        for index, raw_value in native_use_t_entries:
+            category = _infer_constraint_data_selector_category(config, ontology, raw_value)
+            normalized_value = _strip_constraint_value(raw_value, prefix=config.ontology_prefix).strip()
+            if category is None or not normalized_value or category in grouped_values_by_category:
+                grouped_values_by_category = {}
+                break
+            grouped_values_by_category[category] = normalized_value
+        if set(grouped_values_by_category) == set(config.data_dimensions_taxonomy_roots):
+            grouped_use_t_selector = tuple(
+                (category, (grouped_values_by_category[category],))
+                for category in config.data_dimensions_taxonomy_roots
+            )
+            grouped_use_t_indices = {index for index, _ in native_use_t_entries}
+
+    if grouped_use_t_selector is not None:
+        _emit_lazy_constraint(
+            writer,
+            config=config,
+            constraint_name="use_t",
+            args=(grouped_use_t_selector,),
+            allowed_selectors=allowed_selectors,
+            allowed_data_selectors=allowed_data_selectors,
+            selector_ids=selector_ids,
+            data_selector_ids=data_selector_ids,
+            tool_ids=tool_ids,
+            operation_ids=operation_ids,
+            source_name=constraints_path.name,
+            index=min(grouped_use_t_indices),
+        )
+
+    for index, constraint_name, args in parsed_constraints:
+        if index in grouped_use_t_indices:
             continue
         _emit_lazy_constraint(
             writer,
@@ -1371,10 +1528,7 @@ def _collect_lazy_forbidden_tool_ids(
                 continue
             raw_parameters = raw_constraint.get("parameters") or []
             try:
-                selectors = tuple(
-                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
-                    for parameter in raw_parameters
-                )
+                selectors = _parse_template_constraint_args(config, constraint_id, raw_parameters)
             except ValueError:
                 continue
             _mark_forbidden(constraint_id, selectors)
@@ -1443,17 +1597,14 @@ def _collect_lazy_selector_lower_bounds(
 
     _constraints_path, constraints, constraint_kind = loaded_constraints
     if constraint_kind == "template":
-        parsed_constraints: list[tuple[str, tuple[str | int, ...]]] = []
+        parsed_constraints: list[tuple[str, tuple[Any, ...]]] = []
         for raw_constraint in constraints:
             constraint_id = str(raw_constraint.get("constraintid", "")).strip()
             if not constraint_id:
                 continue
             raw_parameters = raw_constraint.get("parameters") or []
             try:
-                selectors = tuple(
-                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
-                    for parameter in raw_parameters
-                )
+                selectors = _parse_template_constraint_args(config, constraint_id, raw_parameters)
             except ValueError:
                 continue
             parsed_constraints.append((constraint_id, selectors))
@@ -1489,13 +1640,31 @@ def _collect_lazy_selector_lower_bounds(
 def _candidate_outputs_match_data_selector(
     ontology: Ontology,
     candidate_record: Mapping[str, object],
-    data_selector: str,
+    data_selector: str | ConstraintDataSelectorSpec,
 ) -> bool:
-    for output_port in tuple(candidate_record["output_ports"]):
-        for values in output_port["port_values_by_dimension"].values():
-            for actual_value in values:
-                if actual_value == data_selector or data_selector in ontology.ancestors_of(actual_value):
-                    return True
+    output_ports = tuple(candidate_record["output_ports"])
+    if isinstance(data_selector, str):
+        for output_port in output_ports:
+            port_values_by_dimension = output_port["port_values_by_dimension"]
+            assert isinstance(port_values_by_dimension, Mapping)
+            for values in port_values_by_dimension.values():
+                for actual_value in values:
+                    if actual_value == data_selector or data_selector in ontology.ancestors_of(actual_value):
+                        return True
+        return False
+
+    for output_port in output_ports:
+        port_values_by_dimension = output_port["port_values_by_dimension"]
+        assert isinstance(port_values_by_dimension, Mapping)
+        if all(
+            any(
+                actual_value == wanted_value or wanted_value in ontology.ancestors_of(actual_value)
+                for wanted_value in wanted_values
+                for actual_value in tuple(port_values_by_dimension.get(category, ()))
+            )
+            for category, wanted_values in data_selector
+        ):
+            return True
     return False
 
 
@@ -1574,15 +1743,30 @@ def _collect_lazy_backward_relevant_candidates(
                 matches.add(tool_id)
         return frozenset(matches)
 
-    def _matching_data_selector(raw_value: str) -> str | None:
-        selector = raw_value.strip()
-        if not selector:
+    def _matching_data_selector(
+        raw_value: str | ConstraintDataSelectorSpec,
+    ) -> str | ConstraintDataSelectorSpec | None:
+        if isinstance(raw_value, str):
+            selector = raw_value.strip()
+            if not selector:
+                return None
+            aliases = _data_selector_aliases(selector, prefix=config.ontology_prefix)
+            for alias in aliases:
+                if alias in allowed_data_selectors:
+                    return alias
             return None
-        aliases = _data_selector_aliases(selector, prefix=config.ontology_prefix)
-        for alias in aliases:
-            if alias in allowed_data_selectors:
-                return alias
-        return None
+        matched_dims: list[tuple[str, tuple[str, ...]]] = []
+        for category, values in raw_value:
+            matched_values = tuple(
+                alias
+                for value in values
+                for alias in _data_selector_aliases(value, prefix=config.ontology_prefix)
+                if alias in allowed_data_selectors
+            )
+            if not matched_values:
+                return None
+            matched_dims.append((category, _dedupe_stable(matched_values)))
+        return tuple(matched_dims)
 
     _constraints_path, constraints, constraint_kind = loaded_constraints
     if constraint_kind == "template":
@@ -1593,10 +1777,7 @@ def _collect_lazy_backward_relevant_candidates(
                 continue
             raw_parameters = raw_constraint.get("parameters") or []
             try:
-                selectors = tuple(
-                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
-                    for parameter in raw_parameters
-                )
+                selectors = _parse_template_constraint_args(config, constraint_id, raw_parameters)
             except ValueError:
                 continue
             parsed_constraints.append((constraint_id, selectors))
@@ -1624,6 +1805,7 @@ def _collect_lazy_backward_relevant_candidates(
         "depend_m",
         "itn_m",
         "next_m",
+        "prev_m",
     }
 
     for constraint_name, args in parsed_constraints:
@@ -1638,14 +1820,18 @@ def _collect_lazy_backward_relevant_candidates(
             if len(args) == 2 and isinstance(args[0], str):
                 for tool_id in _matching_tool_ids(constraint_name, args[0], 0):
                     anchor_candidate_ids.update(candidate_ids_by_tool_id.get(tool_id, set()))
-            if len(args) == 2 and isinstance(args[1], str):
+            if len(args) == 2 and (
+                isinstance(args[1], str) or _is_constraint_data_selector_spec(args[1])
+            ):
                 data_selector = _matching_data_selector(args[1])
                 if data_selector is not None:
                     for candidate_id, record in candidate_records_by_id.items():
                         if _candidate_outputs_match_data_selector(ontology, record, data_selector):
                             anchor_candidate_ids.add(candidate_id)
         elif base_constraint_name == "use_t":
-            if len(args) == 1 and isinstance(args[0], str):
+            if len(args) == 1 and (
+                isinstance(args[0], str) or _is_constraint_data_selector_spec(args[0])
+            ):
                 data_selector = _matching_data_selector(args[0])
                 if data_selector is not None:
                     for candidate_id, record in candidate_records_by_id.items():
@@ -1747,10 +1933,7 @@ def _collect_lazy_exact_prefix_lower_bound(
                 continue
             raw_parameters = raw_constraint.get("parameters") or []
             try:
-                selectors = tuple(
-                    _extract_constraint_selector(parameter, prefix=config.ontology_prefix)
-                    for parameter in raw_parameters
-                )
+                selectors = _parse_template_constraint_args(config, constraint_id, raw_parameters)
             except ValueError:
                 continue
             parsed_constraints.append((constraint_id, selectors))
@@ -1894,6 +2077,7 @@ def _emit_lazy_constraints(
         _emit_lazy_native_constraints(
             writer,
             config=config,
+            ontology=ontology,
             constraints_path=constraints_path,
             constraints=constraints,
             allowed_selectors=allowed_selectors,

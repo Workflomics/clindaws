@@ -34,7 +34,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=(
             "single-shot",
             "multi-shot",
-            "multi-shot-lazy",
         ),
         default="multi-shot",
         help="Solver mode to execute.",

@@ -21,11 +21,33 @@ constraint_artifact_dim(out(T, Tool, Port), V, Cat) :-
     holds(T, dim(out(T, Tool, Port), V, Cat)).
 
 constraint_artifact_matches_selector(WF, Sel) :-
+    constraint_composite_data_selector(Sel),
+    constraint_artifact_dim(WF, _, _),
+    not constraint_artifact_missing_selector_dim(WF, Sel).
+
+constraint_artifact_matches_selector(WF, Sel) :-
+    not constraint_composite_data_selector(Sel),
     constraint_artifact_dim(WF, Actual, _),
     constraint_data_selector_matches_value(Sel, Actual).
 
+constraint_artifact_selector_dim_match(WF, Sel, Cat) :-
+    constraint_artifact_dim(WF, Actual, Cat),
+    constraint_data_selector_matches_dim(Sel, Cat, Actual).
+
+constraint_artifact_missing_selector_dim(WF, Sel) :-
+    constraint_data_selector_category(Sel, Cat),
+    constraint_artifact_dim(WF, _, _),
+    not constraint_artifact_selector_dim_match(WF, Sel, Cat).
+
+constraint_used_artifact(WF) :-
+    occurs(_, bind(_, _, WF)).
+
+constraint_used_artifact(WF) :-
+    chosen_goal_output(_, _, WF).
+
 constraint_used_data(Sel) :-
-    constraint_artifact_matches_selector(_, Sel).
+    constraint_used_artifact(WF),
+    constraint_artifact_matches_selector(WF, Sel).
 
 constraint_connected_pair(SelA, SelB, T1, T2) :-
     constraint_connected(SelA, SelB),
@@ -68,6 +90,12 @@ constraint_connected_pair(SelA, SelB, T1, T2) :-
    constraint_selected_time(T1, SelA),
    #count { T2 : constraint_selected_time(T2, SelB), T2 = T1 + 1 } = 0.
 
+% prev_m: if selector A occurs, selector B must occur at the previous timestep.
+:- constraint_prev(SelA, SelB),
+   constraint_selected_time(T1, SelA),
+   Prev = T1 - 1,
+   #count { T2 : constraint_selected_time(T2, SelB), T2 = Prev } = 0.
+
 % connected_op: some later matching consumer must bind an artifact produced by
 % an earlier matching producer.
 :- constraint_connected(SelA, SelB),
@@ -104,7 +132,7 @@ constraint_connected_pair(SelA, SelB, T1, T2) :-
    occurs(T, bind(Tool, P2, WF)),
    P1 != P2.
 
-% use_t: some artifact in the workflow must carry the selected data value.
+% use_t: some used artifact in the workflow must carry the selected data value.
 :- constraint_use_data(Sel),
    not constraint_used_data(Sel).
 

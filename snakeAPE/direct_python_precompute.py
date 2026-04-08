@@ -47,6 +47,26 @@ def _tuple_value(symbol: clingo.Symbol) -> tuple[str, str]:
     return (_symbol_string(symbol.arguments[0]), _symbol_string(symbol.arguments[1]))
 
 
+def _workflow_input_satisfies_port_requirements(
+    artifact_profile: Mapping[str, frozenset[str]],
+    port_requirements: Mapping[str, tuple[frozenset[str], ...]],
+) -> bool:
+    """Return whether a workflow input can satisfy a port.
+
+    Missing workflow-input dimensions are treated as unconstrained rather than
+    incompatible. This matches the compressed-candidate backend and APE's
+    handling of underspecified inputs such as ImageMagick's Content input.
+    """
+
+    for dimension, required_value_sets in port_requirements.items():
+        artifact_values = artifact_profile.get(dimension, frozenset())
+        if not artifact_values:
+            continue
+        if not any(artifact_values.intersection(required_values) for required_values in required_value_sets):
+            return False
+    return True
+
+
 @dataclass(frozen=True)
 class _ParsedDirectFacts:
     tool_input_variants: Mapping[str, tuple[str, ...]]
@@ -374,7 +394,7 @@ def _emit_bindability_facts(
     base_bindable_count = 0
     for port_id, requirements in sorted(port_requirements.items()):
         for artifact_id, profile in sorted(base_profiles.items()):
-            if _artifact_satisfies_port_requirements(profile, requirements):
+            if _workflow_input_satisfies_port_requirements(profile, requirements):
                 writer.emit_fact(
                     "precomputed_base_artifact_bindable",
                     _quote(port_id),
@@ -496,7 +516,7 @@ def _emit_multi_shot_signature_compatibility_facts(
             for profile_id in compatible_profiles
         ) * signature_port_counts[signature_id]
         for artifact_id, profile in sorted(base_profiles.items()):
-            if _artifact_satisfies_port_requirements(profile, requirements):
+            if _workflow_input_satisfies_port_requirements(profile, requirements):
                 writer.emit_fact(
                     "direct_signature_initial_artifact",
                     _quote(signature_id),
@@ -700,7 +720,7 @@ def _compute_tool_step_windows(
                         else port_idx
                     )
                     earliest_source_step: int | None = 0 if any(
-                        _artifact_satisfies_port_requirements(profile, requirements)
+                        _workflow_input_satisfies_port_requirements(profile, requirements)
                         for profile in planner_profiles
                     ) else None
                     for producer_tool_id, _producer_port_idx in producer_support_by_tool[tool_id].get(consumer_port_ref, ()):
@@ -756,9 +776,8 @@ def _emit_step_window_facts(
         max_step = config.solution_length_max
         if config.use_all_generated_data != "NONE":
             goal_distance = goal_distance_by_tool.get(tool_id)
-            if goal_distance is None:
-                continue
-            max_step = min(max_step, config.solution_length_max - goal_distance)
+            if goal_distance is not None:
+                max_step = min(max_step, config.solution_length_max - goal_distance)
         if max_step < min_step:
             continue
         for step_index in range(min_step, max_step + 1):

@@ -18,7 +18,7 @@
 
 :- query(t),
    constraint_must_use(Sel),
-   #count { T, Tool : occurs(T, run(Tool)), constraint_selector_matches_tool(Sel, Tool) } = 0.
+   not constraint_selected_any(t, Sel).
 
 % ----------------------------------------------------------------
 % must_not_use(Tool) — concrete tool must not run at all
@@ -26,5 +26,4 @@
 
 :- query(t),
    constraint_must_not_use(Sel),
-   occurs(_, run(Tool)),
-   constraint_selector_matches_tool(Sel, Tool).
+   constraint_selected_any(t, Sel).

@@ -247,10 +247,16 @@ workflow_input_slot_class_size(Rep, N) :-
 
 planner_workflow_input(WF) :-
     base_workflow_input(WF),
+    full_workflow_input_witnesses.
+
+planner_workflow_input(WF) :-
+    base_workflow_input(WF),
+    not full_workflow_input_witnesses,
     not workflow_input_collapsed_member(WF).
 
 planner_workflow_input(Slot) :-
-    workflow_input_slot(Slot, _, _).
+    workflow_input_slot(Slot, _, _),
+    not full_workflow_input_witnesses.
 
 workflow_input(WF) :-
     base_workflow_input(WF).

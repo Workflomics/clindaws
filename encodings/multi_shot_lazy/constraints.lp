@@ -1,4 +1,4 @@
-% LAZY CONSTRAINTS (multi-shot-lazy)
+% LEGACY COMPRESSED-CANDIDATE CONSTRAINTS
 % Constraint facts are emitted by the Python translator into the base facts:
 %   constraint_selector(SelID, SelectorName)
 %   constraint_selector_mode(SelID, Mode)
@@ -12,10 +12,13 @@
 %   constraint_depends_prior(SelA_ID, SelB_ID)
 %   constraint_forbid_later(SelA_ID, SelB_ID)
 %   constraint_next(SelA_ID, SelB_ID)
+%   constraint_prev(SelA_ID, SelB_ID)
 %   constraint_used_iff_used(SelA_ID, SelB_ID)
 %   constraint_mutex(SelA_ID, SelB_ID)
 %   constraint_connected(SelA_ID, SelB_ID)
 %   constraint_data_selector(DataSelID, DataSelectorValue)
+%   constraint_data_selector_category(DataSelID, Category)
+%   constraint_data_selector_dim(DataSelID, Category, DataSelectorValue)
 %   constraint_use_data(DataSelID)
 %   constraint_operation_input(ModuleSelID, DataSelID)
 %   constraint_must_use(SelID)      -- handled by tool_inclusion.lp
@@ -59,20 +62,57 @@ constraint_artifact_dim_check(t, out(TSel, Tool, Port), V, Cat) :-
     occurs(TSel, output(Tool, _, Port)),
     artifact_dim(out(TSel, Tool, Port), V, Cat).
 
+constraint_composite_data_selector(Sel) :-
+    constraint_data_selector_category(Sel, _).
+
+constraint_artifact_matches_selector_value_check(t, WF, Sel, Cat) :-
+    query(t),
+    constraint_data_selector_dim(Sel, Cat, Actual),
+    constraint_artifact_dim_check(t, WF, Actual, Cat).
+
+constraint_artifact_matches_selector_value_check(t, WF, Sel, Cat) :-
+    query(t),
+    constraint_data_selector_dim(Sel, Cat, Wanted),
+    constraint_artifact_dim_check(t, WF, Actual, Cat),
+    ancestor(Actual, Wanted).
+
+constraint_artifact_missing_selector_dim_check(t, WF, Sel) :-
+    query(t),
+    constraint_data_selector_category(Sel, Cat),
+    constraint_artifact_dim_check(t, WF, _, _),
+    not constraint_artifact_matches_selector_value_check(t, WF, Sel, Cat).
+
 constraint_artifact_matches_selector_check(t, WF, Sel) :-
     query(t),
+    constraint_composite_data_selector(Sel),
+    constraint_artifact_dim_check(t, WF, _, _),
+    not constraint_artifact_missing_selector_dim_check(t, WF, Sel).
+
+constraint_artifact_matches_selector_check(t, WF, Sel) :-
+    query(t),
+    not constraint_composite_data_selector(Sel),
     constraint_data_selector(Sel, Actual),
     constraint_artifact_dim_check(t, WF, Actual, _).
 
 constraint_artifact_matches_selector_check(t, WF, Sel) :-
     query(t),
+    not constraint_composite_data_selector(Sel),
     constraint_data_selector(Sel, Wanted),
     constraint_artifact_dim_check(t, WF, Actual, _),
     ancestor(Actual, Wanted).
 
+constraint_used_artifact_check(t, WF) :-
+    query(t),
+    occurs(_, bind(_, _, WF)).
+
+constraint_used_artifact_check(t, WF) :-
+    query(t),
+    chosen_goal_output(t, _, WF).
+
 constraint_used_data_check(t, Sel) :-
     query(t),
-    constraint_artifact_matches_selector_check(t, _, Sel).
+    constraint_used_artifact_check(t, WF),
+    constraint_artifact_matches_selector_check(t, WF, Sel).
 
 % first_m: selector must appear at T=1 and nowhere else.
 :- query(t),
@@ -113,6 +153,13 @@ constraint_used_data_check(t, Sel) :-
    constraint_next(SelA, SelB),
    constraint_selected_time(T1, SelA),
    #count { T2 : constraint_selected_time(T2, SelB), T2 = T1 + 1 } = 0.
+
+% prev_m: if A appears at T, B must appear at T-1.
+:- query(t),
+   constraint_prev(SelA, SelB),
+   constraint_selected_time(T1, SelA),
+   Prev = T1 - 1,
+   #count { T2 : constraint_selected_time(T2, SelB), T2 = Prev } = 0.
 
 % connected_op: some later B must bind an artifact produced by some earlier A.
 :- query(t),
@@ -163,7 +210,7 @@ constraint_used_data_check(t, Sel) :-
    occurs(T, bind(Tool, P2, WF)),
    P1 != P2.
 
-% use_t: some artifact in the workflow must carry the selected data value.
+% use_t: some used artifact in the workflow must carry the selected data value.
 :- query(t),
    constraint_use_data(Sel),
    not constraint_used_data_check(t, Sel).

@@ -73,6 +73,15 @@ def _make_grounding_control() -> clingo.Control:
     return clingo.Control(["0", "--warn=none"])
 
 
+def _projection_runtime_facts(*, mode: str, project_models: bool) -> str:
+    """Return runtime fact toggles derived from the chosen solve policy."""
+
+    facts: list[str] = []
+    if mode == "multi-shot" and not project_models:
+        facts.append("full_workflow_input_witnesses.\n")
+    return "".join(facts)
+
+
 @dataclass(frozen=True)
 class SolveOutput:
     """Raw solver output."""
@@ -137,22 +146,6 @@ def _multi_shot_program_paths(*, python_precompute_direct: bool = False) -> tupl
 
 
 
-def _multi_shot_lazy_program_paths() -> tuple[Path, ...]:
-    base = ENCODINGS_ROOT / "multi_shot_lazy"
-    return (
-        base / "base.lp",
-        base / "step_initial.lp",
-        base / "step.lp",
-        base / "step_query.lp",
-        base / "constraints.lp",
-        base / "check.lp",
-        base / "ape_extract.lp",
-        base / "tool_inclusion.lp",
-        base / "input_usage.lp",
-        base / "output_usage.lp",
-    )
-
-
 def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot_compressed_candidate"
     return (
@@ -180,8 +173,6 @@ def program_paths_for_mode(
         return _single_shot_program_paths(python_precompute_direct=python_precompute_direct)
     if mode == "multi-shot":
         return _multi_shot_program_paths(python_precompute_direct=python_precompute_direct)
-    if mode == "multi-shot-lazy":
-        return _multi_shot_lazy_program_paths()
     if mode == "multi-shot-compressed-candidate":
         return _multi_shot_compressed_candidate_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")
@@ -341,6 +332,7 @@ def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Sym
     if horizon == 1:
         parts.append(("init", ()))
     parts.append(("step", (clingo.Number(horizon),)))
+    parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
     return tuple(parts)
 
@@ -354,6 +346,7 @@ def _multi_shot_prefix_horizon_parts(
     if horizon == 1:
         parts.append(("init", ()))
     parts.append(("step", (clingo.Number(horizon),)))
+    parts.append(("constraint_step", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -401,6 +394,7 @@ def _solve_multi_shot_with_programs(
     config: SnakeConfig,
     facts: FactBundle,
     program_paths: tuple[Path, ...],
+    mode: str,
     *,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
@@ -422,6 +416,9 @@ def _solve_multi_shot_with_programs(
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    runtime_facts = _projection_runtime_facts(mode=mode, project_models=project_models)
+    if runtime_facts:
+        control.add("base", [], runtime_facts)
     if facts.python_precomputed_facts:
         control.add("base", [], facts.python_precomputed_facts)
 
@@ -1052,6 +1049,7 @@ def solve_multi_shot(
         config,
         facts,
         _multi_shot_program_paths(python_precompute_direct=facts.python_precompute_enabled),
+        mode="multi-shot",
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -1098,53 +1096,6 @@ def ground_multi_shot(
 
 
 
-def solve_multi_shot_lazy(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-    capture_raw_models: bool = False,
-    parallel_mode: str | None = None,
-    project_models: bool = False,
-) -> SolveOutput:
-    """Solve using the lazy multi-shot encoding."""
-
-    has_translated_constraints = _has_translated_constraints(facts)
-    effective_solve_start = max(config.solution_length_min, facts.earliest_solution_step)
-
-    return _solve_multi_shot_with_programs(
-        config,
-        facts,
-        _multi_shot_lazy_program_paths(),
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        initial_step_program="step_initial",
-        solve_all_horizons=False,
-        stop_on_solution=False,
-        horizon_parts_builder=lambda horizon: (
-            _lazy_prefix_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-                include_constraint_step=has_translated_constraints,
-            )
-            if horizon < effective_solve_start
-            else _lazy_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-            )
-        ),
-        capture_raw_models=capture_raw_models,
-        solve_start_horizon=effective_solve_start,
-        parallel_mode=parallel_mode,
-        project_models=project_models,
-    )
-
-
 def solve_multi_shot_compressed_candidate(
     config: SnakeConfig,
     facts: FactBundle,
@@ -1165,6 +1116,7 @@ def solve_multi_shot_compressed_candidate(
         config,
         facts,
         _multi_shot_compressed_candidate_program_paths(),
+        mode="multi-shot-compressed-candidate",
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -1193,35 +1145,6 @@ def solve_multi_shot_compressed_candidate(
 
 
 
-def ground_multi_shot_lazy(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    stage: str = "base",
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> GroundingOutput:
-    """Ground the lazy multi-shot encoding without solving."""
-
-    control = _make_grounding_control()
-    for program_path in _multi_shot_lazy_program_paths():
-        control.load(str(program_path))
-    control.add("base", [], facts.facts)
-    return _ground_multi_shot_control(
-        control,
-        config,
-        stage=stage,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        initial_step_program="step_initial",
-        horizon_parts_builder=lambda horizon: _lazy_grounding_horizon_parts(
-            horizon,
-            initial_step_program="step_initial",
-            initial_seed_program=None,
-        ),
-    )
 
 
 def ground_multi_shot_compressed_candidate(

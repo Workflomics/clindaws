@@ -110,8 +110,8 @@ def load_direct_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...
     )
 
 
-def load_lazy_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
-    """Load tool annotations for lazy mode preserving duplicate outputs."""
+def load_candidate_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
+    """Load tool annotations for compressed-candidate translation preserving duplicate outputs."""
 
     return load_tool_annotations(
         path,

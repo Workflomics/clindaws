@@ -1,4 +1,4 @@
-"""Lazy translation entrypoints for multi-shot-lazy mode."""
+"""Legacy compressed-candidate translation entrypoints retained for compatibility."""
 
 from __future__ import annotations
 

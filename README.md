@@ -17,7 +17,7 @@ python -m snakeAPE <path-to-config.json> [flags]
 Example from `/Volumes/ZGMF-X20A/GARYU/snakeAPE`:
 
 ```bash
-python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 Run from the workspace root with:
@@ -29,22 +29,20 @@ PYTHONPATH=snakeAPE python -m snakeAPE <path-to-config.json> [flags]
 Example from `/Volumes/ZGMF-X20A/GARYU`:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 ## Modes
 
-The CLI supports 3 runtime modes:
+The CLI supports 2 runtime modes:
 
 - `single-shot`
 - `multi-shot`
-- `multi-shot-lazy`
 
 Meaning:
 
 - `single-shot`: legacy single-shot runtime schema
 - `multi-shot`: APE-style incremental runtime schema
-- `multi-shot-lazy`: lazy candidate incremental runtime schema
 
 All runtime ASP encodings are vendored under `snakeAPE/encodings`.
 
@@ -53,13 +51,13 @@ All runtime ASP encodings are vendored under `snakeAPE/encodings`.
 Normal run:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 Normal run from the `snakeAPE` root:
 
 ```bash
-python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-run
+python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 Legacy single-shot:
@@ -77,7 +75,7 @@ PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/
 Grounding only:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot-lazy --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
 ```
 
 Translation only:
@@ -86,16 +84,16 @@ Translation only:
 PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
 ```
 
-Translation only with lazy candidates:
+Translation only with compressed-candidate optimization:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot-lazy --translate-only --output-dir /tmp/snakeape-lazy-translate
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --python-precompute-direct --translate-only --output-dir /tmp/snakeape-translate-opt
 ```
 
-Multi-shot lazy:
+Optimized multi-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot-lazy --output-dir /tmp/snakeape-multi-lazy
+PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot --python-precompute-direct --output-dir /tmp/snakeape-multi-opt
 ```
 
 ## Comparing SAT and snakeAPE Outputs
@@ -136,8 +134,7 @@ Important files:
 - `translation.lp`
 - `translation_summary.json`
 - `grounding_summary.json` for `--ground-only`
-- `solutions.txt` and `workflow_signatures.json` for normal runs
-- `answer_sets.txt` only when `--write-raw-answer-sets` is enabled
+- descriptive `answer_sets__...txt` files and `workflow_signatures.json` for normal runs
 - `snakeAPE/run_log.csv`
 - `snakeAPE/run_summary.csv`
 

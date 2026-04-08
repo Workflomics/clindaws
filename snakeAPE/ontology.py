@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 from typing import Iterable
+import xml.etree.ElementTree as ET
 
 
 def _strip_prefix(value: str, prefix: str) -> str:
@@ -26,36 +27,46 @@ def _parse_rdf_xml_ontology(xml_text: str, prefix: str) -> tuple[set[tuple[str, 
     edge_set: set[tuple[str, str]] = set()
     nodes: set[str] = set()
 
-    class_pattern = re.compile(
-        r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*(?<!/)>(.*?)</(?:owl:Class|rdf:Description)>",
-        re.DOTALL,
-    )
-    direct_parent_pattern = re.compile(
-        r"<rdfs:subClassOf\b[^>]*rdf:resource=\"([^\"]+)\"\s*/?>",
-        re.DOTALL,
-    )
-    nested_parent_pattern = re.compile(
-        r"<rdfs:subClassOf\b[^>]*>.*?<rdf:Description\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/?>.*?</rdfs:subClassOf>",
-        re.DOTALL,
-    )
+    ns = {
+        "owl": "http://www.w3.org/2002/07/owl#",
+        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    }
+    rdf_about = f"{{{ns['rdf']}}}about"
+    rdf_resource = f"{{{ns['rdf']}}}resource"
+    owl_class = f"{{{ns['owl']}}}Class"
+    rdf_description = f"{{{ns['rdf']}}}Description"
+    rdfs_subclass = f"{{{ns['rdfs']}}}subClassOf"
+    root = ET.fromstring(xml_text)
 
-    for about, body in class_pattern.findall(xml_text):
+    named_tags = {owl_class, rdf_description}
+    for element in root.iter():
+        if element.tag not in named_tags:
+            continue
+        about = element.attrib.get(rdf_about)
+        if not about:
+            continue
         child = _strip_prefix(about, prefix)
         nodes.add(child)
-        for parent_ref in direct_parent_pattern.findall(body):
-            parent = _strip_prefix(parent_ref, prefix)
-            edge_set.add((child, parent))
-            nodes.add(parent)
-        for parent_ref in nested_parent_pattern.findall(body):
-            parent = _strip_prefix(parent_ref, prefix)
-            edge_set.add((child, parent))
-            nodes.add(parent)
+        for subclass_of in element.findall(rdfs_subclass):
+            direct_parent_ref = subclass_of.attrib.get(rdf_resource)
+            if direct_parent_ref:
+                parent = _strip_prefix(direct_parent_ref, prefix)
+                edge_set.add((child, parent))
+                nodes.add(parent)
+                continue
 
-    self_closing_pattern = re.compile(
-        r"<(?:owl:Class|rdf:Description)\b[^>]*rdf:about=\"([^\"]+)\"[^>]*/>"
-    )
-    for about in self_closing_pattern.findall(xml_text):
-        nodes.add(_strip_prefix(about, prefix))
+            for nested in subclass_of.iter():
+                if nested is subclass_of:
+                    continue
+                if nested.tag not in named_tags:
+                    continue
+                parent_ref = nested.attrib.get(rdf_about)
+                if not parent_ref:
+                    continue
+                parent = _strip_prefix(parent_ref, prefix)
+                edge_set.add((child, parent))
+                nodes.add(parent)
 
     return edge_set, nodes
 

@@ -5,25 +5,40 @@
 % ================================================================
 
 holds(0, avail(Slot)) :-
-    workflow_input_slot(Slot, _, _).
+    workflow_input_slot(Slot, _, _),
+    not full_workflow_input_witnesses.
 
 holds(0, dim(Slot, V, Cat)) :-
     workflow_input_slot_source(Slot, WF),
-    holds(0, dim(WF, V, Cat)).
+    holds(0, dim(WF, V, Cat)),
+    not full_workflow_input_witnesses.
 
 holds(0, unit(Slot, U)) :-
     workflow_input_slot_source(Slot, WF),
-    holds(0, unit(WF, U)).
+    holds(0, unit(WF, U)),
+    not full_workflow_input_witnesses.
+
+port_cat_ok(0, Port, WF, Cat) :-
+    planner_workflow_input(WF),
+    holds(0, avail(WF)),
+    port_requires(Port, _, Cat),
+    not holds(0, dim(WF, _, Cat)).
+
+port_cat_ok(0, Port, WF, Cat) :-
+    planner_workflow_input(WF),
+    holds(0, avail(WF)),
+    port_requires(Port, ReqV, Cat),
+    holds(0, dim(WF, V, Cat)),
+    compatible(V, ReqV).
 
 port_cat_ok(0, Port, WF, Cat) :-
     holds(0, avail(WF)),
-    not workflow_input_collapsed_member(WF),
+    not planner_workflow_input(WF),
     port_requires(Port, ReqV, Cat),
     holds(0, dim(WF, V, Cat)),
     compatible(V, ReqV).
 
 eligible(0, Port, WF) :-
     holds(0, avail(WF)),
-    not workflow_input_collapsed_member(WF),
     input_port(_, Port),
     port_cat_ok(0, Port, WF, Cat) : port_requires(Port, _, Cat).

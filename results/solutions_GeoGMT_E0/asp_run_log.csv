@@ -1,3 +1,0 @@
-test,mode,horizon,python_precompute_direct_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
-E0,multi-shot,timeout,false,"6,compete",false,7,20014,,,0,0,0,true,true
-E0,multi-shot,timeout,true,"6,compete",false,13,20053,,,0,0,0,true,true

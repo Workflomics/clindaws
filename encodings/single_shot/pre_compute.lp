@@ -37,6 +37,13 @@ constraint_data_selector_matches_value(Sel, Actual) :-
     constraint_data_selector(Sel, Wanted),
     compatible(Actual, Wanted).
 
+constraint_composite_data_selector(Sel) :-
+    constraint_data_selector_category(Sel, _).
+
+constraint_data_selector_matches_dim(Sel, Cat, Actual) :-
+    constraint_data_selector_dim(Sel, Cat, Wanted),
+    compatible(Actual, Wanted).
+
 workflow_input(WF) :-
     holds(0, avail(WF)).
 

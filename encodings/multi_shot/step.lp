@@ -72,8 +72,21 @@ occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
 % Port satisfaction per category
 port_cat_ok(t, Port, WF, Cat) :-
+    planner_workflow_input(WF),
     holds(t, avail(WF)),
-    not workflow_input_collapsed_member(WF),
+    port_requires(Port, _, Cat),
+    not holds(t, dim(WF, _, Cat)).
+
+port_cat_ok(t, Port, WF, Cat) :-
+    planner_workflow_input(WF),
+    holds(t, avail(WF)),
+    port_requires(Port, ReqV, Cat),
+    holds(t, dim(WF, V, Cat)),
+    compatible(V, ReqV).
+
+port_cat_ok(t, Port, WF, Cat) :-
+    holds(t, avail(WF)),
+    not planner_workflow_input(WF),
     port_requires(Port, ReqV, Cat),
     holds(t, dim(WF, V, Cat)),
     compatible(V, ReqV).
@@ -81,7 +94,6 @@ port_cat_ok(t, Port, WF, Cat) :-
 % Eligible item: all categories satisfied
 eligible(t, Port, WF) :-
     holds(t, avail(WF)),
-    not workflow_input_collapsed_member(WF),
     input_port(_, Port),
     port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
 
@@ -138,6 +150,7 @@ artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
     occurs(T, run(Tool)).
 
 :- occurs(t, use_variant(Tool, TI_ID)),
+   not full_workflow_input_witnesses,
    variant_sym_ports(TI_ID, PortHigh, PortLow),
    occurs(t, bind(Tool, PortLow, ArtifactLow)),
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
@@ -146,6 +159,7 @@ artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
 % If symmetric same-signature ports both consume the same workflow input, use a
 % different equivalent workflow input when one is available.
 :- occurs(t, use_variant(Tool, TI_ID)),
+   not full_workflow_input_witnesses,
    variant_sym_ports(TI_ID, PortHigh, PortLow),
    occurs(t, bind(Tool, PortLow, WF)),
    occurs(t, bind(Tool, PortHigh, WF)),
@@ -157,6 +171,7 @@ artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
 % Within one step, interchangeable slots of the same workflow-input class are
 % assigned canonically to ascending port ids.
 :- occurs(t, use_variant(Tool, TI_ID)),
+   not full_workflow_input_witnesses,
    occurs(t, bind(Tool, Port1, Slot1)),
    occurs(t, bind(Tool, Port2, Slot2)),
    Port1 < Port2,
@@ -175,53 +190,11 @@ slot_used_at_step(t, Rep, Rank) :-
 
 % Across steps, use slots in prefix order within each equivalence class.
 :- slot_used_at_step(t, Rep, Rank),
+   not full_workflow_input_witnesses,
    workflow_input_slot(_, Rep, SmallerRank),
    SmallerRank < Rank,
    not slot_used_before(t, Rep, SmallerRank),
    not slot_used_at_step(t, Rep, SmallerRank).
-
-% If the immediately previous step already consumed a workflow input on a
-% matching-signature port and produced an eligible output for the current port,
-% prefer that fresh output over reusing the original workflow input directly.
-immediate_chain_output_preferred(t, Tool, Port, WF, PrevTool, PrevOutPort) :-
-    occurs(t, bind(Tool, Port, WF)),
-    workflow_input(WF),
-    occurs(t-1, output(PrevTool, _, PrevOutPort)),
-    eligible(t-1, Port, out(t-1, PrevTool, PrevOutPort)),
-    occurs(t-1, bind(PrevTool, PrevPort, WF)),
-    same_input_signature(PrevPort, Port).
-
-:- immediate_chain_output_preferred(t, Tool, Port, WF, PrevTool, PrevOutPort).
-
-% If a tool already consumes the previous step's output on one port and that
-% same fresh output is also eligible on another port, prefer it over the
-% original workflow input that was used to produce it.
-immediate_output_dominates_source_input(t, Tool, Port, WF, PrevTool, PrevOutPort) :-
-    occurs(t, bind(Tool, Port, WF)),
-    workflow_input(WF),
-    occurs(t, bind(Tool, OtherPort, out(t-1, PrevTool, PrevOutPort))),
-    OtherPort != Port,
-    eligible(t-1, Port, out(t-1, PrevTool, PrevOutPort)),
-    occurs(t-1, bind(PrevTool, _, WF)).
-
-:- immediate_output_dominates_source_input(t, Tool, Port, WF, PrevTool, PrevOutPort).
-
-% If the immediately previous step already consumed a workflow-input slot on a
-% matching-signature port and produced an eligible output for the current port,
-% prefer that fresh output over reusing a later-rank equivalent slot directly.
-reused_equivalent_slot_after_immediate_output(t, Tool, Slot, Rep, Rank) :-
-    occurs(t, bind(Tool, _, Slot)),
-    workflow_input_slot(Slot, Rep, Rank),
-    Rank > 1,
-    occurs(t, bind(Tool, _, out(t-1, _, _))),
-    slot_used_before(t, Rep, Rank).
-
-:- reused_equivalent_slot_after_immediate_output(t, Tool, Slot, Rep, Rank),
-   workflow_input_slot(SmallerSlot, Rep, SmallerRank),
-   SmallerRank < Rank,
-   eligible(t-1, Port, SmallerSlot),
-   occurs(t, bind(Tool, Port, Slot)),
-   slot_used_before(t, Rep, SmallerRank).
 
 % Artifact ancestry over committed runs.
 artifact_parent(out(t, Tool, PortOut), WF) :-
@@ -240,101 +213,11 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
 
-% When the same variant is used in a chain and the later run consumes the
-% earlier output, keep workflow-input bindings on the repeated ports ordered by
-% input id across time. This collapses branch-swapped repeated-tool chains.
-same_variant_chain(t, TPrev, Tool, TI_ID) :-
-    TPrev < t,
-    occurs(TPrev, use_variant(Tool, TI_ID)),
-    occurs(t, use_variant(Tool, TI_ID)),
-    occurs(t, bind(Tool, _, out(TPrev, Tool, _))).
-
-:- same_variant_chain(t, TPrev, Tool, TI_ID),
-   input_port(TI_ID, Port),
-   occurs(TPrev, bind(Tool, Port, PrevArtifact)),
-   occurs(t, bind(Tool, Port, Artifact)),
-   artifact_precedes(t, Artifact, PrevArtifact).
-
-% In a three-step same-variant chain, if the middle run still consumes a raw
-% workflow input even though the step before it already produced an eligible
-% output from that same input, keep only the version where the middle run uses
-% that fresh output. This targets the remaining repeated-chain swap family
-% without broad ancestor-based pruning.
-same_variant_chain_middle_prefers_previous_output(
-    t, Tool, TI_ID, Port, WF, EarlierTool, EarlierOutPort
-) :-
-    same_variant_chain(t, t-1, Tool, TI_ID),
-    occurs(t-1, bind(Tool, Port, WF)),
-    workflow_input(WF),
-    occurs(t-2, output(EarlierTool, _, EarlierOutPort)),
-    eligible(t-2, Port, out(t-2, EarlierTool, EarlierOutPort)),
-    occurs(t-2, bind(EarlierTool, _, WF)).
-
-:- same_variant_chain_middle_prefers_previous_output(
-       t, Tool, TI_ID, Port, WF, EarlierTool, EarlierOutPort).
-
-% If the current step consumes the previous step's output, and that previous
-% step still consumed a raw workflow input even though the step before it had
-% already produced an eligible output from that same workflow input, prefer the
-% tighter chain through the earlier output.
-middle_step_prefers_earlier_output_in_consumed_chain(
-    t, MidTool, MidPort, WF, EarlierTool, EarlierOutPort
-) :-
-    t > 2,
-    occurs(t, bind(_, _, out(t-1, MidTool, _))),
-    occurs(t-1, bind(MidTool, MidPort, WF)),
-    workflow_input(WF),
-    occurs(t-2, output(EarlierTool, _, EarlierOutPort)),
-    eligible(t-2, MidPort, out(t-2, EarlierTool, EarlierOutPort)),
-    occurs(t-2, bind(EarlierTool, _, WF)).
-
-:- middle_step_prefers_earlier_output_in_consumed_chain(
-       t, MidTool, MidPort, WF, EarlierTool, EarlierOutPort).
-
-% When two single-input producer runs with the same input signature later feed a
-% symmetric join, keep the earlier producer on the more-derived source and the
-% later producer on the older source. This removes the extra branch-swapped
-% variants while preserving the SAT-aligned one.
-paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2) :-
-    T1 < T2,
-    occurs(T1, use_variant(Tool1, TI1)),
-    occurs(T2, use_variant(Tool2, TI2)),
-    variant_single_input(TI1),
-    variant_single_input(TI2),
-    occurs(T1, bind(Tool1, Port1, WF1)),
-    occurs(T2, bind(Tool2, Port2, WF2)),
-    same_input_signature(Port1, Port2),
-    occurs(TJ, use_variant(JoinTool, JoinTI)),
-    variant_sym_ports(JoinTI, JoinPort1, JoinPort2),
-    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
-    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
-    TJ > T2,
-    JoinPort2 < JoinPort1.
-
-:- paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF, T2, Tool2, TI2, Port2, WF).
-
-:- paired_symmetric_producers(t, T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2),
-   artifact_ancestor(t, WF1, WF2).
-
-% When repeated runs of the same single-input variant later feed the two
-% symmetric inputs of the same join, order the producer inputs canonically.
-repeated_same_variant_symmetric_join_input_swap(
-    t, T1, Tool, TI_ID, WF1, T2, WF2, JoinTool, JoinTI, JoinPortHigh, JoinPortLow
-) :-
-    T1 < T2,
-    occurs(T1, use_variant(Tool, TI_ID)),
-    occurs(T2, use_variant(Tool, TI_ID)),
-    variant_single_input(TI_ID),
-    occurs(T1, bind(Tool, Port1, WF1)),
-    occurs(T2, bind(Tool, Port2, WF2)),
-    occurs(TJ, use_variant(JoinTool, JoinTI)),
-    variant_sym_ports(JoinTI, JoinPortHigh, JoinPortLow),
-    occurs(TJ, bind(JoinTool, JoinPortLow, out(T1, Tool, _))),
-    occurs(TJ, bind(JoinTool, JoinPortHigh, out(T2, Tool, _))),
-    artifact_precedes(t, WF2, WF1).
-
-:- repeated_same_variant_symmetric_join_input_swap(
-       t, T1, Tool, TI_ID, WF1, T2, WF2, JoinTool, JoinTI, JoinPortHigh, JoinPortLow).
+% Direct-only chain-pruning rules that tried to canonicalize repeated-input and
+% repeated-tool witnesses were removed here. They reduced duplicates, but they
+% can also prune valid workflows that the compressed-candidate backend and APE
+% still admit. GeoGMT E0 is one concrete regression case. Keep only the sound
+% local symmetric-port canonicalization above.
 
 % ----------------------------------------------------------------
 % From output_production.lp — output port selection and dimensions

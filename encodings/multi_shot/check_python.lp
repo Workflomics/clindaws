@@ -12,9 +12,6 @@ goal_id(GoalID) :- goal_output(GoalID, _, _).
 % Hard goal constraint
 :- query(t), not holds(t, goal).
 
-% Only accept workflows at the first horizon where the goal is reached.
-:- query(t), t > 1, holds(t-1, goal).
-
 1 { chosen_goal_output(t, GoalID, WF) : goal_satisfied_by_output(t, GoalID, WF) } 1 :-
     query(t),
     goal_id(GoalID).

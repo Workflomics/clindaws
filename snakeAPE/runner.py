@@ -41,23 +41,20 @@ from .runtime_stats import current_peak_rss_mb
 from .solver import (
     ground_multi_shot,
     ground_multi_shot_compressed_candidate,
-    ground_multi_shot_lazy,
     program_paths_for_mode,
     solve_multi_shot,
     solve_multi_shot_compressed_candidate,
-    solve_multi_shot_lazy,
     solve_single_shot,
 )
 from .tool_annotations import (
+    load_candidate_tool_annotations,
     load_direct_tool_annotations,
-    load_lazy_tool_annotations,
 )
 from .translator_direct import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
 )
 from .translator_compressed_candidate import build_compressed_candidate_fact_bundle
-from .translator_lazy import build_lazy_fact_bundle
 from .workflow import reconstruct_solution
 
 
@@ -85,7 +82,6 @@ SCHEMA_PREDICATES = (
     "lazy_candidate_output_declared_type",
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
-LAZY_TRANSLATION_BUILDER = "candidate_lazy"
 COMPRESSED_CANDIDATE_TRANSLATION_BUILDER = "candidate_compressed"
 ProgressCallback = Callable[[str], None] | None
 
@@ -114,13 +110,6 @@ _MODE_CONFIGS = {
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
-    "multi-shot-lazy": _ModeConfig(
-        solver_family="multi-shot",
-        solver_approach="compressed_candidate",
-        translation_pathway="lazy",
-        translation_builder=LAZY_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
     "multi-shot-compressed-candidate": _ModeConfig(
         solver_family="multi-shot",
         solver_approach="compressed_candidate",
@@ -133,13 +122,11 @@ _MODE_CONFIGS = {
 _SOLVER_DISPATCH = {
     "single-shot": solve_single_shot,
     "multi-shot": solve_multi_shot,
-    "multi-shot-lazy": solve_multi_shot_lazy,
     "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
 
 _GROUNDER_DISPATCH = {
     "multi-shot": ground_multi_shot,
-    "multi-shot-lazy": ground_multi_shot_lazy,
     "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
 
@@ -153,7 +140,7 @@ def _mode_config(mode: str) -> _ModeConfig:
 
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     translation_pathway = _mode_config(mode).translation_pathway
-    if translation_pathway in {"lazy", "compressed_candidate"}:
+    if translation_pathway == "compressed_candidate":
         return "python"
     if translation_pathway == "ape_multi_shot":
         return "ape_clingo_legacy"
@@ -161,8 +148,8 @@ def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
 
 
 def _load_tools_for_mode(config, translation_pathway: str):
-    if translation_pathway in {"lazy", "compressed_candidate"}:
-        return load_lazy_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
+    if translation_pathway == "compressed_candidate":
+        return load_candidate_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     return load_direct_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
 
 
@@ -1133,17 +1120,7 @@ def _prepare_run_context(
     tools = _load_tools_for_mode(config, mode_config.translation_pathway)
     resolved_translation_builder = mode_config.translation_builder
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
-    if mode_config.translation_pathway == "lazy":
-        fact_bundle = replace(
-            build_lazy_fact_bundle(
-                config,
-                ontology,
-                tools,
-            ),
-            internal_schema="compressed_candidate",
-            internal_solver_mode="multi-shot-lazy",
-        )
-    elif mode_config.translation_pathway == "ape_multi_shot":
+    if mode_config.translation_pathway == "ape_multi_shot":
         fact_bundle = _legacy_direct_bundle(
             config,
             ontology,
@@ -1155,7 +1132,7 @@ def _prepare_run_context(
                 python_precompute_direct=python_precompute_direct,
                 tools=tools,
             ):
-                compressed_candidate_tools = load_lazy_tool_annotations(
+                compressed_candidate_tools = load_candidate_tool_annotations(
                     config.tool_annotations_path,
                     config.ontology_prefix,
                 )
@@ -1669,7 +1646,7 @@ def run_ground_only(
 
     mode_config = _mode_config(mode)
     if not mode_config.supports_ground_only:
-        raise ValueError("Ground-only runs support only multi-shot and multi-shot-lazy modes.")
+        raise ValueError("Ground-only runs support only multi-shot mode.")
 
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
 
