@@ -102,59 +102,13 @@ eligible(t, Port, WF) :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
-% Canonical artifact order for same-signature ports. This removes duplicate
-% witnesses where identical ports are filled by the same artifacts in a
-% different order, including mixed workflow-input / produced-output swaps.
-artifact_precedes(t, WF1, WF2) :-
-    workflow_input(WF1),
-    workflow_input(WF2),
-    WF1 < WF2.
-
-artifact_precedes(t, WF, Slot) :-
-    workflow_input(WF),
-    workflow_input_slot(Slot, Rep, _),
-    WF < Rep.
-
-artifact_precedes(t, Slot1, Slot2) :-
-    workflow_input_slot(Slot1, Rep1, Rank1),
-    workflow_input_slot(Slot2, Rep2, Rank2),
-    Rep1 < Rep2.
-
-artifact_precedes(t, Slot, WF) :-
-    workflow_input_slot(Slot, Rep, _),
-    workflow_input(WF),
-    Rep < WF.
-
-artifact_precedes(t, Slot1, Slot2) :-
-    workflow_input_slot(Slot1, Rep, Rank1),
-    workflow_input_slot(Slot2, Rep, Rank2),
-    Rank1 < Rank2.
-
-artifact_precedes(t, Slot, out(T, Tool, Port)) :-
-    workflow_input_slot(Slot, _, _),
-    occurs(T, output(Tool, _, Port)).
-
-artifact_precedes(t, WF, out(T, Tool, Port)) :-
-    workflow_input(WF),
-    occurs(T, output(Tool, _, Port)).
-
-artifact_precedes(t, out(T1, Tool1, Port1), out(T2, Tool2, Port2)) :-
-    occurs(T1, output(Tool1, _, Port1)),
-    occurs(T2, output(Tool2, _, Port2)),
-    T1 < T2.
-
-artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
-    occurs(T, output(Tool, _, Port1)),
-    occurs(T, output(Tool, _, Port2)),
-    Port1 < Port2,
-    occurs(T, run(Tool)).
-
+% Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_variant(Tool, TI_ID)),
    not full_workflow_input_witnesses,
    variant_sym_ports(TI_ID, PortHigh, PortLow),
    occurs(t, bind(Tool, PortLow, ArtifactLow)),
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
-   artifact_precedes(t, ArtifactHigh, ArtifactLow).
+   ArtifactHigh < ArtifactLow.
 
 % If symmetric same-signature ports both consume the same workflow input, use a
 % different equivalent workflow input when one is available.
@@ -169,34 +123,15 @@ artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
    WFAlt != WF.
 
 % Within one step, interchangeable slots of the same workflow-input class are
-% assigned canonically to ascending port ids.
-:- occurs(t, use_variant(Tool, TI_ID)),
+% used in increasing Rank order.
+:- occurs(t, bind(Tool, Port, SlotHigh)),
    not full_workflow_input_witnesses,
-   occurs(t, bind(Tool, Port1, Slot1)),
-   occurs(t, bind(Tool, Port2, Slot2)),
-   Port1 < Port2,
-   workflow_input_slot(Slot1, Rep, Rank1),
-   workflow_input_slot(Slot2, Rep, Rank2),
-   Rank1 > Rank2.
+   workflow_input_slot(SlotHigh, Rep, RankHigh),
+   workflow_input_slot(SlotLow, Rep, RankLow),
+   RankLow < RankHigh,
+   eligible(t-1, Port, SlotLow),
+   not occurs(t, bind(_, _, SlotLow)).
 
-slot_used_before(t, Rep, Rank) :-
-    workflow_input_slot(Slot, Rep, Rank),
-    occurs(TPrev, bind(_, _, Slot)),
-    TPrev < t.
-
-slot_used_at_step(t, Rep, Rank) :-
-    workflow_input_slot(Slot, Rep, Rank),
-    occurs(t, bind(_, _, Slot)).
-
-% Across steps, use slots in prefix order within each equivalence class.
-:- slot_used_at_step(t, Rep, Rank),
-   not full_workflow_input_witnesses,
-   workflow_input_slot(_, Rep, SmallerRank),
-   SmallerRank < Rank,
-   not slot_used_before(t, Rep, SmallerRank),
-   not slot_used_at_step(t, Rep, SmallerRank).
-
-% Artifact ancestry over committed runs.
 artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, WF)).
@@ -213,11 +148,6 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
     artifact_ancestor(t, Mid, Ancestor).
 
-% Direct-only chain-pruning rules that tried to canonicalize repeated-input and
-% repeated-tool witnesses were removed here. They reduced duplicates, but they
-% can also prune valid workflows that the compressed-candidate backend and APE
-% still admit. GeoGMT E0 is one concrete regression case. Keep only the sound
-% local symmetric-port canonicalization above.
 
 % ----------------------------------------------------------------
 % From output_production.lp — output port selection and dimensions
@@ -233,7 +163,13 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
 holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, _, Port)).
 
+% Monotonic bridge for symmetry breakers
+available(out(t, Tool, Port)) :- holds(t, avail(out(t, Tool, Port))).
+artifact_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
+artifact_unit(out(t, Tool, Port), U)   :- holds(t, unit(out(t, Tool, Port), U)).
+
 % Output dimensions — Case A: terminal value
+
 holds(t, dim(out(t, Tool, Port), V, Cat)) :-
     occurs(t, output(Tool, _, Port)),
     dimension(Port, (V, Cat)),
@@ -381,24 +317,12 @@ pipeline_has_at(t, Prop) :-
     holds(t, dim(WF, ActualV, Cat)),
     compatible(ActualV, ReqV).
 
-
 % ----------------------------------------------------------------
 % From requirements.lp — constraints only (static derivations in base.lp)
 % ----------------------------------------------------------------
 
 :- requirement_filtering_active, occurs(t, run(Tool)), not tool_req_compatible(Tool).
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
-
-% ----------------------------------------------------------------
-% From constraints.lp
-% ----------------------------------------------------------------
-
-% Contiguous execution: no gaps in the plan
-:- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
-
-% SAT mode does not forbid repeated tool occurrences during synthesis. The
-% config-level tool_seq_repeat flag is handled later as a solution-distinction
-% policy, so repeated runs remain legal here.
 
 % ----------------------------------------------------------------
 % Sequential workflow: at most one tool runs per timestep

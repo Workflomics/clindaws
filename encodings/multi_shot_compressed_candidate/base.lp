@@ -8,11 +8,17 @@ is_terminal(V) :- taxonomy(_, _, (_, V, _)), not taxonomy(_, _, (_, _, V)).
 compatible(V, V)        :- is_terminal(V).
 compatible(V, Ancestor) :- is_terminal(V), ancestor(V, Ancestor).
 
-artifact_dim(WF, V, Category) :-
-    holds(0, dim(WF, V, Category)).
+% Bridge monotonic properties from initial facts (emitted by Python wrapper)
+available(A)          :- holds(0, avail(A)).
+artifact_dim(A, V, C) :- holds(0, dim(A, V, C)).
+artifact_unit(A, U)   :- holds(0, unit(A, U)).
+
+is_workflow_input(WF) :- holds(0, avail(WF)).
 
 workflow_input(WF) :-
-    holds(0, avail(WF)).
+    is_workflow_input(WF).
+
+
 
 tool_has_input(Tool) :-
     lazy_tool_candidate(Candidate, Tool),
@@ -147,20 +153,21 @@ lazy_query_output_value(Candidate, Port, V, Category) :-
 
 initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
-    holds(0, avail(WF)),
+    available(WF),
     artifact_dim(WF, ActualV, Category),
     compatible(ActualV, GoalV).
 
 initial_goal_dim_missing(GoalID, WF) :-
     goal_output(GoalID, GoalV, Category),
-    holds(0, avail(WF)),
+    available(WF),
     not initial_goal_dim_match(GoalID, WF, GoalV, Category).
 
 initial_goal_satisfied_by(GoalID, WF) :-
-    holds(0, avail(WF)),
+    available(WF),
     goal_output(GoalID, _, _),
     initial_goal_dim_match(GoalID, WF, _, _),
     not initial_goal_dim_missing(GoalID, WF).
+
 
 initial_goal_satisfied(GoalID) :-
     goal_id(GoalID),

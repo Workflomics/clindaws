@@ -112,6 +112,7 @@ def _single_shot_program_paths(*, python_precompute_direct: bool = False) -> tup
         base / "show.lp",
         base / ("pre_compute_python.lp" if python_precompute_direct else "pre_compute.lp"),
         base / "propagation.lp",
+
         base / ("tool_choice_python.lp" if python_precompute_direct else "tool_choice.lp"),
         base / "output_production.lp",
         base / "reachability.lp",
@@ -123,8 +124,11 @@ def _single_shot_program_paths(*, python_precompute_direct: bool = False) -> tup
         base / "generated_constraints.lp",
         base / "plan_constraints.lp",
         base / "temporal_constraint.lp",
+        base / "artifact_precedes.lp",
         base / "tool_inclusion_constraints.lp",
+
         base / "input_usage_constraints.lp",
+        base / "output_usage_constraints.lp",
     )
 
 
@@ -788,8 +792,7 @@ def _solve_single_shot_once(
     horizon = config.solution_length_max
 
     static_overlay = (
-        SINGLE_SHOT_OVERLAY_PREFIX
-        + ":- time(T), 2 { occurs(T, run(_)) }.\n"
+        _single_shot_overlay(horizon)
     )
 
     control = _make_solve_control(

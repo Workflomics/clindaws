@@ -31,7 +31,7 @@ workflow_input_reference_check(t, Artifact, WF) :-
 workflow_input_reference_check(t, Artifact, WF) :-
    query(t),
    planner_workflow_input(WF),
-   artifact_ancestor(t, Artifact, WF).
+   artifact_ancestor(Artifact, WF).
 
 workflow_input_used_check(t, WF) :-
    query(t),

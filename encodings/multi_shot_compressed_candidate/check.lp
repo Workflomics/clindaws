@@ -4,19 +4,19 @@
 goal_dim_match(t, GoalID, WF, RequirementID) :-
     query(t),
     compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
-    holds(t, avail(WF)),
+    available(WF),
     artifact_dim(WF, ActualV, Category),
     lazy_profile_accepts(ProfileId, ActualV).
 
 goal_dim_missing(t, GoalID, WF, RequirementID) :-
     query(t),
     compressed_goal_requirement_profile(GoalID, RequirementID, _, _),
-    holds(t, avail(WF)),
+    available(WF),
     not goal_dim_match(t, GoalID, WF, RequirementID).
 
 goal_satisfied_by(t, GoalID, WF) :-
     query(t),
-    holds(t, avail(WF)),
+    available(WF),
     goal_id(GoalID),
     goal_dim_match(t, GoalID, WF, _),
     not goal_dim_missing(t, GoalID, WF, _).

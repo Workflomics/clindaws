@@ -51,13 +51,9 @@ constraint_selected_any(t, Sel) :-
 
 constraint_artifact_dim_check(t, WF, V, Cat) :-
     query(t),
-    holds(0, avail(WF)),
-    holds(0, dim(WF, V, Cat)).
+    available(WF),
+    artifact_dim(WF, V, Cat).
 
-constraint_artifact_dim_check(t, out(TSel, Tool, Port), V, Cat) :-
-    query(t),
-    occurs(TSel, output(Tool, _, Port)),
-    holds(TSel, dim(out(TSel, Tool, Port), V, Cat)).
 
 constraint_composite_data_selector(Sel) :-
     constraint_data_selector_category(Sel, _).

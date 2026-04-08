@@ -44,14 +44,23 @@ constraint_data_selector_matches_dim(Sel, Cat, Actual) :-
     constraint_data_selector_dim(Sel, Cat, Wanted),
     compatible(Actual, Wanted).
 
-workflow_input(WF) :-
+% --- Workflow inputs ---
+is_workflow_input(WF) :-
     holds(0, avail(WF)).
+
+available(WF) :-
+    is_workflow_input(WF).
+
+workflow_input(WF) :-
+    is_workflow_input(WF).
+
 
 workflow_input_profile_mismatch(WF1, WF2) :-
     workflow_input(WF1),
     workflow_input(WF2),
     holds(0, dim(WF1, V, Cat)),
     not holds(0, dim(WF2, V, Cat)).
+
 
 equivalent_workflow_inputs(WF1, WF2) :-
     workflow_input(WF1),

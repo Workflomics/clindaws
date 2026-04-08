@@ -2,8 +2,6 @@
 
 time(t).
 
-holds(t, avail(WF)) :- holds(t-1, avail(WF)).
-
 initial_goal_filter_active(t) :-
     t = 1,
     query(t),
@@ -48,18 +46,14 @@ artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, WF)).
 
-% Carry forward ancestors from the previous step (artifact graph is monotone).
-% At t=1, artifact_ancestor(0, ...) is empty so this is a no-op; base rules fire.
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_ancestor(t-1, Artifact, Ancestor).
-
-% Only compute fresh entries for artifacts produced at THIS step.
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+% Transitive closure of artifact graph (global, non-timestamped)
+artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Ancestor).
 
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(t, Mid, Ancestor).
+    artifact_ancestor(Mid, Ancestor).
+
 
 % paired_symmetric_producers and repeated_same_candidate_symmetric_join_swap are
 % omitted here: both require T1 < T2 < TJ, which needs at least 3 time steps.
@@ -88,8 +82,9 @@ occurs(t, output(Tool, Candidate, Port)) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_output_port(Candidate, Port).
 
-holds(t, avail(out(t, Tool, Port))) :-
+available(out(t, Tool, Port)) :-
     occurs(t, output(Tool, _, Port)).
+
 
 1 { occurs(t, output_dim(Tool, Port, V, Category)) :
     lazy_initial_goal_output_value(Candidate, Port, V, Category) } 1 :-

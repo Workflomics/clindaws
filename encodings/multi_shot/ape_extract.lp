@@ -24,7 +24,7 @@ ape_bind(t, Port, WF) :-
 % The out(t,...) pattern ensures the atom is derived only when the output
 % is first produced, preventing redefinition across incremental steps.
 % Workflow-input annotations are emitted as base facts by ClingoSynthesisEngine.
-ape_holds_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
+ape_holds_dim(out(t, Tool, Port), V, Cat) :- artifact_dim(out(t, Tool, Port), V, Cat).
 #show ape_holds_dim/3.
 
 % Workflow outputs are emitted from the chosen goal-satisfying artifacts only.

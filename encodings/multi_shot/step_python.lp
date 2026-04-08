@@ -8,26 +8,7 @@
 time(t).
 
 % ----------------------------------------------------------------
-% From propagation.lp — inertia for availability and dimensions
-% ----------------------------------------------------------------
-
-holds(t, avail(WF)) :-
-    holds(t-1, avail(WF)).
-
-holds(t, dim(WF, V, Cat)) :-
-    holds(t-1, dim(WF, V, Cat)),
-    holds(t, avail(WF)).
-
-% ----------------------------------------------------------------
-% From unit_reasoning.lp — unit carry-forward
-% ----------------------------------------------------------------
-
-holds(t, unit(WF, U)) :-
-    holds(t-1, unit(WF, U)),
-    holds(t, avail(WF)).
-
-% ----------------------------------------------------------------
-% From artifact_state.lp — inertia and transition firing
+% Transition firing for stateful artifacts (non-monotonic)
 % ----------------------------------------------------------------
 
 % Positive persistence
@@ -56,7 +37,7 @@ holds(t, state(Artifact, NewState)) :-
    S1 != S2.
 
 % ----------------------------------------------------------------
-% From tool_choice.lp — run choice, variant selection, port binding
+% Tool choice, variant selection, port binding
 % ----------------------------------------------------------------
 
 % Run choice
@@ -70,30 +51,27 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Signature-level eligibility keeps the grounding surface proportional to the
-% number of unique input signatures instead of concrete consumer/producer-port
-% pairs. Produced outputs are statically filtered by support-class/profile
-% compatibility and then checked against the actual chosen terminal dimensions.
+% Signature-level eligibility
 eligible_signature(t, Signature, WF) :-
     direct_signature_initial_artifact(Signature, WF),
     workflow_input(WF),
-    holds(t, avail(WF)).
+    available(WF).
 
 eligible_signature(t, Signature, Slot) :-
     direct_signature_initial_artifact(Signature, Slot),
     workflow_input_slot(Slot, _, _),
-    holds(t, avail(Slot)).
+    available(Slot).
 
 output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
     direct_signature_support_class(Signature, SupportClass),
     direct_output_port_profile(ProducerPort, Profile),
     direct_support_class_profile(SupportClass, Profile),
-    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))).
+    available(out(TPrev, ToolPrev, ProducerPort)).
 
 signature_cat_ok(t, Signature, out(TPrev, ToolPrev, ProducerPort), Cat) :-
     output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)),
     direct_signature_requires(Signature, ReqV, Cat),
-    holds(t, dim(out(TPrev, ToolPrev, ProducerPort), V, Cat)),
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), V, Cat),
     compatible(V, ReqV).
 
 eligible_signature(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
@@ -110,59 +88,14 @@ eligible(t, Port, Artifact) :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
-% Canonical artifact order for same-signature ports. This removes duplicate
-% witnesses where identical ports are filled by the same artifacts in a
-% different order, including mixed workflow-input / produced-output swaps.
-artifact_precedes(t, WF1, WF2) :-
-    workflow_input(WF1),
-    workflow_input(WF2),
-    WF1 < WF2.
 
-artifact_precedes(t, WF, Slot) :-
-    workflow_input(WF),
-    workflow_input_slot(Slot, Rep, _),
-    WF < Rep.
-
-artifact_precedes(t, Slot1, Slot2) :-
-    workflow_input_slot(Slot1, Rep1, Rank1),
-    workflow_input_slot(Slot2, Rep2, Rank2),
-    Rep1 < Rep2.
-
-artifact_precedes(t, Slot, WF) :-
-    workflow_input_slot(Slot, Rep, _),
-    workflow_input(WF),
-    Rep < WF.
-
-artifact_precedes(t, Slot1, Slot2) :-
-    workflow_input_slot(Slot1, Rep, Rank1),
-    workflow_input_slot(Slot2, Rep, Rank2),
-    Rank1 < Rank2.
-
-artifact_precedes(t, Slot, out(T, Tool, Port)) :-
-    workflow_input_slot(Slot, _, _),
-    occurs(T, output(Tool, _, Port)).
-
-artifact_precedes(t, WF, out(T, Tool, Port)) :-
-    workflow_input(WF),
-    occurs(T, output(Tool, _, Port)).
-
-artifact_precedes(t, out(T1, Tool1, Port1), out(T2, Tool2, Port2)) :-
-    occurs(T1, output(Tool1, _, Port1)),
-    occurs(T2, output(Tool2, _, Port2)),
-    T1 < T2.
-
-artifact_precedes(t, out(T, Tool, Port1), out(T, Tool, Port2)) :-
-    occurs(T, output(Tool, _, Port1)),
-    occurs(T, output(Tool, _, Port2)),
-    Port1 < Port2,
-    occurs(T, run(Tool)).
-
+% Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_variant(Tool, TI_ID)),
    not full_workflow_input_witnesses,
    variant_sym_ports(TI_ID, PortHigh, PortLow),
    occurs(t, bind(Tool, PortLow, ArtifactLow)),
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
-   artifact_precedes(t, ArtifactHigh, ArtifactLow).
+   ArtifactHigh < ArtifactLow.
 
 % If symmetric same-signature ports both consume the same workflow input, use a
 % different equivalent workflow input when one is available.
@@ -210,16 +143,12 @@ artifact_parent(out(t, Tool, PortOut), WF) :-
     occurs(t, bind(Tool, _, WF)).
 
 % Carry forward ancestors from previous steps; the artifact graph is monotone.
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_ancestor(t-1, Artifact, Ancestor).
-
-% Only compute fresh ancestry for artifacts produced at THIS step.
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Ancestor).
 
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
+artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
     artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(t, Mid, Ancestor).
+    artifact_ancestor(Mid, Ancestor).
 
 % Direct-only chain-pruning rules that tried to canonicalize repeated-input and
 % repeated-tool witnesses were removed here. They reduced duplicates, but they
@@ -237,12 +166,12 @@ artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
     tool_has_output(Tool),
     tool_output(Tool, TOut_ID).
 
-% Output availability
-holds(t, avail(out(t, Tool, Port))) :-
+% Output availability (monotonic)
+available(out(t, Tool, Port)) :-
     occurs(t, output(Tool, _, Port)).
 
 % Output dimensions — Case A: terminal value
-holds(t, dim(out(t, Tool, Port), V, Cat)) :-
+artifact_dim(out(t, Tool, Port), V, Cat) :-
     occurs(t, output(Tool, _, Port)),
     dimension(Port, (V, Cat)),
     is_terminal(V).
@@ -255,7 +184,8 @@ holds(t, dim(out(t, Tool, Port), V, Cat)) :-
     dimension(Port, (V, Cat)),
     not is_terminal(V).
 
-holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
+
+artifact_dim(out(t, Tool, Port), Descendant, Cat) :-
     occurs(t, output_dim(Tool, Port, Descendant, Cat)).
 
 % ----------------------------------------------------------------
@@ -263,12 +193,12 @@ holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
 % ----------------------------------------------------------------
 
 % Case 1: explicit port_unit declaration
-holds(t, unit(out(t, Tool, Port), U)) :-
+artifact_unit(out(t, Tool, Port), U) :-
     occurs(t, output(Tool, _, Port)),
     port_unit(Port, U).
 
 % Case 2: strict mode — no declaration → unit is none
-holds(t, unit(out(t, Tool, Port), none)) :-
+artifact_unit(out(t, Tool, Port), none) :-
     unit_mode(strict),
     occurs(t, output(Tool, _, Port)),
     not port_unit(Port, _).
@@ -276,7 +206,7 @@ holds(t, unit(out(t, Tool, Port), none)) :-
 % Case 3: agnostic mode — inherit from homogeneous inputs
 input_root(t, Tool, Root) :-
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none,
     unit_root(U, Root).
 
@@ -284,26 +214,27 @@ single_input_root(t, Tool) :-
     occurs(t, run(Tool)),
     #count { Root : input_root(t, Tool, Root) } = 1.
 
-holds(t, unit(out(t, Tool, Port), U)) :-
+artifact_unit(out(t, Tool, Port), U) :-
     unit_mode(agnostic),
     occurs(t, output(Tool, _, Port)),
     not port_unit(Port, _),
     single_input_root(t, Tool),
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none.
 
 % Unit binding compatibility constraints
 :- occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, UPort),
-   holds(t, unit(WF, UData)),
+   artifact_unit(WF, UData),
    UData != none,
    not units_compatible(UPort, UData).
 
 :- unit_mode(strict),
    occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, _),
-   not holds(t, unit(WF, _)).
+   not artifact_unit(WF, _).
+
 
 % ----------------------------------------------------------------
 % From reachability.lp
@@ -343,24 +274,24 @@ reachable(t, Tool2) :-
 
 goal_dim_match(t, GoalID, WF, GoalV, Cat) :-
     goal_output(GoalID, GoalV, Cat),
-    holds(t, avail(WF)),
-    holds(t, dim(WF, ActualV, Cat)),
+    available(WF),
+    artifact_dim(WF, ActualV, Cat),
     compatible(ActualV, GoalV).
 
 goal_dim_missing(t, GoalID, WF) :-
     goal_output(GoalID, GoalV, Cat),
-    holds(t, avail(WF)),
+    available(WF),
     not goal_dim_match(t, GoalID, WF, GoalV, Cat).
 
 goal_satisfied_by(t, GoalID, WF) :-
-    holds(t, avail(WF)),
+    available(WF),
     goal_output(GoalID, _, _),
     goal_dim_match(t, GoalID, WF, _, _),
     not goal_dim_missing(t, GoalID, WF).
 
 goal_satisfied_by_output(t, GoalID, WF) :-
     goal_satisfied_by(t, GoalID, WF),
-    not holds(0, avail(WF)).
+    not planner_workflow_input(WF).
 
 goal_satisfied(t, GoalID) :-
     goal_output(GoalID, _, _),
@@ -386,8 +317,9 @@ pipeline_has_at(t, Prop) :-
 pipeline_has_at(t, Prop) :-
     port_property(Tool, Port, ReqV, Cat, Prop),
     occurs(t, bind(Tool, Port, WF)),
-    holds(t, dim(WF, ActualV, Cat)),
+    artifact_dim(WF, ActualV, Cat),
     compatible(ActualV, ReqV).
+
 
 
 % ----------------------------------------------------------------

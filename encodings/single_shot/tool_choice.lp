@@ -31,13 +31,19 @@ eligible(T, Port, WF) :-
     input_port(TI_ID, Port).
 
 :- occurs(T, use_variant(Tool, TI_ID)),
-   occurs(T, bind(Tool, Port1, WF1)),
-   occurs(T, bind(Tool, Port2, WF2)),
-   Port1 < Port2,
-   input_port(TI_ID, Port1),
-   input_port(TI_ID, Port2),
-   same_input_signature(Port1, Port2),
-   equivalent_workflow_inputs(WF2, WF1).
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(T, bind(Tool, PortLow, ArtifactLow)),
+   occurs(T, bind(Tool, PortHigh, ArtifactHigh)),
+   artifact_precedes(ArtifactHigh, ArtifactLow).
+
+:- occurs(T, use_variant(Tool, TI_ID)),
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(T, bind(Tool, PortLow, WF)),
+   occurs(T, bind(Tool, PortHigh, WF)),
+   workflow_input_slot(WF, Rep, _),
+   eligible(T-1, PortHigh, WFAlt),
+   workflow_input_slot(WFAlt, Rep, _),
+   WFAlt != WF.
 
 artifact_parent(out(T, Tool, PortOut), WF) :-
     occurs(T, output(Tool, _, PortOut)),
@@ -50,34 +56,3 @@ artifact_ancestor(Artifact, Ancestor) :-
     artifact_parent(Artifact, Mid),
     artifact_ancestor(Mid, Ancestor).
 
-:- occurs(T, use_variant(Tool, TI_ID)),
-   occurs(T, bind(Tool, Port1, out(T1, Tool1, _))),
-   occurs(T, bind(Tool, Port2, out(T2, Tool2, _))),
-   Port1 < Port2,
-   input_port(TI_ID, Port1),
-   input_port(TI_ID, Port2),
-   same_input_signature(Port1, Port2),
-   T1 < T2.
-
-paired_symmetric_producers(T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2) :-
-    T1 < T2,
-    occurs(T1, use_variant(Tool1, TI1)),
-    occurs(T2, use_variant(Tool2, TI2)),
-    variant_single_input(TI1),
-    variant_single_input(TI2),
-    occurs(T1, bind(Tool1, Port1, WF1)),
-    occurs(T2, bind(Tool2, Port2, WF2)),
-    same_input_signature(Port1, Port2),
-    occurs(TJ, use_variant(JoinTool, JoinTI)),
-    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
-    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
-    TJ > T2,
-    input_port(JoinTI, JoinPort1),
-    input_port(JoinTI, JoinPort2),
-    JoinPort2 < JoinPort1,
-    same_input_signature(JoinPort1, JoinPort2).
-
-:- paired_symmetric_producers(T1, Tool1, TI1, Port1, WF, T2, Tool2, TI2, Port2, WF).
-
-:- paired_symmetric_producers(T1, Tool1, TI1, Port1, WF1, T2, Tool2, TI2, Port2, WF2),
-   artifact_ancestor(WF1, WF2).

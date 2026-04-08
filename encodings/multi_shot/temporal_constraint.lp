@@ -54,14 +54,14 @@ sel_run_at(t, T, with_input_type(Tool, TypeVal)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, bind(Tool, _, WF)),
-    holds(T-1, dim(WF, TypeVal, type)).
+    holds(T, dim(WF, TypeVal, type)).
 
 % Tool with a specific input state
 sel_run_at(t, T, with_input_state(Tool, State)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, bind(Tool, _, WF)),
-    holds(T-1, dim(WF, State, state)).
+    holds(T, state(WF, State)).
 
 % Tool with a specific output type
 sel_run_at(t, T, with_output_type(Tool, TypeVal)) :-
@@ -75,14 +75,16 @@ sel_run_at(t, T, with_output_state(Tool, State)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, output(Tool, _, Port)),
-    holds(T, dim(out(T, Tool, Port), State, state)).
+    holds(T, state(out(T, Tool, Port), State)).
 
 % Tool with a specific input unit
 sel_run_at(t, T, with_input_unit(Tool, Unit)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, bind(Tool, _, WF)),
-    holds(T-1, unit(WF, Unit)).
+    holds(T, unit(WF, Unit)).
+
+
 
 % Tool with a given tool_property annotation
 sel_run_at(t, T, with_property(Tool, Prop)) :-
