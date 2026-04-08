@@ -76,6 +76,14 @@ def build_compressed_candidate_fact_bundle(
                     str(port_idx),
                     str(support_class_id),
                 )
+                # Helper for single-shot mode
+                writer.emit_fact(
+                    "precomputed_candidate_input_support_class",
+                    core._quote(candidate_id),
+                    str(port_idx),
+                    str(support_class_id),
+                )
+
             for dim, (profile_id, _values) in sorted(
                 optimization.signature_profiles_by_id.get(signature_id, {}).items()
             ):
@@ -96,11 +104,20 @@ def build_compressed_candidate_fact_bundle(
 
         for output_port in tuple(record["output_ports"]):
             port_idx = int(output_port["port_idx"])
+            output_id = optimization.candidate_output_id_map.get((candidate_id, port_idx))
             writer.emit_fact(
                 "lazy_candidate_output_port",
                 core._quote(candidate_id),
                 str(port_idx),
             )
+            if output_id is not None:
+                writer.emit_fact(
+                    "lazy_candidate_output_id",
+                    core._quote(candidate_id),
+                    str(port_idx),
+                    str(output_id),
+                )
+
             writer.emit_fact(
                 "lazy_candidate_output_multiplicity",
                 core._quote(candidate_id),

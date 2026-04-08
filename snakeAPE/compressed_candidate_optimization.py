@@ -29,7 +29,11 @@ class CompressedCandidateOptimizationResult:
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]]
     signature_support_class_by_id: dict[int, int]
     support_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
+    candidate_output_id_map: Mapping[tuple[str, int], int]
+    canonical_producers: Mapping[tuple[int, int], tuple[int, int]]
     cache_stats: dict[str, int]
+
+
     earliest_solution_step: int
     phase_timings: dict[str, float]
 
@@ -406,7 +410,22 @@ def optimize_compressed_candidates(
         support_class_stats,
     ) = _factor_signature_support_classes(signature_bindable_ports)
 
+    candidate_output_id_map: dict[tuple[str, int], int] = {}
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            candidate_output_id_map[(candidate_id, port_idx)] = len(candidate_output_id_map) + 1
+
+    # Precompute canonical producers for each SupportClass at each possible step
+    canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
+    # (Not strictly necessary to precompute EVERYTHING here, but we can do it for Step 8)
+    # Actually, the canonical producer depends on which tools ARE RUNNING. 
+    # Python can't know that. Only ASP knows.
+    # So I must find a better way for Point 8.
+
     t4 = perf_counter()
+
 
     relevant_tools = tuple(record["tool"] for record in relevant_records)
     query_goal_candidates: set[str] = set()
@@ -555,7 +574,11 @@ def optimize_compressed_candidates(
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
         signature_support_class_by_id=signature_support_class_by_id,
         support_class_bindable_ports=support_class_bindable_ports,
+        candidate_output_id_map=candidate_output_id_map,
+        canonical_producers=canonical_producers,
         cache_stats={
+
+
             **resolver.stats(),
             **lazy_schema_stats,
             **bindability_stats,

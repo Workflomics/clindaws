@@ -41,15 +41,18 @@ ape_holds_dim(out(T, Tool, Port), V, Cat) :-
 """
 
 
-def _single_shot_overlay(horizon: int) -> str:
-    return (
-        SINGLE_SHOT_OVERLAY_PREFIX
-        + f"""
-:- not holds({horizon}, goal).
-:- {horizon} > 1, holds({horizon - 1}, goal).
-:- time(T), 2 {{ occurs(T, run(_)) }}.
-"""
-    )
+def _single_shot_overlay(min_length: int, horizon: int) -> str:
+    overlay = [
+        SINGLE_SHOT_OVERLAY_PREFIX,
+        f":- not holds({horizon}, goal).",
+        ":- occurs(T, run(_)), not occurs(T-1, run(_)), T > 1.",
+        ":- holds(T-1, goal), occurs(T, run(_)).",
+        f":- time(T), 2 {{ occurs(T, run(_)) }}.",
+    ]
+    if min_length > 1:
+        overlay.append(f":- holds({min_length - 1}, goal).")
+    return "\n".join(overlay) + "\n"
+
 
 
 def _make_solve_control(
@@ -791,9 +794,7 @@ def _solve_single_shot_once(
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_max
 
-    static_overlay = (
-        _single_shot_overlay(horizon)
-    )
+    static_overlay = _single_shot_overlay(config.solution_length_min, horizon)
 
     control = _make_solve_control(
         parallel_mode=parallel_mode,
@@ -832,7 +833,6 @@ def _solve_single_shot_once(
 
             _report(progress_callback, "Step 3: solving started.")
             _report(progress_callback, "Solving: single-shot...")
-            seen_unique_keys: set[tuple[object, ...]] = set()
             start = perf_counter()
 
             def _solve() -> None:
@@ -842,40 +842,21 @@ def _solve_single_shot_once(
                         models_seen += 1
                         shown_symbols = tuple(model.symbols(shown=True))
                         workflow_key = extract_workflow_signature_key(shown_symbols)
-                        workflow_length = workflow_signature_length(workflow_key)
-                        in_length_window = (
-                            config.solution_length_min
-                            <= workflow_length
-                            <= config.solution_length_max
-                        )
-                        if workflow_key not in seen_unique_keys:
-                            seen_unique_keys.add(workflow_key)
+                        
+                        if workflow_key not in stored_unique_keys:
                             unique_workflows_seen += 1
-                        store_raw = (
-                            in_length_window
-                            and
-                            capture_raw_models
-                            and len(raw_solutions) < config.solutions
-                        )
-                        store_unique = (
-                            in_length_window
-                            and
-                            workflow_key not in stored_unique_keys
-                            and len(unique_solutions) < config.solutions
-                        )
-                        canonical_shown: tuple[clingo.Symbol, ...] | None = None
-                        if store_unique:
-                            canonical_shown = canonicalize_shown_symbols(
-                                shown_symbols,
-                                tool_input_signatures,
-                            )
-                        if store_raw:
-                            raw_solutions.append(shown_symbols)
-                            models_stored += 1
-                        if store_unique:
-                            stored_unique_keys.add(workflow_key)
-                            unique_solutions.append(canonical_shown if canonical_shown is not None else shown_symbols)
-                            unique_workflows_stored += 1
+                            if len(unique_solutions) < config.solutions:
+                                unique_workflows_stored += 1
+                                stored_unique_keys.add(workflow_key)
+                                unique_solutions.append(
+                                    canonicalize_shown_symbols(shown_symbols, tool_input_signatures)
+                                )
+                                if capture_raw_models:
+                                    raw_solutions.append(shown_symbols)
+                                    models_stored += 1
+                        else:
+                            unique_workflows_seen += 1
+
                         if len(unique_solutions) >= config.solutions:
                             break
 
@@ -917,6 +898,7 @@ def _solve_single_shot_once(
         solving_sec=solve_elapsed,
         horizon_records=(record,),
     )
+
 
 
 def solve_single_shot(

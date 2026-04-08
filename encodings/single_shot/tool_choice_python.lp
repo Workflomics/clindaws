@@ -17,33 +17,37 @@
 occurs(T, run(Tool)) :- occurs(T, use_variant(Tool, _)).
 
 % --- Port binding: exactly one eligible item per port ---
+% Helper to project out concrete dimension 'V' from the main cross-product
+wf_provides_req(T, WF, ReqV, Cat) :-
+    holds(T, dim(WF, V, Cat)),
+    compatible(V, ReqV).
+
 % Item satisfies one category requirement of a port at time T.
 port_cat_ok(T, Port, WF, Cat) :-
     precomputed_base_artifact_bindable(Port, WF),
     holds(T, avail(WF)),
     port_requires(Port, ReqV, Cat),
-    holds(T, dim(WF, V, Cat)),
-    compatible(V, ReqV).
+    wf_provides_req(T, WF, ReqV, Cat).
 
 port_cat_ok(T, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
     precomputed_output_port_bindable(Port, ProducerPort),
     holds(T, avail(out(TPrev, ToolPrev, ProducerPort))),
     port_requires(Port, ReqV, Cat),
-    holds(T, dim(out(TPrev, ToolPrev, ProducerPort), V, Cat)),
-    compatible(V, ReqV).
+    wf_provides_req(T, out(TPrev, ToolPrev, ProducerPort), ReqV, Cat).
+
 
 % Item is eligible if ALL categories are satisfied.
-eligible(T, Port, WF) :-
+elgible(T, Port, WF) :-
     precomputed_base_artifact_bindable(Port, WF),
     holds(T, avail(WF)),
     port_cat_ok(T, Port, WF, Cat) : port_requires(Port, _, Cat).
 
-eligible(T, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+elgible(T, Port, out(TPrev, ToolPrev, ProducerPort)) :-
     precomputed_output_port_bindable(Port, ProducerPort),
     holds(T, avail(out(TPrev, ToolPrev, ProducerPort))),
     port_cat_ok(T, Port, out(TPrev, ToolPrev, ProducerPort), Cat) : port_requires(Port, _, Cat).
 
-1 { occurs(T, bind(Tool, Port, WF)) : eligible(T-1, Port, WF) } 1 :-
+1 { occurs(T, bind(Tool, Port, WF)) : elgible(T-1, Port, WF) } 1 :-
     occurs(T, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
@@ -72,4 +76,3 @@ artifact_ancestor(Artifact, Ancestor) :-
    occurs(T, bind(Tool, PortLow, ArtifactLow)),
    occurs(T, bind(Tool, PortHigh, ArtifactHigh)),
    artifact_precedes(ArtifactHigh, ArtifactLow).
-

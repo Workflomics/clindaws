@@ -61,47 +61,39 @@ query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     not query_output_filter_active(t),
     lazy_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
+% Identify non-terminal outputs and their candidates
 candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
     query(t),
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
     query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
 
-output_dim_has_consumer_support(t, TProd, ToolProd, Port, V, Category) :-
-    query(t),
-    used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
-    lazy_profile_accepts(ProfileId, V).
-
-chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, GoalID, RequirementID, Category, ProfileId) :-
-    query(t),
-    chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
-    compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId).
-
-output_dim_consumer_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
+% Identify profile violations
+output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
     used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
     not lazy_profile_accepts(ProfileId, V).
 
-output_dim_violates_consumer(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
-    candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
-    output_dim_consumer_profile_violation(t, TProd, ToolProd, Port, V, Category, _).
+output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category) :-
+    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, _).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId),
     not lazy_profile_accepts(ProfileId, V).
 
-output_dim_supported(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
-    candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
-    not output_dim_violates_consumer(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
+output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
+    candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
+    not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category).
 
-output_dim_smaller_supported(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
-    output_dim_supported(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
-    output_dim_supported(t, TProd, ToolProd, ProducerCandidate, Port, V2, Category),
+output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category) :-
+    output_dim_supported(t, TProd, ToolProd, Port, V, Category),
+    output_dim_supported(t, TProd, ToolProd, Port, V2, Category),
     V2 < V.
 
 :- query(t),
    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
    occurs(TProd, output_dim(ToolProd, Port, V, Category)),
-   output_dim_supported(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
-   output_dim_smaller_supported(t, TProd, ToolProd, ProducerCandidate, Port, V, Category).
+   output_dim_supported(t, TProd, ToolProd, Port, V, Category),
+   output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category).
+

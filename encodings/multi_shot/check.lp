@@ -51,6 +51,16 @@ chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
     chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
     goal_output(GoalID, GoalV, Cat).
 
+% Monotonic bridge for canonicalization (since we might bind by ID or out/3)
+artifact_id_of(out(T, Tool, Port), ArtID) :-
+    occurs(T, output(Tool, _, Port)),
+    lazy_candidate_output_id(Candidate, Port, ArtID),
+    occurs(T, use_lazy_candidate(Tool, Candidate)).
+
+% For non-lazy modes, IDs aren't used yet, so we'll fallback or keep out/3.
+% This optimization is primarily for precompute mode.
+
+
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),

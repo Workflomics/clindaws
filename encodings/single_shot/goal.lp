@@ -1,40 +1,5 @@
-% GOAL — checks whether the pipeline satisfies all declared goal dimensions
+% GOAL — goal satisfaction check and output-dimension canonicalization
 % Docs: DOCS/encoding/goal.md
-
-% --- Dimension matching at timestep T ---
-goal_dim_match(T, GoalID, WF, GoalV, Cat) :-
-    goal_output(GoalID, GoalV, Cat),
-    holds(T, avail(WF)),
-    holds(T, dim(WF, ActualV, Cat)),
-    compatible(ActualV, GoalV).
-
-% --- Missing dimension detection at timestep T ---
-goal_dim_missing(T, GoalID, WF) :-
-    goal_output(GoalID, GoalV, Cat),
-    holds(T, avail(WF)),
-    not goal_dim_match(T, GoalID, WF, GoalV, Cat).
-
-% --- Goal satisfaction at timestep T ---
-goal_id(GoalID) :- goal_output(GoalID, _, _).
-
-goal_satisfied_by(T, GoalID, WF) :-
-    holds(T, avail(WF)),
-    goal_output(GoalID, _, _),
-    goal_dim_match(T, GoalID, WF, _, _),
-    not goal_dim_missing(T, GoalID, WF).
-
-% Direct modes should only count produced outputs toward the workflow goal.
-goal_satisfied_by_output(T, GoalID, WF) :-
-    goal_satisfied_by(T, GoalID, WF),
-    not holds(0, avail(WF)).
-
-goal_satisfied(T, GoalID) :-
-    goal_output(GoalID, _, _),
-    goal_satisfied_by_output(T, GoalID, WF).
-
-1 { chosen_goal_output(T, GoalID, WF) : goal_satisfied_by_output(T, GoalID, WF) } 1 :-
-    holds(T, goal_time(T)),
-    goal_id(GoalID).
 
 % --- Goal holds at T when all GoalIDs are satisfied ---
 holds(T, goal) :-
@@ -47,12 +12,38 @@ holds(T, goal) :-
     T > 1,
     holds(T-1, goal).
 
-% --- Goal timing: first timestep goal is reached ---
+% First time goal is reached.
 holds(T, goal_time(T)) :-
     holds(T, goal),
     not holds(T-1, goal).
 
+% A specific goal requirement is satisfied if there's an available item that matches.
+goal_satisfied(T, GoalID) :-
+    time(T),
+    goal_output(GoalID, _, _),
+    goal_satisfied_by(T, GoalID, _).
+
+% Helper: item satisfies one category of a goal requirement.
+goal_dim_match(T, GoalID, WF, Cat) :-
+    goal_output(GoalID, ReqV, Cat),
+    holds(T, dim(WF, V, Cat)),
+    compatible(V, ReqV).
+
+% Item is eligible for a goal if ALL categories match.
+goal_satisfied_by(T, GoalID, WF) :-
+    holds(T, avail(WF)),
+    goal_dim_match(T, GoalID, WF, Cat) : goal_output(GoalID, _, Cat).
+
+% Tie-breaker for multiple items satisfying the same goal requirement.
+% Pick exactly one witness item for the goal at time T.
+1 { chosen_goal_output(T, GoalID, WF) : goal_satisfied_by(T, GoalID, WF) } 1 :-
+    holds(T, goal_time(T)),
+    goal_output(GoalID, _, _).
+
 % --- Output-dimension canonicalization ---
+% Keep the smallest terminal value that still satisfies all actual downstream
+% consumers and any goal the produced output satisfies at horizon T.
+
 output_dim_violates_consumer(TProd, ToolProd, Port, V, Cat) :-
     occurs(TProd, output(ToolProd, _, Port)),
     dimension(Port, (BaseV, Cat)),
@@ -74,7 +65,7 @@ output_dim_violates_goal(TProd, ToolProd, Port, V, Cat) :-
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V),
-    chosen_output_goal_requirement(TGoal, TProd, ToolProd, Port, GoalID, GoalV, Cat),
+    chosen_output_goal_requirement(_, TProd, ToolProd, Port, _, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(TProd, ToolProd, Port, V, Cat) :-
@@ -94,6 +85,3 @@ output_dim_smaller_supported(TProd, ToolProd, Port, V, Cat) :-
 :- occurs(TProd, output_dim(ToolProd, Port, V, Cat)),
    output_dim_supported(TProd, ToolProd, Port, V, Cat),
    output_dim_smaller_supported(TProd, ToolProd, Port, V, Cat).
-
-% --- Hard constraint: goal must be reached ---
-:- not holds(_, goal).
