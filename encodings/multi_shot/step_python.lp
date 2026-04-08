@@ -44,6 +44,10 @@ holds(t, state(Artifact, NewState)) :-
 { occurs(t, run(Tool)) } :- precomputed_tool_allowed_at_step(Tool, t), not tool_has_input(Tool).
 { occurs(t, run(Tool)) } :- precomputed_tool_allowed_at_step(Tool, t), tool_has_input(Tool).
 
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(t, run(Tool)). [100 - t, true]
+
+
 % Variant selection: exactly one input group per run
 1 { occurs(t, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
     occurs(t, run(Tool)),

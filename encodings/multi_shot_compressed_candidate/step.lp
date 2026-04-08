@@ -15,80 +15,85 @@ occurs(t, run(Tool)) :- occurs(t, use_lazy_candidate(Tool, _)).
 
 1 {
     occurs(t, bind(Tool, Port, WF)) : eligible(Candidate, Port, WF);
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))) :
-        produced_bind_option(
-            t,
-            Candidate,
-            Port,
-            TPrev,
-            ToolPrev,
-            ProducerCandidate,
-            ProducerPort
-        )
+    occurs(t, bind_support_class(Tool, Port, SupportClassId)) :
+        produced_bind_option(t, Candidate, Port, SupportClassId)
 } 1 :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
     lazy_candidate_input_port(Candidate, Port).
 
-produced_bind_option(
-    t,
-    Candidate,
-    Port,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort
-) :-
+produced_bind_option(t, Candidate, Port, SupportClassId) :-
     occurs(t, use_lazy_candidate(_, Candidate)),
     compressed_candidate_input_support_class(Candidate, Port, SupportClassId),
+    available_support_class(t, SupportClassId).
+
+available_support_class(t, SupportClassId) :-
     lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
     occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     TPrev < t.
 
-chosen_produced_bind(
-    t,
-    Tool,
-    Candidate,
-    Port,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort
-) :-
+chosen_produced_bind(t, Tool, Candidate, Port, SupportClassId) :-
     occurs(t, use_lazy_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
-    produced_bind_option(
-        t,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ).
+    occurs(t, bind_support_class(Tool, Port, SupportClassId)),
+    produced_bind_option(t, Candidate, Port, SupportClassId).
 
-bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
-    chosen_produced_bind(
-        t,
-        Tool,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ),
+bound_output_category_match(t, Tool, Candidate, Port, SupportClassId, Category) :-
+    chosen_produced_bind(t, Tool, Candidate, Port, SupportClassId),
     lazy_candidate_input_signature_id(Candidate, Port, SignatureId),
     lazy_signature_profile(SignatureId, Category, ProfileId),
-    artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
+    % Wait, how do we get ActualV for the SupportClassId?
+    % We can check if ANY producer of this SupportClassId provides the matching V!
+    available_support_class_dim(t, SupportClassId, ActualV, Category),
     lazy_profile_accepts(ProfileId, ActualV).
 
+available_support_class_dim(t, SupportClassId, ActualV, Category) :-
+    lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
+    occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t,
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category).
+
 :- occurs(t, use_lazy_candidate(Tool, Candidate)),
-   occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+   occurs(t, bind_support_class(Tool, Port, SupportClassId)),
    lazy_candidate_input_category(Candidate, Port, Category),
-   not bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category).
+   not bound_output_category_match(t, Tool, Candidate, Port, SupportClassId, Category).
+
+
+% Find the earliest TPrev for the SupportClassId
+earliest_support_class_producer(t, SupportClassId, MinT) :-
+    available_support_class(t, SupportClassId),
+    MinT = #min { TPrev :
+        lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
+        occurs(TPrev, use_lazy_candidate(ToolPrev, ProducerCandidate)),
+        occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+        TPrev < t
+    }.
+
+% Pick the canonical producer (e.g. smallest ToolPrev at MinT)
+canonical_support_class_producer_tool(t, SupportClassId, MinT, MinTool) :-
+    earliest_support_class_producer(t, SupportClassId, MinT),
+    MinTool = #min { ToolPrev :
+        lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
+        occurs(MinT, use_lazy_candidate(ToolPrev, ProducerCandidate)),
+        occurs(MinT, output(ToolPrev, ProducerCandidate, ProducerPort))
+    }.
+
+% Pick the canonical producer port (smallest ProducerPort at MinT for MinTool)
+canonical_support_class_producer(t, SupportClassId, MinT, MinTool, MinPort) :-
+    canonical_support_class_producer_tool(t, SupportClassId, MinT, MinTool),
+    MinPort = #min { ProducerPort :
+        lazy_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
+        occurs(MinT, use_lazy_candidate(MinTool, ProducerCandidate)),
+        occurs(MinT, output(MinTool, ProducerCandidate, ProducerPort))
+    }.
+
+% Bind exactly to the canonical producer to satisfy downstream constraints
+occurs(t, bind(Tool, Port, out(MinT, MinTool, MinPort))) :-
+    occurs(t, bind_support_class(Tool, Port, SupportClassId)),
+    canonical_support_class_producer(t, SupportClassId, MinT, MinTool, MinPort).
 
 artifact_parent(out(t, Tool, PortOut), WF) :-
+
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, WF)).
 

@@ -20,15 +20,30 @@ goal_id(GoalID) :- goal_output(GoalID, _, _).
 % consumers and any goal the produced output satisfies at horizon t.
 % ----------------------------------------------------------------
 
-output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    occurs(TProd, output(ToolProd, _, Port)),
+% Precompute relevant terminals per port to avoid evaluating the taxonomy hierarchy
+% against the solver's occurs/1 domain.
+port_terminal_value(Port, V, Cat) :-
     dimension(Port, (BaseV, Cat)),
     not is_terminal(BaseV),
     compatible(V, BaseV),
-    is_terminal(V),
+    is_terminal(V).
+
+% 1. Identify non-terminal outputs and their candidates
+output_dim_candidate(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    occurs(TProd, output(ToolProd, _, Port)),
+    port_terminal_value(Port, V, Cat).
+
+% 2. Identify the requirements of actual consumers of an output
+output_consumer_req(t, TProd, ToolProd, Port, ReqV, Cat) :-
+    query(t),
     output_used_by(TProd, ToolProd, Port, TUse, ToolUse, PortIn),
-    port_requires(PortIn, ReqV, Cat),
+    port_requires(PortIn, ReqV, Cat).
+
+output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
+    output_consumer_req(t, TProd, ToolProd, Port, ReqV, Cat),
     not compatible(V, ReqV).
 
 chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
@@ -38,23 +53,16 @@ chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat) :-
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
-    occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
-    chosen_output_goal_requirement(t, TProd, ToolProd, Port, GoalID, GoalV, Cat),
+    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
+    chosen_output_goal_requirement(t, TProd, ToolProd, Port, _, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
-    occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
+    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat).
+
 
 output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Cat) :-
     output_dim_supported(t, TProd, ToolProd, Port, V, Cat),

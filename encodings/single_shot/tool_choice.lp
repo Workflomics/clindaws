@@ -5,6 +5,10 @@
 { occurs(T, run(Tool)) } :- time(T), tool(Tool), not tool_has_input(Tool).
 { occurs(T, run(Tool)) } :- time(T), tool(Tool), tool_has_input(Tool).
 
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(T, run(Tool)). [100 - T, true]
+
+
 % --- Variant selection: exactly one input group per run ---
 1 { occurs(T, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
     occurs(T, run(Tool)),
@@ -13,12 +17,17 @@
 occurs(T, run(Tool)) :- occurs(T, use_variant(Tool, _)).
 
 % --- Port binding: exactly one eligible item per port ---
+% Helper to project out concrete dimension 'V' from the main cross-product
+wf_provides_req(T, WF, ReqV, Cat) :-
+    holds(T, dim(WF, V, Cat)),
+    compatible(V, ReqV).
+
 % Item satisfies one category requirement of a port at time T
 port_cat_ok(T, Port, WF, Cat) :-
     holds(T, avail(WF)),
     port_requires(Port, ReqV, Cat),
-    holds(T, dim(WF, V, Cat)),
-    compatible(V, ReqV).
+    wf_provides_req(T, WF, ReqV, Cat).
+
 
 % Item is eligible if ALL categories are satisfied
 eligible(T, Port, WF) :-

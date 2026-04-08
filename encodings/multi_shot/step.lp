@@ -63,12 +63,20 @@ holds(t, state(Artifact, NewState)) :-
 { occurs(t, run(Tool)) } :- tool(Tool), not tool_has_input(Tool).
 { occurs(t, run(Tool)) } :- tool(Tool), tool_has_input(Tool).
 
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(t, run(Tool)). [100 - t, true]
+
 % Variant selection: exactly one input group per run
 1 { occurs(t, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
     occurs(t, run(Tool)),
     tool_has_input(Tool).
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
+
+% Helper to project out concrete dimension 'V' from the main cross-product
+wf_provides_req(t, WF, ReqV, Cat) :-
+    holds(t, dim(WF, V, Cat)),
+    compatible(V, ReqV).
 
 % Port satisfaction per category
 port_cat_ok(t, Port, WF, Cat) :-
@@ -81,15 +89,13 @@ port_cat_ok(t, Port, WF, Cat) :-
     planner_workflow_input(WF),
     holds(t, avail(WF)),
     port_requires(Port, ReqV, Cat),
-    holds(t, dim(WF, V, Cat)),
-    compatible(V, ReqV).
+    wf_provides_req(t, WF, ReqV, Cat).
 
 port_cat_ok(t, Port, WF, Cat) :-
     holds(t, avail(WF)),
     not planner_workflow_input(WF),
     port_requires(Port, ReqV, Cat),
-    holds(t, dim(WF, V, Cat)),
-    compatible(V, ReqV).
+    wf_provides_req(t, WF, ReqV, Cat).
 
 % Eligible item: all categories satisfied
 eligible(t, Port, WF) :-

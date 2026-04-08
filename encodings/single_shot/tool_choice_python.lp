@@ -5,6 +5,10 @@
 { occurs(T, run(Tool)) } :- time(T), precomputed_tool_allowed_at_step(Tool, T), not tool_has_input(Tool).
 { occurs(T, run(Tool)) } :- time(T), precomputed_tool_allowed_at_step(Tool, T), tool_has_input(Tool).
 
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(T, run(Tool)). [100 - T, true]
+
+
 % --- Variant selection: exactly one input group per run ---
 1 { occurs(T, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
     occurs(T, run(Tool)),
