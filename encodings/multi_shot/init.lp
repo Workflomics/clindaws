@@ -47,6 +47,3 @@ eligible(0, Port, WF) :-
     holds(0, avail(WF)),
     input_port(_, Port),
     port_cat_ok(0, Port, WF, Cat) : port_requires(Port, _, Cat).
-
-
-

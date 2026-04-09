@@ -25,23 +25,23 @@
 
 workflow_input_reference_check(t, Artifact, WF) :-
    query(t),
-   planner_workflow_input(WF),
+   holds(0, avail(WF)),
    Artifact = WF.
 
 workflow_input_reference_check(t, Artifact, WF) :-
    query(t),
-   planner_workflow_input(WF),
-   artifact_ancestor(Artifact, WF).
+   holds(0, avail(WF)),
+   artifact_ancestor(t, Artifact, WF).
 
 workflow_input_used_check(t, WF) :-
    query(t),
-   planner_workflow_input(WF),
+   holds(0, avail(WF)),
    occurs(T, bind(Tool, Port, Artifact)),
    workflow_input_reference_check(t, Artifact, WF).
 
 workflow_input_used_check(t, WF) :-
    query(t),
-   planner_workflow_input(WF),
+   holds(0, avail(WF)),
    chosen_goal_output(t, _, Artifact),
    workflow_input_reference_check(t, Artifact, WF).
 
@@ -52,7 +52,7 @@ workflow_input_used_check(t, WF) :-
 
 :- query(t),
    enable_all_inputs_used,
-   planner_workflow_input(WF),
+   holds(0, avail(WF)),
    not workflow_input_used_check(t, WF).
 
 % ----------------------------------------------------------------
@@ -71,5 +71,5 @@ workflow_input_used_check(t, WF) :-
 
 :- query(t),
    enable_inputs_consumed,
-   planner_workflow_input(WF),
+   holds(0, avail(WF)),
    #count { T, Tool, Port : occurs(T, bind(Tool, Port, WF)) } > 1.

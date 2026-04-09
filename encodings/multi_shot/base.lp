@@ -22,6 +22,17 @@ port_category(Port, Category) :-
     input_port(_, Port),
     dimension(Port, (_, Category)).
 
+goal_requirement(GoalID, goalreq(GoalID, GoalValue, Category), GoalValue, Category) :-
+    goal_output(GoalID, GoalValue, Category).
+
+goal_requirement_accepts(GoalReq, ActualValue, Category) :-
+    goal_requirement(_, GoalReq, GoalValue, Category),
+    compatible(ActualValue, GoalValue).
+
+port_property_accepts(Tool, Port, ActualValue, Category, Prop) :-
+    port_property(Tool, Port, RequiredValue, Category, Prop),
+    compatible(ActualValue, RequiredValue).
+
 variant_single_input(TI_ID) :-
     tool_input_variant(_, TI_ID),
     1 = #count { Port : input_port(TI_ID, Port) }.

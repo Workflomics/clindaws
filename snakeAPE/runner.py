@@ -1071,6 +1071,14 @@ def _effective_internal_solver_mode(mode: str, fact_bundle) -> str:
     return fact_bundle.internal_solver_mode or mode
 
 
+def _is_clasp_id_overflow(exc: BaseException) -> bool:
+    message = str(exc)
+    return (
+        "Id out of range" in message
+        or "Value too large to be stored in data type" in message
+    )
+
+
 def _validate_run_config(config: SnakeConfig) -> None:
     """Validate derived run bounds before translation/solving."""
 
@@ -1383,23 +1391,6 @@ def run_once(
     effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
 
-    csv_writers = _RunCsvWriters(
-        csv_dir=config.solutions_dir_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_count=fact_bundle.fact_count,
-        run_metadata=run_metadata,
-        translation_builder=_translation_builder,
-        translation_schema=_translation_schema(fact_bundle),
-        python_precompute_direct_enabled=python_precompute_direct,
-        effective_parallel_mode=effective_parallel_mode,
-        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
-    )
-    csv_writers.step_writer.log_translation(
-        translation_sec=translation_sec,
-        translation_peak_rss_mb=translation_peak_rss_mb,
-    )
-
     effective_project_models = _effective_project_models(mode, project_models)
     if effective_parallel_mode:
         _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
@@ -1416,16 +1407,62 @@ def run_once(
     if remaining_timeout <= 0:
         solve_output = _empty_solve_output()
     else:
-        solve_output, _timed_out = _run_solve_in_worker(
-            mode=internal_solver_mode,
-            config=config,
-            fact_bundle=fact_bundle,
-            capture_raw_models=True,
-            parallel_mode=effective_parallel_mode,
-            project_models=effective_project_models,
-            remaining_timeout=remaining_timeout,
-            progress_callback=progress_callback,
-        )
+        try:
+            solve_output, _timed_out = _run_solve_in_worker(
+                mode=internal_solver_mode,
+                config=config,
+                fact_bundle=fact_bundle,
+                capture_raw_models=True,
+                parallel_mode=effective_parallel_mode,
+                project_models=effective_project_models,
+                remaining_timeout=remaining_timeout,
+                progress_callback=progress_callback,
+            )
+        except RuntimeError as exc:
+            if (
+                mode == "multi-shot"
+                and not python_precompute_direct
+                and _is_clasp_id_overflow(exc)
+            ):
+                _report(
+                    progress_callback,
+                    "Legacy multi-shot grounding exceeded clasp's internal id limit; "
+                    "retrying with optimized direct precompute.",
+                )
+                return run_once(
+                    config_path,
+                    mode=mode,
+                    grounding_strategy=grounding_strategy,
+                    output_dir=output_dir,
+                    solutions=solutions,
+                    min_length=min_length,
+                    max_length=max_length,
+                    parallel_mode=parallel_mode,
+                    project_models=project_models,
+                    graph_format=graph_format,
+                    render_graphs=render_graphs,
+                    write_raw_answer_sets=write_raw_answer_sets,
+                    progress_callback=progress_callback,
+                    python_precompute_direct=True,
+                )
+            raise
+
+    csv_writers = _RunCsvWriters(
+        csv_dir=config.solutions_dir_path,
+        mode=mode,
+        grounding_strategy=grounding_strategy,
+        fact_count=fact_bundle.fact_count,
+        run_metadata=run_metadata,
+        translation_builder=_translation_builder,
+        translation_schema=_translation_schema(fact_bundle),
+        python_precompute_direct_enabled=python_precompute_direct,
+        effective_parallel_mode=effective_parallel_mode,
+        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
+    )
+    csv_writers.step_writer.log_translation(
+        translation_sec=translation_sec,
+        translation_peak_rss_mb=translation_peak_rss_mb,
+    )
 
     if solve_output.base_grounding_sec or solve_output.base_grounding_peak_rss_mb:
         csv_writers.step_writer.log_base_grounding(

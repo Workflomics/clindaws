@@ -54,7 +54,7 @@ sel_run_at(t, T, with_input_type(Tool, TypeVal)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, bind(Tool, _, WF)),
-    holds(T, dim(WF, TypeVal, type)).
+    artifact_dim(WF, TypeVal, type).
 
 % Tool with a specific input state
 sel_run_at(t, T, with_input_state(Tool, State)) :-
@@ -68,7 +68,7 @@ sel_run_at(t, T, with_output_type(Tool, TypeVal)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, output(Tool, _, Port)),
-    holds(T, dim(out(T, Tool, Port), TypeVal, type)).
+    artifact_dim(out(T, Tool, Port), TypeVal, type).
 
 % Tool with a specific output state
 sel_run_at(t, T, with_output_state(Tool, State)) :-
@@ -82,7 +82,7 @@ sel_run_at(t, T, with_input_unit(Tool, Unit)) :-
     query(t),
     occurs(T, run(Tool)),
     occurs(T, bind(Tool, _, WF)),
-    holds(T, unit(WF, Unit)).
+    artifact_unit(WF, Unit).
 
 
 

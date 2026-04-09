@@ -97,7 +97,6 @@ port_cat_ok(t, Port, WF, Cat) :-
     port_requires(Port, ReqV, Cat),
     wf_provides_req(t, WF, ReqV, Cat).
 
-% Eligible item: all categories satisfied
 eligible(t, Port, WF) :-
     holds(t, avail(WF)),
     input_port(_, Port),
@@ -210,7 +209,7 @@ holds(t, unit(out(t, Tool, Port), none)) :-
 % Case 3: agnostic mode — inherit from homogeneous inputs
 input_root(t, Tool, Root) :-
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none,
     unit_root(U, Root).
 
@@ -224,20 +223,20 @@ holds(t, unit(out(t, Tool, Port), U)) :-
     not port_unit(Port, _),
     single_input_root(t, Tool),
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none.
 
 % Unit binding compatibility constraints
 :- occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, UPort),
-   holds(t, unit(WF, UData)),
+   artifact_unit(WF, UData),
    UData != none,
    not units_compatible(UPort, UData).
 
 :- unit_mode(strict),
    occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, _),
-   not holds(t, unit(WF, _)).
+   not artifact_unit(WF, _).
 
 % ----------------------------------------------------------------
 % From reachability.lp
@@ -278,8 +277,8 @@ reachable(t, Tool2) :-
 goal_dim_match(t, GoalID, WF, GoalV, Cat) :-
     goal_output(GoalID, GoalV, Cat),
     holds(t, avail(WF)),
-    holds(t, dim(WF, ActualV, Cat)),
-    compatible(ActualV, GoalV).
+    artifact_dim(WF, ActualV, Cat),
+    goal_requirement_accepts(goalreq(GoalID, GoalV, Cat), ActualV, Cat).
 
 goal_dim_missing(t, GoalID, WF) :-
     goal_output(GoalID, GoalV, Cat),
@@ -318,10 +317,10 @@ pipeline_has_at(t, Prop) :-
     occurs(t, run(Tool)).
 
 pipeline_has_at(t, Prop) :-
-    port_property(Tool, Port, ReqV, Cat, Prop),
+    port_property(Tool, Port, _, Cat, Prop),
     occurs(t, bind(Tool, Port, WF)),
-    holds(t, dim(WF, ActualV, Cat)),
-    compatible(ActualV, ReqV).
+    artifact_dim(WF, ActualV, Cat),
+    port_property_accepts(Tool, Port, ActualV, Cat, Prop).
 
 % ----------------------------------------------------------------
 % From requirements.lp — constraints only (static derivations in base.lp)

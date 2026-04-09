@@ -31,6 +31,7 @@ goal_dim_match(T, GoalID, WF, Cat) :-
 
 % Item is eligible for a goal if ALL categories match.
 goal_satisfied_by(T, GoalID, WF) :-
+    goal_output(GoalID, _, _),
     holds(T, avail(WF)),
     goal_dim_match(T, GoalID, WF, Cat) : goal_output(GoalID, _, Cat).
 
