@@ -30,6 +30,10 @@ from clindaws.core.models import (
     TranslationRunResult,
 )
 from clindaws.core.ontology import Ontology
+from clindaws.core.workflow_input_compression import (
+    build_workflow_input_compression_plan,
+    workflow_input_compression_stats,
+)
 from clindaws.rendering.rendering import (
     render_solution_graphs,
     write_workflow_signatures,
@@ -877,11 +881,35 @@ def _translation_warnings(
     return warnings
 
 
+def _workflow_input_compression_payload(
+    *,
+    config: SnakeConfig,
+    mode: str,
+    internal_solver_mode: str,
+    compression_active: bool | None = None,
+) -> dict[str, object] | None:
+    if mode != "multi-shot" or internal_solver_mode != "multi-shot":
+        return None
 
+    workflow_input_dimensions = {
+        f"wf_input_{index}": dimensions
+        for index, dimensions in enumerate(config.inputs)
+    }
+    plan = build_workflow_input_compression_plan(workflow_input_dimensions)
+    payload: dict[str, object] = dict(sorted(workflow_input_compression_stats(plan).items()))
+    if compression_active is not None:
+        payload["workflow_input_compression_active"] = compression_active
+        payload["workflow_input_planner_visible_count_effective"] = (
+            plan.planner_visible_count_if_compressed
+            if compression_active
+            else plan.planner_visible_count_if_uncompressed
+        )
+    return payload
 
 
 def _translation_summary_payload(
     *,
+    config: SnakeConfig,
     mode: str,
     grounding_strategy: str,
     translation_builder: TranslationBuilder,
@@ -925,6 +953,11 @@ def _translation_summary_payload(
         "python_precompute_enabled": fact_bundle.python_precompute_enabled,
         "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
         "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+        "workflow_input_compression": _workflow_input_compression_payload(
+            config=config,
+            mode=mode,
+            internal_solver_mode=internal_mode,
+        ),
         "translation_path": str(translation_path) if translation_path else None,
         "translation_sec": translation_sec,
         "predicate_counts": dict(sorted(fact_bundle.predicate_counts.items())),
@@ -960,6 +993,7 @@ def _translation_summary_payload(
 
 def _write_translation_summary(
     *,
+    config: SnakeConfig,
     solution_dir: Path,
     mode: str,
     grounding_strategy: str,
@@ -971,6 +1005,7 @@ def _write_translation_summary(
 ) -> tuple[Path, dict[str, object]]:
     translation_summary_path = solution_dir / "translation_summary.json"
     payload = _translation_summary_payload(
+        config=config,
         mode=mode,
         grounding_strategy=grounding_strategy,
         translation_builder=translation_builder,
@@ -1317,6 +1352,7 @@ def run_translate_only(
     )
 
     translation_summary_path, _ = _write_translation_summary(
+        config=ctx.config,
         solution_dir=ctx.solution_dir,
         mode=mode,
         grounding_strategy=grounding_strategy,
@@ -1522,6 +1558,12 @@ def run_once(
                 "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                 "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                 "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                "workflow_input_compression": _workflow_input_compression_payload(
+                    config=config,
+                    mode=mode,
+                    internal_solver_mode=internal_solver_mode,
+                    compression_active=effective_project_models,
+                ),
                 "effective_parallel_mode": effective_parallel_mode,
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
@@ -1689,6 +1731,7 @@ def run_ground_only(
     )
 
     translation_summary_path, translation_summary = _write_translation_summary(
+        config=config,
         solution_dir=solution_dir,
         mode=mode,
         grounding_strategy=grounding_strategy,
@@ -1738,6 +1781,11 @@ def run_ground_only(
                 "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                 "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                 "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                "workflow_input_compression": _workflow_input_compression_payload(
+                    config=config,
+                    mode=mode,
+                    internal_solver_mode=internal_solver_mode,
+                ),
                 "grounded_horizons": list(grounding_output.grounded_horizons),
                 "translation_peak_rss_mb": translation_peak_rss_mb,
                 "base_grounding_peak_rss_mb": grounding_output.base_grounding_peak_rss_mb,

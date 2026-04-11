@@ -11,6 +11,10 @@ import clingo
 
 from clindaws.core.models import FactBundle, SnakeConfig, ToolMode
 from clindaws.core.ontology import Ontology
+from clindaws.core.workflow_input_compression import (
+    build_workflow_input_compression_plan,
+    workflow_input_compression_stats,
+)
 from clindaws.translators.fact_writer import (
     _FactWriter,
 )
@@ -593,47 +597,57 @@ def _emit_multi_shot_workflow_input_facts(
     writer: _FactWriter,
     parsed: _ParsedDirectFacts,
 ) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, int]]:
-    classes: dict[tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[str, ...]], list[str]] = defaultdict(list)
-    for wf in parsed.workflow_input_ids:
-        dimensions = parsed.workflow_input_dims.get(wf, {})
-        classes[_profile_key(dimensions, parsed.workflow_input_units.get(wf, ()))].append(wf)
+    plan = build_workflow_input_compression_plan(
+        parsed.workflow_input_dims,
+        parsed.workflow_input_units,
+    )
 
     planner_artifact_profiles: dict[str, dict[str, tuple[str, ...]]] = {}
-    repeated_class_count = 0
-    slot_count = 0
-    for members in classes.values():
-        ordered_members = sorted(members)
-        rep = ordered_members[0]
-        for wf in ordered_members:
+    for group in plan.classes:
+        rep = group.representative
+        for wf in group.members:
             planner_artifact_profiles[wf] = dict(parsed.workflow_input_dims.get(wf, {}))
         writer.emit_fact("canonical_workflow_input", _quote(rep))
-        if len(ordered_members) == 1:
+        if not group.repeated:
             writer.emit_fact("workflow_input_class_member", _quote(rep), _quote(rep))
-            writer.emit_fact("planner_workflow_input", _quote(rep))
             continue
 
-        repeated_class_count += 1
         writer.emit_fact("workflow_input_class_repeated", _quote(rep))
-        writer.emit_fact("workflow_input_slot_class_size", _quote(rep), str(len(ordered_members)))
-        for rank, wf in enumerate(ordered_members, start=1):
+        writer.emit_fact("workflow_input_slot_class_size", _quote(rep), str(len(group.members)))
+        for rank, wf in enumerate(group.members, start=1):
             slot_term = _slot_term(rep, wf)
             writer.emit_fact("workflow_input_class_member", _quote(rep), _quote(wf))
             writer.emit_fact("workflow_input_collapsed_member", _quote(wf))
             writer.emit_fact("workflow_input_slot", slot_term, _quote(rep), str(rank))
             writer.emit_fact("workflow_input_slot_source", slot_term, _quote(wf))
-            writer.emit_fact("planner_workflow_input", slot_term)
             planner_artifact_profiles[slot_term] = dict(parsed.workflow_input_dims.get(wf, {}))
-            slot_count += 1
-        for wf_a in ordered_members:
-            for wf_b in ordered_members:
+        for wf_a in group.members:
+            for wf_b in group.members:
                 if wf_a != wf_b:
                     writer.emit_fact("equivalent_workflow_input_pair", _quote(wf_a), _quote(wf_b))
 
-    return planner_artifact_profiles, {
-        "precompute_workflow_input_classes": len(classes),
-        "precompute_repeated_workflow_input_classes": repeated_class_count,
-        "precompute_workflow_input_slots": slot_count,
+    stats = {
+        "precompute_workflow_input_classes": plan.equivalence_class_count,
+        "precompute_repeated_workflow_input_classes": plan.repeated_equivalence_class_count,
+        "precompute_workflow_input_slots": plan.slot_count,
+        "precompute_workflow_input_collapsed_members": plan.collapsed_member_count,
+        "precompute_workflow_input_planner_visible_count_uncompressed": (
+            plan.planner_visible_count_if_uncompressed
+        ),
+        "precompute_workflow_input_planner_visible_count_compressed": (
+            plan.planner_visible_count_if_compressed
+        ),
+        "precompute_workflow_input_planner_visible_reduction_if_compressed": (
+            plan.planner_visible_reduction_if_compressed
+        ),
     }
+    stats.update(
+        {
+            f"precompute_{name}": value
+            for name, value in workflow_input_compression_stats(plan).items()
+        }
+    )
+    return planner_artifact_profiles, stats
 
 
 def _emit_bindability_facts(
