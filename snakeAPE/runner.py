@@ -1002,7 +1002,7 @@ def _effective_project_models(mode: str, project_models: bool | None) -> bool:
 
     if project_models is not None:
         return project_models
-    return mode == "multi-shot"
+    return False
 
 
 def _effective_parallel_mode(

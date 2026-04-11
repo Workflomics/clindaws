@@ -335,3 +335,8 @@ pipeline_has_at(t, Prop) :-
 % ----------------------------------------------------------------
 
 :- 2 { occurs(t, run(_)) }.
+
+% Contiguous execution: no gaps in the plan — prevents shorter pipelines from
+% reappearing at later horizons with empty intermediate steps, which would produce
+% C(H,k) step-assignment duplicates per unique k-step sequence.
+:- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
