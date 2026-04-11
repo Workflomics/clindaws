@@ -18,9 +18,10 @@ from uuid import uuid4
 
 import clingo
 
-from clindaws.core.config import load_config
+from clindaws.core.config import load_config, SnakeConfig
 from clindaws.execution.direct_python_precompute import apply_direct_python_precompute
 from clindaws.core.models import (
+    FactBundle,
     GroundingRunResult,
     HorizonRecord,
     RunResult,
@@ -125,6 +126,20 @@ _GROUNDER_DISPATCH = {
     "multi-shot": ground_multi_shot,
     "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
+
+
+@dataclass(frozen=True)
+class RunContext:
+    """All translation-phase results, passed from _prepare_run_context to callers."""
+
+    config: SnakeConfig
+    solution_dir: Path
+    fact_bundle: FactBundle
+    translation_sec: float
+    translation_peak_rss_mb: float
+    effective_translation_strategy: str
+    resolved_translation_builder: str
+    run_metadata: dict[str, object]
 
 
 def _mode_config(mode: str) -> _ModeConfig:
@@ -1022,9 +1037,11 @@ def _compressed_candidate_internal_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools,
+    *,
+    max_workers: int = 1,
 ):
     return replace(
-        build_compressed_candidate_fact_bundle(config, ontology, tools),
+        build_compressed_candidate_fact_bundle(config, ontology, tools, max_workers=max_workers),
         internal_schema="compressed_candidate_fallback",
         internal_solver_mode="multi-shot-compressed-candidate",
     )
@@ -1072,65 +1089,35 @@ def _validate_run_config(config: SnakeConfig) -> None:
         raise ValueError("timeout_sec must be non-negative.")
 
 
-def _prepare_run_context(
-    config_path: str | Path,
+def _select_fact_bundle(
     *,
+    mode_config: _ModeConfig,
     mode: str,
-    grounding_strategy: str,
-    output_dir: str | Path | None = None,
-    solutions: int | None = None,
-    min_length: int | None = None,
-    max_length: int | None = None,
-    progress_callback: ProgressCallback = None,
-    optimized: bool = False,
-) -> tuple:
-    """Load config and build the fact bundle for a run."""
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple,
+    optimized: bool,
+    effective_translation_strategy: str,
+    progress_callback: ProgressCallback,
+    max_workers: int = 1,
+) -> tuple[FactBundle, str]:
+    """Select and build the fact bundle, applying backend fallback logic.
 
-    mode_config = _mode_config(mode)
-    if optimized and mode not in {"single-shot", "multi-shot"}:
-        raise ValueError("--optimized supports only single-shot and multi-shot.")
-    config = load_config(config_path)
-    config = replace(
-        config,
-        solutions=solutions if solutions is not None else config.solutions,
-        solution_length_min=min_length if min_length is not None else config.solution_length_min,
-        solution_length_max=max_length if max_length is not None else config.solution_length_max,
-    )
-    _validate_run_config(config)
-    solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
-    solution_dir.mkdir(parents=True, exist_ok=True)
-
-    effective_translation_strategy = _effective_translation_strategy(mode, grounding_strategy)
-
-    _report(progress_callback, "Step 1: translation started.")
-    start = perf_counter()
-    ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
-    tools = _load_tools_for_mode(config, mode_config.translation_pathway)
+    Returns (fact_bundle, resolved_translation_builder).
+    """
     resolved_translation_builder = mode_config.translation_builder
-    run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
+
     if mode_config.translation_pathway == "ape_multi_shot":
-        fact_bundle = _legacy_direct_bundle(
-            config,
-            ontology,
-            tools,
-        )
+        fact_bundle = _legacy_direct_bundle(config, ontology, tools)
         if optimized:
-            if _should_consider_direct_candidate_fallback(
-                mode,
-                optimized=optimized,
-                tools=tools,
-            ):
+            if _should_consider_direct_candidate_fallback(mode, optimized=optimized, tools=tools):
                 compressed_candidate_tools = load_candidate_tool_annotations(
                     config.tool_annotations_path,
                     config.ontology_prefix,
                 )
                 if _should_force_direct_candidate_fallback(tools):
                     _report(progress_callback, "Step 1b: forcing compressed-candidate internal fallback for heavy direct run.")
-                    fact_bundle = _compressed_candidate_internal_bundle(
-                        config,
-                        ontology,
-                        compressed_candidate_tools,
-                    )
+                    fact_bundle = _compressed_candidate_internal_bundle(config, ontology, compressed_candidate_tools, max_workers=max_workers)
                     resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
                     _report(
                         progress_callback,
@@ -1139,13 +1126,7 @@ def _prepare_run_context(
                     )
                 else:
                     _report(progress_callback, "Step 1b: Python direct precompute started.")
-                    optimized_direct_bundle = apply_direct_python_precompute(
-                        mode,
-                        config,
-                        ontology,
-                        tools,
-                        fact_bundle,
-                    )
+                    optimized_direct_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
                     _report(
                         progress_callback,
                         "Step 1b complete: Python direct precompute emitted "
@@ -1153,11 +1134,7 @@ def _prepare_run_context(
                     )
                     fact_bundle = optimized_direct_bundle
                     _report(progress_callback, "Step 1c: evaluating compressed-candidate internal fallback.")
-                    compressed_candidate_bundle = _compressed_candidate_internal_bundle(
-                        config,
-                        ontology,
-                        compressed_candidate_tools,
-                    )
+                    compressed_candidate_bundle = _compressed_candidate_internal_bundle(config, ontology, compressed_candidate_tools, max_workers=max_workers)
                     if compressed_candidate_bundle.fact_count < fact_bundle.fact_count:
                         fact_bundle = compressed_candidate_bundle
                         resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
@@ -1174,19 +1151,14 @@ def _prepare_run_context(
                         )
             else:
                 _report(progress_callback, "Step 1b: Python direct precompute started.")
-                optimized_direct_bundle = apply_direct_python_precompute(
-                    mode,
-                    config,
-                    ontology,
-                    tools,
-                    fact_bundle,
-                )
+                optimized_direct_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
                 _report(
                     progress_callback,
                     "Step 1b complete: Python direct precompute emitted "
                     f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
                 )
                 fact_bundle = optimized_direct_bundle
+
     elif mode_config.translation_pathway == "normal":
         fact_bundle = replace(
             build_fact_bundle(config, ontology, tools, effective_translation_strategy),
@@ -1195,33 +1167,78 @@ def _prepare_run_context(
         )
         if optimized:
             _report(progress_callback, "Step 1b: Python direct precompute started.")
-            fact_bundle = apply_direct_python_precompute(
-                mode,
-                config,
-                ontology,
-                tools,
-                fact_bundle,
-            )
+            fact_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
             _report(
                 progress_callback,
                 "Step 1b complete: Python direct precompute emitted "
                 f"{fact_bundle.python_precompute_fact_count} helper facts.",
             )
+
     else:
-        raise ValueError(
-            f"Unsupported translation pathway: {mode_config.translation_pathway}"
-        )
+        raise ValueError(f"Unsupported translation pathway: {mode_config.translation_pathway}")
+
+    return fact_bundle, resolved_translation_builder
+
+
+def _prepare_run_context(
+    config_path: str | Path,
+    *,
+    mode: str,
+    grounding_strategy: str,
+    output_dir: str | Path | None = None,
+    solutions: int | None = None,
+    min_length: int | None = None,
+    max_length: int | None = None,
+    progress_callback: ProgressCallback = None,
+    optimized: bool = False,
+    max_workers: int = 1,
+) -> RunContext:
+    """Load config and build the fact bundle for a run."""
+
+    mode_config = _mode_config(mode)
+    if optimized and mode not in {"single-shot", "multi-shot"}:
+        raise ValueError("--optimized supports only single-shot and multi-shot.")
+    config = load_config(config_path)
+    config = config.model_copy(update={
+        "solutions": solutions if solutions is not None else config.solutions,
+        "solution_length_min": min_length if min_length is not None else config.solution_length_min,
+        "solution_length_max": max_length if max_length is not None else config.solution_length_max,
+    })
+    _validate_run_config(config)
+    solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
+    solution_dir.mkdir(parents=True, exist_ok=True)
+
+    effective_translation_strategy = _effective_translation_strategy(mode, grounding_strategy)
+
+    _report(progress_callback, "Step 1: translation started.")
+    start = perf_counter()
+    ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
+    tools = _load_tools_for_mode(config, mode_config.translation_pathway)
+    run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
+    fact_bundle, resolved_translation_builder = _select_fact_bundle(
+        mode_config=mode_config,
+        mode=mode,
+        config=config,
+        ontology=ontology,
+        tools=tools,
+        optimized=optimized,
+        effective_translation_strategy=effective_translation_strategy,
+        progress_callback=progress_callback,
+        max_workers=max_workers,
+    )
     translation_sec = perf_counter() - start
+    translation_peak_rss_mb = current_peak_rss_mb()
     _report(progress_callback, f"Step 1 complete: translation finished after {translation_sec:.3f}s.")
 
-    return (
-        config,
-        solution_dir,
-        fact_bundle,
-        translation_sec,
-        effective_translation_strategy,
-        resolved_translation_builder,
-        run_metadata,
+    return RunContext(
+        config=config,
+        solution_dir=solution_dir,
+        fact_bundle=fact_bundle,
+        translation_sec=translation_sec,
+        translation_peak_rss_mb=translation_peak_rss_mb,
+        effective_translation_strategy=effective_translation_strategy,
+        resolved_translation_builder=resolved_translation_builder,
+        run_metadata=run_metadata,
     )
 
 
@@ -1236,18 +1253,11 @@ def run_translate_only(
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    max_workers: int = 1,
 ) -> TranslationRunResult:
     """Run translation only and write translation diagnostics."""
 
-    (
-        config,
-        solution_dir,
-        fact_bundle,
-        translation_sec,
-        effective_translation_strategy,
-        resolved_translation_builder,
-        run_metadata,
-    ) = _prepare_run_context(
+    ctx = _prepare_run_context(
         config_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
@@ -1257,44 +1267,44 @@ def run_translate_only(
         max_length=max_length,
         progress_callback=progress_callback,
         optimized=optimized,
+        max_workers=max_workers,
     )
-    translation_peak_rss_mb = current_peak_rss_mb()
     csv_writers = _RunCsvWriters(
-        csv_dir=config.solutions_dir_path,
+        csv_dir=ctx.config.solutions_dir_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
-        fact_count=fact_bundle.fact_count,
-        run_metadata=run_metadata,
-        translation_builder=resolved_translation_builder,
-        translation_schema=_translation_schema(fact_bundle),
+        fact_count=ctx.fact_bundle.fact_count,
+        run_metadata=ctx.run_metadata,
+        translation_builder=ctx.resolved_translation_builder,
+        translation_schema=_translation_schema(ctx.fact_bundle),
         optimized_enabled=optimized,
         effective_parallel_mode=None,
-        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
+        compressed_candidate_engaged=_compressed_candidate_engaged(ctx.fact_bundle),
     )
     csv_writers.step_writer.log_translation(
-        translation_sec=translation_sec,
-        translation_peak_rss_mb=translation_peak_rss_mb,
+        translation_sec=ctx.translation_sec,
+        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
     )
 
     translation_summary_path, _ = _write_translation_summary(
-        solution_dir=solution_dir,
+        solution_dir=ctx.solution_dir,
         mode=mode,
         grounding_strategy=grounding_strategy,
-        translation_builder=resolved_translation_builder,
-        effective_translation_strategy=effective_translation_strategy,
-        fact_bundle=fact_bundle,
+        translation_builder=ctx.resolved_translation_builder,
+        effective_translation_strategy=ctx.effective_translation_strategy,
+        fact_bundle=ctx.fact_bundle,
         translation_path=None,
-        translation_sec=translation_sec,
+        translation_sec=ctx.translation_sec,
     )
     csv_writers.summary_writer.log_summary(
         completed_stage="translate_only",
         timings=TimingBreakdown(
-            translation_sec=translation_sec,
+            translation_sec=ctx.translation_sec,
             grounding_sec=0.0,
             solving_sec=0.0,
             rendering_sec=0.0,
         ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
+        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
         base_grounding_sec=0.0,
         base_grounding_peak_rss_mb=0.0,
         horizon_records=(),
@@ -1307,19 +1317,19 @@ def run_translate_only(
     run_summary_path = csv_writers.run_summary_path
 
     return TranslationRunResult(
-        config=config,
+        config=ctx.config,
         mode=mode,
         grounding_strategy=grounding_strategy,
-        translation_builder=resolved_translation_builder,
-        effective_translation_strategy=effective_translation_strategy,
-        fact_bundle=fact_bundle,
+        translation_builder=ctx.resolved_translation_builder,
+        effective_translation_strategy=ctx.effective_translation_strategy,
+        fact_bundle=ctx.fact_bundle,
         timings=TimingBreakdown(
-            translation_sec=translation_sec,
+            translation_sec=ctx.translation_sec,
             grounding_sec=0.0,
             solving_sec=0.0,
             rendering_sec=0.0,
         ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
+        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
         translation_path=None,
         translation_summary_path=translation_summary_path,
         run_log_path=run_log_path,
@@ -1343,18 +1353,11 @@ def run_once(
     write_raw_answer_sets: bool = False,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    max_workers: int = 1,
 ) -> RunResult:
     """Run one snakeAPE execution."""
 
-    (
-        config,
-        solution_dir,
-        fact_bundle,
-        translation_sec,
-        _effective_strategy,
-        _translation_builder,
-        run_metadata,
-    ) = _prepare_run_context(
+    ctx = _prepare_run_context(
         config_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
@@ -1364,8 +1367,15 @@ def run_once(
         max_length=max_length,
         progress_callback=progress_callback,
         optimized=optimized,
+        max_workers=max_workers,
     )
-    translation_peak_rss_mb = current_peak_rss_mb()
+    config = ctx.config
+    solution_dir = ctx.solution_dir
+    fact_bundle = ctx.fact_bundle
+    translation_sec = ctx.translation_sec
+    translation_peak_rss_mb = ctx.translation_peak_rss_mb
+    run_metadata = ctx.run_metadata
+    _translation_builder = ctx.resolved_translation_builder
     effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
 
@@ -1422,6 +1432,7 @@ def run_once(
                     write_raw_answer_sets=write_raw_answer_sets,
                     progress_callback=progress_callback,
                     optimized=True,
+                    max_workers=max_workers,
                 )
             raise
 
@@ -1606,18 +1617,11 @@ def run_ground_only(
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    max_workers: int = 1,
 ) -> GroundingRunResult:
     """Run translation plus grounding without solving."""
 
-    (
-        config,
-        solution_dir,
-        fact_bundle,
-        translation_sec,
-        effective_translation_strategy,
-        translation_builder,
-        run_metadata,
-    ) = _prepare_run_context(
+    ctx = _prepare_run_context(
         config_path,
         mode=mode,
         grounding_strategy=grounding_strategy,
@@ -1627,8 +1631,16 @@ def run_ground_only(
         max_length=max_length,
         progress_callback=progress_callback,
         optimized=optimized,
+        max_workers=max_workers,
     )
-    translation_peak_rss_mb = current_peak_rss_mb()
+    config = ctx.config
+    solution_dir = ctx.solution_dir
+    fact_bundle = ctx.fact_bundle
+    translation_sec = ctx.translation_sec
+    translation_peak_rss_mb = ctx.translation_peak_rss_mb
+    translation_builder = ctx.resolved_translation_builder
+    effective_translation_strategy = ctx.effective_translation_strategy
+    run_metadata = ctx.run_metadata
     csv_writers = _RunCsvWriters(
         csv_dir=config.solutions_dir_path,
         mode=mode,

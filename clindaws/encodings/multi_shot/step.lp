@@ -73,34 +73,31 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Helper to project out concrete dimension 'V' from the main cross-product
-wf_provides_req(t, WF, ReqV, Cat) :-
-    holds(t, dim(WF, V, Cat)),
+eligible_initial_artifact(t, Port, Artifact) :-
+    holds(0, avail(Artifact)),
+    holds(t, avail(Artifact)),
+    initial_bindable(Port, Artifact).
+
+produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))),
+    bindable_output_port(Port, ProducerPort).
+
+produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
+    port_requires(Port, ReqV, Cat),
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), V, Cat),
     compatible(V, ReqV).
 
-% Port satisfaction per category
-port_cat_ok(t, Port, WF, Cat) :-
-    planner_workflow_input(WF),
-    holds(t, avail(WF)),
-    port_requires(Port, _, Cat),
-    not holds(t, dim(WF, _, Cat)).
+eligible_produced_output(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
+    produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :
+        port_category(Port, Cat).
 
-port_cat_ok(t, Port, WF, Cat) :-
-    planner_workflow_input(WF),
-    holds(t, avail(WF)),
-    port_requires(Port, ReqV, Cat),
-    wf_provides_req(t, WF, ReqV, Cat).
+eligible(t, Port, Artifact) :-
+    eligible_initial_artifact(t, Port, Artifact).
 
-port_cat_ok(t, Port, WF, Cat) :-
-    holds(t, avail(WF)),
-    not planner_workflow_input(WF),
-    port_requires(Port, ReqV, Cat),
-    wf_provides_req(t, WF, ReqV, Cat).
-
-eligible(t, Port, WF) :-
-    holds(t, avail(WF)),
-    input_port(_, Port),
-    port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
+eligible(t, Port, Artifact) :-
+    eligible_produced_output(t, Port, Artifact).
 
 % Port binding: exactly one eligible item per port
 1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Port, WF) } 1 :-

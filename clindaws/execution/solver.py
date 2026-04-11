@@ -190,6 +190,79 @@ def _report(progress_callback: ProgressCallback, message: str) -> None:
         progress_callback(message)
 
 
+def _artifact_is_produced_output(symbol: clingo.Symbol) -> bool:
+    return (
+        symbol.type == clingo.SymbolType.Function
+        and symbol.name == "out"
+        and len(symbol.arguments) == 3
+    )
+
+
+def _legacy_direct_multishot_horizon_metrics(
+    control: clingo.Control,
+    *,
+    horizon: int,
+) -> dict[str, int]:
+    """Collect grounded-domain counts for direct multi-shot eligibility/binding."""
+
+    metrics = {
+        "available_artifacts_at_step": 0,
+        "eligible_artifacts_at_step": 0,
+        "eligible_workflow_inputs_at_step": 0,
+        "eligible_produced_outputs_at_step": 0,
+        "bind_choice_domain_size_at_step": 0,
+    }
+    horizon_symbol = clingo.Number(horizon)
+    available_artifacts: set[str] = set()
+
+    for atom in control.symbolic_atoms.by_signature("holds", 2):
+        symbol = atom.symbol
+        if symbol.arguments[0] != horizon_symbol:
+            continue
+        state = symbol.arguments[1]
+        if (
+            state.type == clingo.SymbolType.Function
+            and state.name == "avail"
+            and len(state.arguments) == 1
+        ):
+            available_artifacts.add(str(state.arguments[0]))
+
+    for atom in control.symbolic_atoms.by_signature("available", 1):
+        symbol = atom.symbol
+        available_artifacts.add(str(symbol.arguments[0]))
+
+    metrics["available_artifacts_at_step"] = len(available_artifacts)
+
+    for atom in control.symbolic_atoms.by_signature("eligible", 3):
+        symbol = atom.symbol
+        if symbol.arguments[0] != horizon_symbol:
+            continue
+        metrics["eligible_artifacts_at_step"] += 1
+        artifact = symbol.arguments[2]
+        if _artifact_is_produced_output(artifact):
+            metrics["eligible_produced_outputs_at_step"] += 1
+        else:
+            metrics["eligible_workflow_inputs_at_step"] += 1
+
+    for atom in control.symbolic_atoms.by_signature("occurs", 2):
+        symbol = atom.symbol
+        if symbol.arguments[0] != horizon_symbol:
+            continue
+        event = symbol.arguments[1]
+        if (
+            event.type == clingo.SymbolType.Function
+            and event.name == "bind"
+            and len(event.arguments) == 3
+        ):
+            metrics["bind_choice_domain_size_at_step"] += 1
+
+    return metrics
+
+
+def _collect_direct_multishot_metrics(facts: FactBundle) -> bool:
+    return facts.internal_solver_mode == "multi-shot"
+
+
 @contextmanager
 def _interrupt_guard(control: clingo.Control) -> Iterator[Callable[[], bool]]:
     interrupted = False
@@ -440,6 +513,7 @@ def _solve_multi_shot_with_programs(
     solving_started = False
     tool_input_signatures = dict(facts.tool_input_signatures)
     effective_solve_start = solve_start_horizon if solve_start_horizon is not None else config.solution_length_min
+    collect_horizon_metrics = _collect_direct_multishot_metrics(facts)
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -475,6 +549,11 @@ def _solve_multi_shot_with_programs(
                     is_interrupted=is_interrupted,
                     progress_callback=progress_callback,
                     horizon=horizon,
+                )
+                horizon_metrics = (
+                    _legacy_direct_multishot_horizon_metrics(control, horizon=horizon)
+                    if collect_horizon_metrics
+                    else {}
                 )
                 total_grounding += ground_elapsed
                 _report(
@@ -572,6 +651,11 @@ def _solve_multi_shot_with_programs(
                     models_stored=models_stored,
                     unique_workflows_seen=unique_workflows_seen,
                     unique_workflows_stored=unique_workflows_stored,
+                    available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                    eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                    eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                    eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                    bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
                     grounding_parts=grounding_parts,
                 )
                 horizon_records.append(record)
@@ -932,6 +1016,7 @@ def _ground_multi_shot_control(
     config: SnakeConfig,
     *,
     stage: str,
+    collect_horizon_metrics: bool = False,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -977,6 +1062,11 @@ def _ground_multi_shot_control(
                         progress_callback=progress_callback,
                         horizon=horizon,
                     )
+                    horizon_metrics = (
+                        _legacy_direct_multishot_horizon_metrics(control, horizon=horizon)
+                        if collect_horizon_metrics
+                        else {}
+                    )
                     total_grounding += elapsed
                     grounded_horizons.append(horizon)
                     record = HorizonRecord(
@@ -989,6 +1079,11 @@ def _ground_multi_shot_control(
                         models_stored=0,
                         unique_workflows_seen=0,
                         unique_workflows_stored=0,
+                        available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                        eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                        eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                        eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                        bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
                         grounding_parts=grounding_parts,
                     )
                     horizon_records.append(record)
@@ -1024,12 +1119,6 @@ def solve_multi_shot(
     project_models: bool = False,
 ) -> SolveOutput:
     """Solve using the multi-shot encoding."""
-    effective_solve_start = max(config.solution_length_min, facts.earliest_solution_step)
-    if effective_solve_start > config.solution_length_min:
-        _report(
-            progress_callback,
-            f"Lower-bound solve start: skipping query/check before horizon {effective_solve_start}.",
-        )
     return _solve_multi_shot_with_programs(
         config,
         facts,
@@ -1040,13 +1129,8 @@ def solve_multi_shot(
         horizon_record_callback=horizon_record_callback,
         solve_all_horizons=False,
         stop_on_solution=False,
-        horizon_parts_builder=lambda horizon: (
-            _multi_shot_prefix_horizon_parts(horizon)
-            if horizon < effective_solve_start
-            else _multi_shot_horizon_parts(horizon)
-        ),
+        horizon_parts_builder=_multi_shot_horizon_parts,
         capture_raw_models=capture_raw_models,
-        solve_start_horizon=effective_solve_start,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )
@@ -1073,6 +1157,7 @@ def ground_multi_shot(
         control,
         config,
         stage=stage,
+        collect_horizon_metrics=_collect_direct_multishot_metrics(facts),
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,

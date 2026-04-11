@@ -150,6 +150,11 @@ tool_req_incompatible(Tool) :-
 % (unit carry-forward and production are in step.lp)
 % ----------------------------------------------------------------
 
+% Bridge monotonic properties for reusable initial artifacts.
+available(A)          :- holds(0, avail(A)).
+artifact_dim(A, V, C) :- holds(0, dim(A, V, C)).
+artifact_unit(A, U)   :- holds(0, unit(A, U)).
+
 base_workflow_input(WF) :-
     holds(0, avail(WF)).
 

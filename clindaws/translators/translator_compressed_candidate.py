@@ -20,10 +20,12 @@ def build_compressed_candidate_fact_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
+    *,
+    max_workers: int = 1,
 ) -> FactBundle:
     """Build compressed-candidate facts using a dedicated optimization layer."""
 
-    optimization = optimize_compressed_candidates(config, ontology, tools)
+    optimization = optimize_compressed_candidates(config, ontology, tools, max_workers=max_workers)
 
     writer = _FactWriter()
     _build_common_facts(writer, config, ontology, optimization.relevant_tools)

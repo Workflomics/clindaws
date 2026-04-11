@@ -22,6 +22,59 @@ port_category(Port, Category) :-
     input_port(_, Port),
     dimension(Port, (_, Category)).
 
+port_has_category(Port) :-
+    port_category(Port, _).
+
+smaller_port_category(Port, CategoryHigh) :-
+    port_category(Port, CategoryHigh),
+    port_category(Port, CategoryLow),
+    CategoryLow < CategoryHigh.
+
+port_anchor_category(Port, Category) :-
+    port_category(Port, Category),
+    not smaller_port_category(Port, Category).
+
+output_port_has_category(ProducerPort, Category) :-
+    output_port(_, ProducerPort),
+    dimension(ProducerPort, (_, Category)).
+
+declared_output_value_supports_requirement(OutputValue, ReqV) :-
+    is_terminal(Terminal),
+    compatible(Terminal, OutputValue),
+    compatible(Terminal, ReqV).
+
+output_port_cat_bindable(ConsumerPort, ProducerPort, Category) :-
+    input_port(_, ConsumerPort),
+    output_port(_, ProducerPort),
+    port_requires(ConsumerPort, ReqV, Category),
+    dimension(ProducerPort, (OutputValue, Category)),
+    declared_output_value_supports_requirement(OutputValue, ReqV).
+
+port_category_count(ConsumerPort, Count) :-
+    input_port(_, ConsumerPort),
+    Count = #count { Category : port_category(ConsumerPort, Category) }.
+
+output_port_category_cover_count(ConsumerPort, ProducerPort, Count) :-
+    input_port(_, ConsumerPort),
+    output_port(_, ProducerPort),
+    Count = #count {
+        Category : port_category(ConsumerPort, Category), output_port_has_category(ProducerPort, Category)
+    }.
+
+output_port_bindable_category_count(ConsumerPort, ProducerPort, Count) :-
+    input_port(_, ConsumerPort),
+    output_port(_, ProducerPort),
+    Count = #count {
+        Category : port_category(ConsumerPort, Category), output_port_cat_bindable(ConsumerPort, ProducerPort, Category)
+    }.
+
+bindable_output_port(ConsumerPort, ProducerPort) :-
+    input_port(_, ConsumerPort),
+    output_port(_, ProducerPort),
+    port_category_count(ConsumerPort, Count),
+    output_port_category_cover_count(ConsumerPort, ProducerPort, Count),
+    output_port_bindable_category_count(ConsumerPort, ProducerPort, Count).
+
 goal_requirement(GoalID, goalreq(GoalID, GoalValue, Category), GoalValue, Category) :-
     goal_output(GoalID, GoalValue, Category).
 

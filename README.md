@@ -2,34 +2,16 @@
 
 ## Running
 
-Run from the `snakeAPE` root with either of these forms:
+Run from the workspace root (`/Volumes/ZGMF-X20A/GARYU`):
 
 ```bash
-python snakeAPE <path-to-config.json> [flags]
+PYTHONPATH=snakeAPE python -m clindaws <path-to-config.json> [flags]
 ```
 
-or:
+Example:
 
 ```bash
-python -m snakeAPE <path-to-config.json> [flags]
-```
-
-Example from `/Volumes/ZGMF-X20A/GARYU/snakeAPE`:
-
-```bash
-python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
-```
-
-Run from the workspace root with:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE <path-to-config.json> [flags]
-```
-
-Example from `/Volumes/ZGMF-X20A/GARYU`:
-
-```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 ## Modes
@@ -44,90 +26,61 @@ Meaning:
 - `single-shot`: legacy single-shot runtime schema
 - `multi-shot`: APE-style incremental runtime schema
 
-All runtime ASP encodings are vendored under `snakeAPE/encodings`.
+All runtime ASP encodings are vendored under `clindaws/encodings`.
 
 ## Common Commands
 
 Normal run:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
-```
-
-Normal run from the `snakeAPE` root:
-
-```bash
-python snakeAPE ../ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
 Legacy single-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-single
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-single
 ```
 
 Legacy multi-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi
 ```
 
 Grounding only:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
 ```
 
 Translation only:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
 ```
 
 Translation only with compressed-candidate optimization:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --python-precompute-direct --translate-only --output-dir /tmp/snakeape-translate-opt
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --optimized --translate-only --output-dir /tmp/snakeape-translate-opt
 ```
 
 Optimized multi-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m snakeAPE ironAPE/APE_Example/biotools/config.json --mode multi-shot --python-precompute-direct --output-dir /tmp/snakeape-multi-opt
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --output-dir /tmp/snakeape-multi-opt
 ```
 
-## Comparing SAT and snakeAPE Outputs
-
-The comparison utility now lives in the `snakeAPE` root:
+Parallel translation expansion (8 workers):
 
 ```bash
-cd snakeAPE
-python3 compare_solutions.py <left-solutions-file> <right-solutions-file> [flags]
+PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --translation-workers 8 --output-dir /tmp/snakeape-multi-opt-par
 ```
-
-Example comparing APE SAT output against snakeAPE answer sets for exact length 8:
-
-```bash
-cd snakeAPE
-python3 compare_solutions.py \
-  /tmp/ape_sat_compare/sat_output/solutions.txt \
-  /tmp/ape_sat_compare/snake_output/answer_sets.txt \
-  --left-config /tmp/ape_sat_compare/config_sat_compare.json \
-  --left-name SAT \
-  --right-name snakeAPE \
-  --length 8 \
-  --sample-limit 5
-```
-
-The comparator explains three levels of agreement:
-
-- exact normalized workflow matches
-- same tool sequence but different strict signature
-- workflows present on only one side at the tool-sequence level
 
 ## Output Artifacts
 
-Each run writes artifacts into `--output-dir` or the directory from the config.
+Each run writes artifacts into `--output-dir` or the directory derived from the config.
 
 Important files:
 
@@ -135,12 +88,12 @@ Important files:
 - `translation_summary.json`
 - `grounding_summary.json` for `--ground-only`
 - descriptive `answer_sets__...txt` files and `workflow_signatures.json` for normal runs
-- `snakeAPE/run_log.csv`
-- `snakeAPE/run_summary.csv`
+- `asp_run_log.csv`
+- `asp_run_summary.csv`
 
-The CSV logs are written to the root of the `snakeAPE` project directory, not to `--output-dir`.
+The CSV logs are written to the output directory for each run (same as `--output-dir`).
 
-`snakeAPE/run_log.csv` is append-only and records runtime information per completed stage or horizon, including:
+`asp_run_log.csv` is append-only and records runtime information per completed stage or horizon, including:
 
 - `mode`
 - `solver_family`
@@ -151,7 +104,7 @@ The CSV logs are written to the root of the `snakeAPE` project directory, not to
 - peak RSS memory columns
 - satisfiability / stored-solution counts
 
-`snakeAPE/run_summary.csv` is append-only and contains one row per completed invocation with total:
+`asp_run_summary.csv` is append-only and contains one row per completed invocation with total:
 
 - translation time
 - base grounding time
@@ -161,17 +114,25 @@ The CSV logs are written to the root of the `snakeAPE` project directory, not to
 - total runtime
 - final solution count
 
-If a run is interrupted, `snakeAPE/run_log.csv` still contains all stages that were completed before the interruption.
+If a run is interrupted, `asp_run_log.csv` still contains all stages that were completed before the interruption.
 
 ## Useful Flags
 
-- `--mode ...`
+- `--mode single-shot|multi-shot`
+- `--grounding python|hybrid|clingo` — grounding strategy (default `hybrid`)
 - `--output-dir ...`
 - `--solutions N`
 - `--min-length N`
 - `--max-length N`
+- `--parallel-mode ...` — clingo solve parallel mode, e.g. `8,compete`
+- `--project` / `--no-project` — enable/disable clingo model projection during solving
 - `--no-graphs`
+- `--graph-format png|dot|svg`
+- `--optimized` — precompute static helper relations and bindability facts in Python before grounding
+- `--translation-workers N` — parallel worker processes for candidate expansion (default 1, sequential)
 - `--ground-only`
 - `--ground-only-stage base|full`
 - `--translate-only`
 - `--write-raw-answer-sets`
+- `--benchmark-repetitions N` — repeat the grounding benchmark N times
+- `--summary-top-tools N` — include top N expanded tools in translation/grounding summaries

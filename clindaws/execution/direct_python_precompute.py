@@ -19,6 +19,9 @@ from clindaws.translators.ports import (
     _artifact_satisfies_port_requirements,
     _port_requirement_terminal_sets,
 )
+from clindaws.translators.signatures import (
+    _prefer_less_specific_value,
+)
 from clindaws.translators.builder import (
     _build_roots,
 )
@@ -83,6 +86,7 @@ class _ParsedDirectFacts:
     output_ports_by_group: Mapping[str, tuple[str, ...]]
     input_dimensions_by_port: Mapping[str, Mapping[str, tuple[str, ...]]]
     output_dimensions_by_port: Mapping[str, Mapping[str, tuple[str, ...]]]
+    workflow_input_ids: tuple[str, ...]
     workflow_input_dims: Mapping[str, Mapping[str, tuple[str, ...]]]
     workflow_input_units: Mapping[str, tuple[str, ...]]
     goal_dimensions_by_id: Mapping[str, Mapping[str, tuple[str, ...]]]
@@ -103,6 +107,7 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
     output_group_tool_by_id: dict[str, str] = {}
     output_ports_by_group: dict[str, list[str]] = defaultdict(list)
     all_dimensions_by_port: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    workflow_input_ids: set[str] = set()
     workflow_input_dims: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     workflow_input_units: dict[str, list[str]] = defaultdict(list)
     goal_dimensions_by_id: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
@@ -153,13 +158,17 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
         if atom.name != "holds" or atom.arguments[0].number != 0:
             continue
         inner = atom.arguments[1]
-        if inner.name == "dim":
+        if inner.name == "avail":
+            workflow_input_ids.add(_symbol_string(inner.arguments[0]))
+        elif inner.name == "dim":
             wf = _symbol_string(inner.arguments[0])
+            workflow_input_ids.add(wf)
             value = _symbol_string(inner.arguments[1])
             category = _symbol_string(inner.arguments[2])
             workflow_input_dims[wf][category].append(value)
         elif inner.name == "unit":
             wf = _symbol_string(inner.arguments[0])
+            workflow_input_ids.add(wf)
             workflow_input_units[wf].append(_symbol_string(inner.arguments[1]))
 
     input_dimensions_by_port = {
@@ -198,6 +207,7 @@ def _parse_direct_facts(facts: str) -> _ParsedDirectFacts:
         },
         input_dimensions_by_port=input_dimensions_by_port,
         output_dimensions_by_port=output_dimensions_by_port,
+        workflow_input_ids=tuple(sorted(workflow_input_ids)),
         workflow_input_dims={
             wf: {
                 category: tuple(sorted(dict.fromkeys(values)))
@@ -228,6 +238,130 @@ def _profile_key(
     units: tuple[str, ...] = (),
 ) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[str, ...]]:
     return (_signature_key(dims), tuple(units))
+
+
+def _compress_direct_output_profile_candidates(
+    ontology: Ontology,
+    *,
+    output_profile_terminal_sets: Mapping[str, Mapping[str, frozenset[str]]],
+    signature_requirements: Mapping[str, Mapping[str, tuple[frozenset[str], ...]]],
+    goal_requirements: Mapping[str, Mapping[str, tuple[frozenset[str], ...]]],
+) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, int]]:
+    """Compress output-choice terminals by consumer/goal equivalence profile."""
+
+    compressed_candidates: dict[str, dict[str, tuple[str, ...]]] = {}
+    dense_candidate_count = 0
+    emitted_candidate_count = 0
+    equivalence_class_count = 0
+    dropped_candidate_count = 0
+    compressed_category_count = 0
+
+    for profile_id, profile in sorted(output_profile_terminal_sets.items()):
+        category_candidates: dict[str, tuple[str, ...]] = {}
+        for category, terminal_values in sorted(profile.items()):
+            ordered_values = tuple(sorted(terminal_values))
+            dense_candidate_count += len(ordered_values)
+            if len(ordered_values) <= 1:
+                category_candidates[category] = ordered_values
+                emitted_candidate_count += len(ordered_values)
+                equivalence_class_count += len(ordered_values)
+                continue
+
+            representatives: dict[tuple[tuple[str, ...], tuple[str, ...]], str] = {}
+            for terminal_value in ordered_values:
+                supported_signatures = tuple(
+                    signature_id
+                    for signature_id, requirements in sorted(signature_requirements.items())
+                    if any(
+                        terminal_value in requirement_set
+                        for requirement_set in requirements.get(category, ())
+                    )
+                )
+                supported_goals = tuple(
+                    goal_id
+                    for goal_id, requirements in sorted(goal_requirements.items())
+                    if any(
+                        terminal_value in requirement_set
+                        for requirement_set in requirements.get(category, ())
+                    )
+                )
+                profile_key = (supported_signatures, supported_goals)
+                current = representatives.get(profile_key)
+                if current is None:
+                    representatives[profile_key] = terminal_value
+                else:
+                    representatives[profile_key] = _prefer_less_specific_value(
+                        ontology,
+                        current,
+                        terminal_value,
+                    )
+
+            retained_values = tuple(representatives.values())
+            category_candidates[category] = retained_values
+            emitted_candidate_count += len(retained_values)
+            equivalence_class_count += len(retained_values)
+            dropped_candidate_count += len(ordered_values) - len(retained_values)
+            if len(retained_values) < len(ordered_values):
+                compressed_category_count += 1
+
+        compressed_candidates[profile_id] = category_candidates
+
+    return compressed_candidates, {
+        "precompute_output_profile_candidates_dense": dense_candidate_count,
+        "precompute_output_profile_candidates": emitted_candidate_count,
+        "precompute_output_profile_candidate_equivalence_classes": equivalence_class_count,
+        "precompute_output_profile_candidates_dropped": dropped_candidate_count,
+        "precompute_output_profile_candidate_categories_compressed": compressed_category_count,
+    }
+
+
+def _emit_direct_output_profile_check_facts(
+    writer: _FactWriter,
+    *,
+    compressed_output_profile_candidates: Mapping[str, Mapping[str, tuple[str, ...]]],
+    candidate_signature_supports: Mapping[tuple[str, str, str], frozenset[str]],
+    candidate_goal_supports: Mapping[tuple[str, str, str], frozenset[str]],
+) -> dict[str, int]:
+    retained_category_count = 0
+    ambiguous_category_count = 0
+    ambiguous_candidate_count = 0
+
+    for profile_id, profile in sorted(compressed_output_profile_candidates.items()):
+        for category, terminal_values in sorted(profile.items()):
+            retained_category_count += 1
+            if len(terminal_values) <= 1:
+                continue
+
+            support_profiles = {
+                (
+                    tuple(sorted(candidate_signature_supports.get((profile_id, terminal_value, category), frozenset()))),
+                    tuple(sorted(candidate_goal_supports.get((profile_id, terminal_value, category), frozenset()))),
+                )
+                for terminal_value in terminal_values
+            }
+            if len(support_profiles) <= 1:
+                continue
+
+            writer.emit_fact(
+                "direct_output_profile_category_requires_check",
+                _quote(profile_id),
+                _quote(category),
+            )
+            ambiguous_category_count += 1
+            for terminal_value in terminal_values:
+                writer.emit_fact(
+                    "direct_output_profile_candidate_requires_check",
+                    _quote(profile_id),
+                    _quote(terminal_value),
+                    _quote(category),
+                )
+                ambiguous_candidate_count += 1
+
+    return {
+        "precompute_output_profile_candidate_categories_retained": retained_category_count,
+        "precompute_output_profile_candidate_categories_requiring_check": ambiguous_category_count,
+        "precompute_output_profile_candidates_requiring_check": ambiguous_candidate_count,
+    }
 
 
 def _emit_port_signature_facts(
@@ -318,8 +452,11 @@ def _emit_single_shot_workflow_input_facts(
 ) -> dict[str, int]:
     emitted_pairs = 0
     profiles = {
-        wf: _profile_key(dimensions)
-        for wf, dimensions in parsed.workflow_input_dims.items()
+        wf: _profile_key(
+            parsed.workflow_input_dims.get(wf, {}),
+            parsed.workflow_input_units.get(wf, ()),
+        )
+        for wf in parsed.workflow_input_ids
     }
     for wf_a, wf_b in combinations(sorted(profiles), 2):
         if profiles[wf_a] == profiles[wf_b]:
@@ -335,7 +472,8 @@ def _emit_multi_shot_workflow_input_facts(
     parsed: _ParsedDirectFacts,
 ) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, int]]:
     classes: dict[tuple[tuple[tuple[str, tuple[str, ...]], ...], tuple[str, ...]], list[str]] = defaultdict(list)
-    for wf, dimensions in sorted(parsed.workflow_input_dims.items()):
+    for wf in parsed.workflow_input_ids:
+        dimensions = parsed.workflow_input_dims.get(wf, {})
         classes[_profile_key(dimensions, parsed.workflow_input_units.get(wf, ()))].append(wf)
 
     planner_artifact_profiles: dict[str, dict[str, tuple[str, ...]]] = {}
@@ -344,11 +482,12 @@ def _emit_multi_shot_workflow_input_facts(
     for members in classes.values():
         ordered_members = sorted(members)
         rep = ordered_members[0]
+        for wf in ordered_members:
+            planner_artifact_profiles[wf] = dict(parsed.workflow_input_dims.get(wf, {}))
         writer.emit_fact("canonical_workflow_input", _quote(rep))
         if len(ordered_members) == 1:
             writer.emit_fact("workflow_input_class_member", _quote(rep), _quote(rep))
             writer.emit_fact("planner_workflow_input", _quote(rep))
-            planner_artifact_profiles[rep] = dict(parsed.workflow_input_dims[rep])
             continue
 
         repeated_class_count += 1
@@ -361,7 +500,7 @@ def _emit_multi_shot_workflow_input_facts(
             writer.emit_fact("workflow_input_slot", slot_term, _quote(rep), str(rank))
             writer.emit_fact("workflow_input_slot_source", slot_term, _quote(wf))
             writer.emit_fact("planner_workflow_input", slot_term)
-            planner_artifact_profiles[slot_term] = dict(parsed.workflow_input_dims[wf])
+            planner_artifact_profiles[slot_term] = dict(parsed.workflow_input_dims.get(wf, {}))
             slot_count += 1
         for wf_a in ordered_members:
             for wf_b in ordered_members:
@@ -463,8 +602,11 @@ def _emit_multi_shot_signature_compatibility_facts(
     output_profile_port_counts: dict[str, int] = {}
     output_profile_by_port: dict[str, str] = {}
     signature_port_counts: dict[str, int] = defaultdict(int)
+    ports_by_signature: dict[str, list[str]] = defaultdict(list)
     for signature_id in port_signatures.signature_by_port.values():
         signature_port_counts[signature_id] += 1
+    for port_id, signature_id in sorted(port_signatures.signature_by_port.items()):
+        ports_by_signature[signature_id].append(port_id)
 
     for index, profile_key in enumerate(sorted(output_profile_dimensions), start=1):
         profile_id = f"profile_{index}"
@@ -487,26 +629,37 @@ def _emit_multi_shot_signature_compatibility_facts(
     compatible_profiles_by_signature: dict[str, tuple[str, ...]] = {}
     dense_output_bindable_estimate = 0
     base_bindable_count = 0
-    output_profile_candidate_count = 0
+    port_initial_artifact_count = 0
+    port_bindable_output_profile_count = 0
     profile_signature_candidate_support_count = 0
     profile_goal_candidate_support_count = 0
     goal_category_count = 0
+    candidate_signature_support_map: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    candidate_goal_support_map: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+
+    compressed_output_profile_candidates, candidate_compression_stats = (
+        _compress_direct_output_profile_candidates(
+            ontology,
+            output_profile_terminal_sets=output_profile_terminal_sets,
+            signature_requirements=signature_requirements,
+            goal_requirements=goal_requirements,
+        )
+    )
 
     for goal_id, requirements in sorted(goal_requirements.items()):
         for category in sorted(requirements):
             writer.emit_fact("direct_goal_category", goal_id, _quote(category))
             goal_category_count += 1
 
-    for profile_id, profile in sorted(output_profile_terminal_sets.items()):
+    for profile_id, profile in sorted(compressed_output_profile_candidates.items()):
         for category, terminal_values in sorted(profile.items()):
-            for terminal_value in sorted(terminal_values):
+            for terminal_value in terminal_values:
                 writer.emit_fact(
                     "direct_output_profile_candidate",
                     _quote(profile_id),
                     _quote(terminal_value),
                     _quote(category),
                 )
-                output_profile_candidate_count += 1
 
     for signature_id, requirements in sorted(signature_requirements.items()):
         compatible_profiles = tuple(
@@ -517,27 +670,50 @@ def _emit_multi_shot_signature_compatibility_facts(
             )
         )
         compatible_profiles_by_signature[signature_id] = compatible_profiles
+        for port_id in sorted(ports_by_signature.get(signature_id, ())):
+            for profile_id in compatible_profiles:
+                writer.emit_fact(
+                    "direct_port_bindable_output_profile",
+                    _quote(port_id),
+                    _quote(profile_id),
+                )
+                port_bindable_output_profile_count += 1
         dense_output_bindable_estimate += sum(
             output_profile_port_counts[profile_id]
             for profile_id in compatible_profiles
         ) * signature_port_counts[signature_id]
-        for artifact_id, profile in sorted(base_profiles.items()):
-            if _workflow_input_satisfies_port_requirements(profile, requirements):
+        compatible_initial_artifacts = tuple(
+            artifact_id
+            for artifact_id, profile in sorted(base_profiles.items())
+            if _workflow_input_satisfies_port_requirements(profile, requirements)
+        )
+        for artifact_id in compatible_initial_artifacts:
+            for port_id in sorted(ports_by_signature.get(signature_id, ())):
                 writer.emit_fact(
-                    "direct_signature_initial_artifact",
-                    _quote(signature_id),
+                    "direct_port_initial_artifact",
+                    _quote(port_id),
                     _artifact_term(artifact_id),
                 )
-                base_bindable_count += 1
+                port_initial_artifact_count += 1
+        for artifact_id in compatible_initial_artifacts:
+            writer.emit_fact(
+                "direct_signature_initial_artifact",
+                _quote(signature_id),
+                _artifact_term(artifact_id),
+            )
+            base_bindable_count += 1
         for profile_id in compatible_profiles:
-            profile = output_profile_terminal_sets[profile_id]
+            profile = compressed_output_profile_candidates[profile_id]
             for category, requirement_sets in sorted(requirements.items()):
-                supported_values = {
-                    terminal_value
-                    for terminal_value in profile.get(category, frozenset())
-                    if any(terminal_value in requirement_set for requirement_set in requirement_sets)
-                }
-                for terminal_value in sorted(supported_values):
+                supported_values = tuple(
+                    sorted(
+                        terminal_value
+                        for terminal_value in profile.get(category, ())
+                        if any(terminal_value in requirement_set for requirement_set in requirement_sets)
+                    )
+                )
+                for terminal_value in supported_values:
+                    candidate_signature_support_map[(profile_id, terminal_value, category)].add(signature_id)
                     writer.emit_fact(
                         "direct_output_profile_candidate_supports_signature",
                         _quote(profile_id),
@@ -548,14 +724,17 @@ def _emit_multi_shot_signature_compatibility_facts(
                     profile_signature_candidate_support_count += 1
 
     for goal_id, requirements in sorted(goal_requirements.items()):
-        for profile_id, profile in sorted(output_profile_terminal_sets.items()):
+        for profile_id, profile in sorted(compressed_output_profile_candidates.items()):
             for category, requirement_sets in sorted(requirements.items()):
-                supported_values = {
-                    terminal_value
-                    for terminal_value in profile.get(category, frozenset())
-                    if any(terminal_value in requirement_set for requirement_set in requirement_sets)
-                }
-                for terminal_value in sorted(supported_values):
+                supported_values = tuple(
+                    sorted(
+                        terminal_value
+                        for terminal_value in profile.get(category, ())
+                        if any(terminal_value in requirement_set for requirement_set in requirement_sets)
+                    )
+                )
+                for terminal_value in supported_values:
+                    candidate_goal_support_map[(profile_id, terminal_value, category)].add(goal_id)
                     writer.emit_fact(
                         "direct_output_profile_candidate_supports_goal",
                         _quote(profile_id),
@@ -564,6 +743,19 @@ def _emit_multi_shot_signature_compatibility_facts(
                         _quote(category),
                     )
                     profile_goal_candidate_support_count += 1
+
+    check_fact_stats = _emit_direct_output_profile_check_facts(
+        writer,
+        compressed_output_profile_candidates=compressed_output_profile_candidates,
+        candidate_signature_supports={
+            key: frozenset(value)
+            for key, value in candidate_signature_support_map.items()
+        },
+        candidate_goal_supports={
+            key: frozenset(value)
+            for key, value in candidate_goal_support_map.items()
+        },
+    )
 
     support_class_id_by_profiles: dict[tuple[str, ...], str] = {}
     support_class_profiles: dict[str, tuple[str, ...]] = {}
@@ -597,14 +789,17 @@ def _emit_multi_shot_signature_compatibility_facts(
         + len(support_class_profiles)
         + support_class_profile_count
         + base_bindable_count
+        + port_initial_artifact_count
+        + port_bindable_output_profile_count
     )
 
     return {
         "precompute_base_artifact_bindable": base_bindable_count,
+        "precompute_port_initial_artifact_bindable": port_initial_artifact_count,
+        "precompute_port_bindable_output_profiles": port_bindable_output_profile_count,
         "precompute_unique_output_profiles": len(output_profile_terminal_sets),
         "precompute_signature_support_classes": len(support_class_profiles),
         "precompute_support_class_profiles": support_class_profile_count,
-        "precompute_output_profile_candidates": output_profile_candidate_count,
         "precompute_profile_signature_candidate_support": profile_signature_candidate_support_count,
         "precompute_profile_goal_candidate_support": profile_goal_candidate_support_count,
         "precompute_goal_requirement_sets": len(goal_requirements),
@@ -612,6 +807,8 @@ def _emit_multi_shot_signature_compatibility_facts(
         "precompute_dense_output_bindable_estimate": dense_output_bindable_estimate,
         "precompute_compact_output_bindable_estimate": compact_fact_count,
         "precompute_compact_output_compatibility_mode_selected": 1,
+        **check_fact_stats,
+        **candidate_compression_stats,
     }
 
 

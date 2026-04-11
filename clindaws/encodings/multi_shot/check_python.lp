@@ -20,32 +20,34 @@ goal_id(GoalID) :- goal_output(GoalID, _, _).
 % Output-dimension canonicalization
 % Keep the smallest terminal value that still satisfies all actual downstream
 % consumers and any goal the produced output satisfies at horizon t.
+% Restrict the volatile check to profile/category pairs whose retained
+% optimized candidates remain distinguishable for some consumer or goal.
 % ----------------------------------------------------------------
 
-output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
+output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     occurs(TProd, output(ToolProd, _, Port)),
     direct_output_port_profile(Port, Profile),
-    direct_output_profile_candidate(Profile, V, Cat),
+    direct_output_profile_category_requires_check(Profile, Cat),
+    direct_output_profile_candidate_requires_check(Profile, V, Cat).
+
+output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
+    direct_output_port_profile(Port, Profile),
     output_used_by(TProd, ToolProd, Port, TUse, ToolUse, PortIn),
     direct_port_signature(PortIn, Signature),
     direct_signature_category(Signature, Cat),
     not direct_output_profile_candidate_supports_signature(Profile, Signature, V, Cat).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    occurs(TProd, output(ToolProd, _, Port)),
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
     direct_output_port_profile(Port, Profile),
-    direct_output_profile_candidate(Profile, V, Cat),
     chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
     direct_goal_category(GoalID, Cat),
     not direct_output_profile_candidate_supports_goal(Profile, GoalID, V, Cat).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    occurs(TProd, output(ToolProd, _, Port)),
-    direct_output_port_profile(Port, Profile),
-    direct_output_profile_candidate(Profile, V, Cat),
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat).
 

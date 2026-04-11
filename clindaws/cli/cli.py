@@ -101,6 +101,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="For direct modes, precompute selected static helper relations and bindability facts in Python before grounding.",
     )
     parser.add_argument(
+        "--translation-workers",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel worker processes for per-tool candidate expansion. Default 1 (sequential). Values >1 use ProcessPoolExecutor.",
+    )
+    parser.add_argument(
         "--ground-only",
         action="store_true",
         help="Run translation plus grounding only, without solving.",
@@ -154,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 progress_callback=_progress,
                 optimized=args.optimized,
+                max_workers=args.translation_workers,
             )
             if grounding_result.translation_path is not None:
                 print(f"Translation written to: {grounding_result.translation_path}")
@@ -188,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 progress_callback=_progress,
                 optimized=args.optimized,
+                max_workers=args.translation_workers,
             )
             if translation_result.translation_path is not None:
                 print(f"Translation written to: {translation_result.translation_path}")
@@ -219,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             write_raw_answer_sets=args.write_raw_answer_sets,
             progress_callback=_progress,
             optimized=args.optimized,
+            max_workers=args.translation_workers,
         )
         if run_result.translation_path is not None:
             print(f"Translation written to: {run_result.translation_path}")

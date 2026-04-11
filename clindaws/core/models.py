@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping
 
+from clindaws.core.config import SnakeConfig as SnakeConfig  # re-export
+
 
 GroundingStrategy = str
 SolverMode = str
@@ -65,32 +67,6 @@ class ToolMode:
     outputs: tuple[ToolPortSpec, ...] = ()
     implementation: str | None = None
 
-
-@dataclass(frozen=True)
-class SnakeConfig:
-    """Normalized configuration resolved from an APE-style config."""
-
-    config_path: Path
-    base_dir: Path
-    ontology_path: Path
-    tool_annotations_path: Path
-    constraints_path: Path | None
-    solutions_dir_path: Path
-    ontology_prefix: str
-    tools_taxonomy_root: str
-    data_dimensions_taxonomy_roots: tuple[str, ...]
-    strict_tool_annotations: bool
-    solution_length_min: int
-    solution_length_max: int
-    solutions: int
-    timeout_sec: int
-    number_of_generated_graphs: int
-    inputs: tuple[Mapping[str, tuple[str, ...]], ...]
-    outputs: tuple[Mapping[str, tuple[str, ...]], ...]
-    use_workflow_input: str
-    use_all_generated_data: str
-    tool_seq_repeat: bool
-    debug_mode: bool
 
 
 @dataclass(frozen=True)
@@ -200,6 +176,11 @@ class HorizonRecord:
     models_stored: int
     unique_workflows_seen: int
     unique_workflows_stored: int
+    available_artifacts_at_step: int | None = None
+    eligible_artifacts_at_step: int | None = None
+    eligible_workflow_inputs_at_step: int | None = None
+    eligible_produced_outputs_at_step: int | None = None
+    bind_choice_domain_size_at_step: int | None = None
     grounding_parts: tuple[tuple[str, float], ...] = ()
 
 
@@ -269,5 +250,3 @@ class TranslationRunResult:
     translation_summary_path: Path
     run_log_path: Path | None = None
     run_summary_path: Path | None = None
-
-

@@ -11,6 +11,7 @@ from clindaws.translators.builder import _build_roots
 
 from collections import defaultdict, deque
 from collections.abc import Mapping
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
 
@@ -84,19 +85,106 @@ def _factor_signature_support_classes(
     )
 
 
+def _expand_single_tool(
+    args: tuple,
+) -> tuple[dict[str, object], ToolExpansionStat]:
+    """Expand one tool into its candidate record and stats.
+
+    Accepts a single tuple argument so it can be used with executor.map.
+    Each call creates its own _ExpansionResolver so workers are independent.
+    """
+    tool, candidate_id, config, ontology, roots = args
+    resolver = _ExpansionResolver(ontology, roots, "python")
+
+    input_port_value_counts: list[int] = []
+    output_port_value_counts: list[int] = []
+    input_variant_count = 1
+    output_variant_count = 1
+    dynamic_input_value_count = 0
+    dynamic_output_value_count = 0
+    input_ports: list[dict[str, object]] = []
+    output_ports: list[dict[str, object]] = []
+
+    for port_idx, port in enumerate(tool.inputs):
+        port_values, port_variant_count = _dynamic_port_expansion(
+            resolver,
+            _normalize_dim_map(port.dimensions),
+            expand_outputs=False,
+        )
+        port_values_by_dimension = _group_port_values_by_dimension(port_values)
+        workflow_input_matches = [
+            wf_index
+            for wf_index, workflow_input in enumerate(config.inputs)
+            if _workflow_input_matches_dynamic_port(ontology, workflow_input, port_values_by_dimension)
+        ]
+        input_ports.append(
+            {
+                "port_idx": port_idx,
+                "port_values": port_values,
+                "port_values_by_dimension": port_values_by_dimension,
+                "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
+                "workflow_input_matches": workflow_input_matches,
+            }
+        )
+        emitted_count = len(port_values)
+        input_port_value_counts.append(emitted_count)
+        dynamic_input_value_count += emitted_count
+        input_variant_count *= port_variant_count
+
+    for port_idx, port in enumerate(tool.outputs):
+        declared_dims = _normalize_dim_map(port.dimensions)
+        port_values, port_variant_count = _dynamic_port_expansion(
+            resolver,
+            declared_dims,
+            expand_outputs=True,
+        )
+        port_values_by_dimension = _group_port_values_by_dimension(port_values)
+        output_ports.append(
+            {
+                "port_idx": port_idx,
+                "declared_dims": declared_dims,
+                "port_values_by_dimension": port_values_by_dimension,
+                "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
+            }
+        )
+        emitted_count = sum(len(values) for values in port_values_by_dimension.values())
+        output_port_value_counts.append(emitted_count)
+        dynamic_output_value_count += emitted_count
+        output_variant_count *= port_variant_count
+
+    stat = ToolExpansionStat(
+        tool_id=tool.mode_id,
+        tool_label=tool.label,
+        input_ports=len(tool.inputs),
+        output_ports=len(tool.outputs),
+        input_variant_count=input_variant_count,
+        output_variant_count=output_variant_count,
+        dynamic_input_value_count=dynamic_input_value_count,
+        dynamic_output_value_count=dynamic_output_value_count,
+        dynamic_input_port_value_counts=tuple(input_port_value_counts),
+        dynamic_output_port_value_counts=tuple(output_port_value_counts),
+        dynamic_cross_product_estimate=input_variant_count * output_variant_count,
+    )
+    record: dict[str, object] = {
+        "tool": tool,
+        "candidate_id": candidate_id,
+        "input_ports": tuple(input_ports),
+        "output_ports": _compress_duplicate_output_ports(tuple(output_ports)),
+    }
+    return record, stat
+
+
 def optimize_compressed_candidates(
     config: SnakeConfig,
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
+    *,
+    max_workers: int = 1,
 ) -> CompressedCandidateOptimizationResult:
     """Precompute the compressed-candidate surface before fact emission."""
 
     roots = _build_roots(config, ontology)
     resolver = _ExpansionResolver(ontology, roots, "python")
-    tool_stats: list[ToolExpansionStat] = []
-    candidate_records: list[dict[str, object]] = []
-
-    dynamic_offset: dict[str, int] = defaultdict(int)
 
     forbidden_tool_ids = _collect_dynamic_forbidden_tool_ids(config, ontology, tools)
     candidate_source_tools = tuple(
@@ -105,90 +193,22 @@ def optimize_compressed_candidates(
         if tool.mode_id not in forbidden_tool_ids
     )
 
+    # Pre-assign candidate IDs to maintain deterministic ordering across workers.
+    offset_tracker: dict[str, int] = defaultdict(int)
+    work_items: list[tuple] = []
     for tool in candidate_source_tools:
-        candidate_index = dynamic_offset[tool.mode_id]
-        candidate_id = f"{tool.mode_id}_lc{candidate_index}"
-        dynamic_offset[tool.mode_id] += 1
+        candidate_id = f"{tool.mode_id}_lc{offset_tracker[tool.mode_id]}"
+        offset_tracker[tool.mode_id] += 1
+        work_items.append((tool, candidate_id, config, ontology, roots))
 
-        input_port_value_counts: list[int] = []
-        output_port_value_counts: list[int] = []
-        input_variant_count = 1
-        output_variant_count = 1
-        dynamic_input_value_count = 0
-        dynamic_output_value_count = 0
-        input_ports: list[dict[str, object]] = []
-        output_ports: list[dict[str, object]] = []
+    if max_workers == 1:
+        results = [_expand_single_tool(item) for item in work_items]
+    else:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(_expand_single_tool, work_items))
 
-        for port_idx, port in enumerate(tool.inputs):
-            port_values, port_variant_count = _dynamic_port_expansion(
-                resolver,
-                _normalize_dim_map(port.dimensions),
-                expand_outputs=False,
-            )
-            port_values_by_dimension = _group_port_values_by_dimension(port_values)
-            workflow_input_matches = [
-                wf_index
-                for wf_index, workflow_input in enumerate(config.inputs)
-                if _workflow_input_matches_dynamic_port(ontology, workflow_input, port_values_by_dimension)
-            ]
-            input_ports.append(
-                {
-                    "port_idx": port_idx,
-                    "port_values": port_values,
-                    "port_values_by_dimension": port_values_by_dimension,
-                    "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
-                    "workflow_input_matches": workflow_input_matches,
-                }
-            )
-            emitted_count = len(port_values)
-            input_port_value_counts.append(emitted_count)
-            dynamic_input_value_count += emitted_count
-            input_variant_count *= port_variant_count
-
-        for port_idx, port in enumerate(tool.outputs):
-            declared_dims = _normalize_dim_map(port.dimensions)
-            port_values, port_variant_count = _dynamic_port_expansion(
-                resolver,
-                declared_dims,
-                expand_outputs=True,
-            )
-            port_values_by_dimension = _group_port_values_by_dimension(port_values)
-            output_ports.append(
-                {
-                    "port_idx": port_idx,
-                    "declared_dims": declared_dims,
-                    "port_values_by_dimension": port_values_by_dimension,
-                    "port_values_fset": {dim: frozenset(vals) for dim, vals in port_values_by_dimension.items()},
-                }
-            )
-            emitted_count = sum(len(values) for values in port_values_by_dimension.values())
-            output_port_value_counts.append(emitted_count)
-            dynamic_output_value_count += emitted_count
-            output_variant_count *= port_variant_count
-
-        tool_stats.append(
-            ToolExpansionStat(
-                tool_id=tool.mode_id,
-                tool_label=tool.label,
-                input_ports=len(tool.inputs),
-                output_ports=len(tool.outputs),
-                input_variant_count=input_variant_count,
-                output_variant_count=output_variant_count,
-                dynamic_input_value_count=dynamic_input_value_count,
-                dynamic_output_value_count=dynamic_output_value_count,
-                dynamic_input_port_value_counts=tuple(input_port_value_counts),
-                dynamic_output_port_value_counts=tuple(output_port_value_counts),
-                dynamic_cross_product_estimate=input_variant_count * output_variant_count,
-            )
-        )
-        candidate_records.append(
-            {
-                "tool": tool,
-                "candidate_id": candidate_id,
-                "input_ports": tuple(input_ports),
-                "output_ports": _compress_duplicate_output_ports(tuple(output_ports)),
-            }
-        )
+    candidate_records: list[dict[str, object]] = [r[0] for r in results]
+    tool_stats: list[ToolExpansionStat] = [r[1] for r in results]
 
     goal_port_values: list[dict[str, tuple[str, ...]]] = []
     goal_requirement_accepts_by_id: dict[int, tuple[tuple[int, str, tuple[str, ...]], ...]] = {}

@@ -55,37 +55,32 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Signature-level eligibility
-eligible_signature(t, Signature, WF) :-
-    direct_signature_initial_artifact(Signature, WF),
-    workflow_input(WF),
-    available(WF).
+eligible_initial_artifact(t, Port, Artifact) :-
+    direct_port_initial_artifact(Port, Artifact),
+    available(Artifact).
 
-eligible_signature(t, Signature, Slot) :-
-    direct_signature_initial_artifact(Signature, Slot),
-    workflow_input_slot(Slot, _, _),
-    available(Slot).
-
-output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
-    direct_signature_support_class(Signature, SupportClass),
+output_port_profile_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort), Profile) :-
+    direct_port_bindable_output_profile(Port, Profile),
     direct_output_port_profile(ProducerPort, Profile),
-    direct_support_class_profile(SupportClass, Profile),
     available(out(TPrev, ToolPrev, ProducerPort)).
 
-signature_cat_ok(t, Signature, out(TPrev, ToolPrev, ProducerPort), Cat) :-
-    output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)),
-    direct_signature_requires(Signature, ReqV, Cat),
+output_port_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
+    output_port_profile_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort), Profile),
+    direct_port_signature(Port, Signature),
     artifact_dim(out(TPrev, ToolPrev, ProducerPort), V, Cat),
-    compatible(V, ReqV).
+    direct_output_profile_candidate_supports_signature(Profile, Signature, V, Cat).
 
-eligible_signature(t, Signature, out(TPrev, ToolPrev, ProducerPort)) :-
-    output_signature_candidate(t, Signature, out(TPrev, ToolPrev, ProducerPort)),
-    signature_cat_ok(t, Signature, out(TPrev, ToolPrev, ProducerPort), Cat) :
+eligible_produced_output(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    output_port_profile_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort), _),
+    direct_port_signature(Port, Signature),
+    output_port_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :
         direct_signature_category(Signature, Cat).
 
 eligible(t, Port, Artifact) :-
-    direct_port_signature(Port, Signature),
-    eligible_signature(t, Signature, Artifact).
+    eligible_initial_artifact(t, Port, Artifact).
+
+eligible(t, Port, Artifact) :-
+    eligible_produced_output(t, Port, Artifact).
 
 % Port binding: exactly one eligible item per port
 1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Port, WF) } 1 :-
@@ -182,9 +177,9 @@ artifact_dim(out(t, Tool, Port), V, Cat) :-
 
 % Output dimensions — Case B: non-terminal, planner picks terminal descendant
 1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
-    compatible(Descendant, V),
-    is_terminal(Descendant) } 1 :-
+    direct_output_profile_candidate(Profile, Descendant, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
+    direct_output_port_profile(Port, Profile),
     dimension(Port, (V, Cat)),
     not is_terminal(V).
 
