@@ -1,4 +1,4 @@
-"""Optional Python-side precompute layer for direct encodings."""
+"""Optional Python-side precompute layer for legacy direct encodings."""
 
 from __future__ import annotations
 
@@ -313,6 +313,128 @@ def _compress_direct_output_profile_candidates(
         "precompute_output_profile_candidates_dropped": dropped_candidate_count,
         "precompute_output_profile_candidate_categories_compressed": compressed_category_count,
     }
+
+
+def _compress_plain_output_port_candidates(
+    *,
+    output_port_terminal_sets: Mapping[str, Mapping[str, frozenset[str]]],
+    port_requirements: Mapping[str, Mapping[str, tuple[frozenset[str], ...]]],
+    goal_requirements: Mapping[str, Mapping[str, tuple[frozenset[str], ...]]],
+) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, int]]:
+    """Compress legacy multi-shot output terminals by consumer/goal support."""
+
+    compressed_candidates: dict[str, dict[str, tuple[str, ...]]] = {}
+    dense_candidate_count = 0
+    emitted_candidate_count = 0
+    dropped_candidate_count = 0
+    compressed_category_count = 0
+    retained_category_count = 0
+    requiring_check_category_count = 0
+    requiring_check_candidate_count = 0
+
+    for port_id, profile in sorted(output_port_terminal_sets.items()):
+        category_candidates: dict[str, tuple[str, ...]] = {}
+        for category, terminal_values in sorted(profile.items()):
+            retained_category_count += 1
+            ordered_values = tuple(sorted(terminal_values))
+            dense_candidate_count += len(ordered_values)
+            if len(ordered_values) <= 1:
+                category_candidates[category] = ordered_values
+                emitted_candidate_count += len(ordered_values)
+                continue
+
+            representatives: dict[tuple[tuple[str, ...], tuple[str, ...]], str] = {}
+            for terminal_value in ordered_values:
+                supported_ports = tuple(
+                    consumer_port
+                    for consumer_port, requirements in sorted(port_requirements.items())
+                    if any(
+                        terminal_value in requirement_set
+                        for requirement_set in requirements.get(category, ())
+                    )
+                )
+                supported_goals = tuple(
+                    goal_id
+                    for goal_id, requirements in sorted(goal_requirements.items())
+                    if any(
+                        terminal_value in requirement_set
+                        for requirement_set in requirements.get(category, ())
+                    )
+                )
+                profile_key = (supported_ports, supported_goals)
+                current = representatives.get(profile_key)
+                if current is None or terminal_value < current:
+                    representatives[profile_key] = terminal_value
+
+            retained_values = tuple(sorted(representatives.values()))
+            category_candidates[category] = retained_values
+            emitted_candidate_count += len(retained_values)
+            dropped_candidate_count += len(ordered_values) - len(retained_values)
+            if len(retained_values) < len(ordered_values):
+                compressed_category_count += 1
+            if len(retained_values) > 1:
+                requiring_check_category_count += 1
+                requiring_check_candidate_count += len(retained_values)
+
+        compressed_candidates[port_id] = category_candidates
+
+    return compressed_candidates, {
+        "precompute_plain_output_port_candidate_categories_retained": retained_category_count,
+        "precompute_plain_output_port_candidate_categories_requiring_check": requiring_check_category_count,
+        "precompute_plain_output_port_candidates_dense": dense_candidate_count,
+        "precompute_plain_output_port_candidates": emitted_candidate_count,
+        "precompute_plain_output_port_candidates_dropped": dropped_candidate_count,
+        "precompute_plain_output_port_candidate_categories_compressed": compressed_category_count,
+        "precompute_plain_output_port_candidates_requiring_check": requiring_check_candidate_count,
+    }
+
+
+def _emit_plain_multi_shot_check_facts(
+    writer: _FactWriter,
+    *,
+    config: SnakeConfig,
+    ontology: Ontology,
+    parsed: _ParsedDirectFacts,
+) -> dict[str, int]:
+    roots = _build_roots(config, ontology)
+    output_port_terminal_sets = {
+        port_id: _artifact_profile_terminal_sets(ontology, roots, dimensions)
+        for port_id, dimensions in parsed.output_dimensions_by_port.items()
+    }
+    port_requirements = {
+        port_id: _port_requirement_terminal_sets(ontology, roots, dimensions)
+        for port_id, dimensions in parsed.input_dimensions_by_port.items()
+    }
+    goal_requirements = {
+        goal_id: _port_requirement_terminal_sets(ontology, roots, dimensions)
+        for goal_id, dimensions in parsed.goal_dimensions_by_id.items()
+    }
+    compressed_candidates, stats = _compress_plain_output_port_candidates(
+        output_port_terminal_sets=output_port_terminal_sets,
+        port_requirements=port_requirements,
+        goal_requirements=goal_requirements,
+    )
+
+    for port_id, profile in sorted(compressed_candidates.items()):
+        for category, terminal_values in sorted(profile.items()):
+            for terminal_value in terminal_values:
+                writer.emit_fact(
+                    "precomputed_output_port_candidate",
+                    _quote(port_id),
+                    _quote(terminal_value),
+                    _quote(category),
+                )
+            if len(terminal_values) <= 1:
+                continue
+            for terminal_value in terminal_values:
+                writer.emit_fact(
+                    "precomputed_output_port_candidate_requires_check",
+                    _quote(port_id),
+                    _quote(terminal_value),
+                    _quote(category),
+                )
+
+    return stats
 
 
 def _emit_direct_output_profile_check_facts(
@@ -998,77 +1120,88 @@ def _emit_step_window_facts(
     }
 
 
-def apply_direct_python_precompute(
+def apply_precompute(
     mode: str,
     config: SnakeConfig,
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
     fact_bundle: FactBundle,
+    *,
+    optimized_programs: bool,
 ) -> FactBundle:
-    """Augment a direct fact bundle with Python-precomputed helper facts."""
+    """Augment a legacy direct fact bundle with Python-precomputed helper facts."""
 
     if mode not in {"single-shot", "multi-shot"}:
+        return fact_bundle
+
+    if not optimized_programs and mode != "multi-shot":
         return fact_bundle
 
     parsed = _parse_direct_facts(fact_bundle.facts)
     writer = _FactWriter()
     stats: dict[str, int] = {}
-    port_signatures = _emit_port_signature_facts(writer, parsed)
-    stats.update(port_signatures.stats)
+    if optimized_programs:
+        port_signatures = _emit_port_signature_facts(writer, parsed)
+        stats.update(port_signatures.stats)
 
-    if mode == "single-shot":
-        stats.update(_emit_single_shot_workflow_input_facts(writer, parsed))
-        planner_artifact_profiles = dict(parsed.workflow_input_dims)
-    else:
-        planner_artifact_profiles, workflow_stats = _emit_multi_shot_workflow_input_facts(writer, parsed)
-        stats.update(workflow_stats)
+        if mode == "single-shot":
+            stats.update(_emit_single_shot_workflow_input_facts(writer, parsed))
+            planner_artifact_profiles = dict(parsed.workflow_input_dims)
+        else:
+            planner_artifact_profiles, workflow_stats = _emit_multi_shot_workflow_input_facts(writer, parsed)
+            stats.update(workflow_stats)
 
-    if mode == "single-shot":
-        stats.update(
-            _emit_bindability_facts(
-                writer,
-                config=config,
-                ontology=ontology,
-                planner_artifact_profiles=planner_artifact_profiles,
-                parsed=parsed,
+        if mode == "single-shot":
+            stats.update(
+                _emit_bindability_facts(
+                    writer,
+                    config=config,
+                    ontology=ontology,
+                    planner_artifact_profiles=planner_artifact_profiles,
+                    parsed=parsed,
+                )
             )
-        )
-    else:
-        stats.update(
-            _emit_multi_shot_signature_compatibility_facts(
-                writer,
-                config=config,
-                ontology=ontology,
-                planner_artifact_profiles=planner_artifact_profiles,
-                parsed=parsed,
-                port_signatures=port_signatures,
+        else:
+            stats.update(
+                _emit_multi_shot_signature_compatibility_facts(
+                    writer,
+                    config=config,
+                    ontology=ontology,
+                    planner_artifact_profiles=planner_artifact_profiles,
+                    parsed=parsed,
+                    port_signatures=port_signatures,
+                )
             )
-        )
-    min_step_by_tool, goal_distance_by_tool, producer_support_by_tool = _compute_tool_step_windows(
-        config=config,
-        ontology=ontology,
-        tools=tools,
-        planner_artifact_profiles=planner_artifact_profiles,
-        parsed=parsed,
-        mode=mode,
-    )
-    stats.update(
-        _emit_step_window_facts(
-            writer,
+        min_step_by_tool, goal_distance_by_tool, producer_support_by_tool = _compute_tool_step_windows(
             config=config,
-            min_step_by_tool=min_step_by_tool,
-            goal_distance_by_tool=goal_distance_by_tool,
-            producer_support_by_tool=producer_support_by_tool,
+            ontology=ontology,
+            tools=tools,
+            planner_artifact_profiles=planner_artifact_profiles,
+            parsed=parsed,
             mode=mode,
         )
-    )
+        stats.update(
+            _emit_step_window_facts(
+                writer,
+                config=config,
+                min_step_by_tool=min_step_by_tool,
+                goal_distance_by_tool=goal_distance_by_tool,
+                producer_support_by_tool=producer_support_by_tool,
+                mode=mode,
+            )
+        )
+    else:
+        stats.update(
+            _emit_plain_multi_shot_check_facts(
+                writer,
+                config=config,
+                ontology=ontology,
+                parsed=parsed,
+            )
+        )
 
     if writer.fact_count == 0:
-        return replace(
-            fact_bundle,
-            internal_schema="direct_precompute_legacy",
-            internal_solver_mode="multi-shot" if mode == "multi-shot" else mode,
-        )
+        return fact_bundle
 
     merged_predicates = dict(fact_bundle.predicate_counts)
     for name, count in writer.predicate_counts.items():
@@ -1076,17 +1209,54 @@ def apply_direct_python_precompute(
 
     merged_emit_stats = dict(fact_bundle.emit_stats)
     for name, count in writer.stats().items():
-        merged_emit_stats[f"python_precompute:{name}"] = count
+        prefix = "python_precompute" if optimized_programs else "precompute"
+        merged_emit_stats[f"{prefix}:{name}"] = count
+
+    if optimized_programs:
+        return replace(
+            fact_bundle,
+            fact_count=fact_bundle.fact_count + writer.fact_count,
+            predicate_counts=merged_predicates,
+            emit_stats=merged_emit_stats,
+            python_precomputed_facts=writer.text(),
+            python_precompute_enabled=True,
+            python_precompute_fact_count=writer.fact_count,
+            python_precompute_stats=dict(sorted(stats.items())),
+            internal_schema="direct_precompute_legacy",
+            internal_solver_mode="multi-shot" if mode == "multi-shot" else mode,
+        )
+
+    merged_facts = fact_bundle.facts
+    if merged_facts and not merged_facts.endswith("\n"):
+        merged_facts += "\n"
+    merged_facts += writer.text()
 
     return replace(
         fact_bundle,
+        facts=merged_facts,
         fact_count=fact_bundle.fact_count + writer.fact_count,
         predicate_counts=merged_predicates,
         emit_stats=merged_emit_stats,
-        python_precomputed_facts=writer.text(),
-        python_precompute_enabled=True,
         python_precompute_fact_count=writer.fact_count,
         python_precompute_stats=dict(sorted(stats.items())),
-        internal_schema="direct_precompute_legacy",
-        internal_solver_mode="multi-shot" if mode == "multi-shot" else mode,
+        internal_schema="legacy_direct_check_precompute",
+    )
+
+
+def apply_direct_python_precompute(
+    mode: str,
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools: tuple[ToolMode, ...],
+    fact_bundle: FactBundle,
+) -> FactBundle:
+    """Backward-compatible alias for optimized direct precompute."""
+
+    return apply_precompute(
+        mode,
+        config,
+        ontology,
+        tools,
+        fact_bundle,
+        optimized_programs=True,
     )

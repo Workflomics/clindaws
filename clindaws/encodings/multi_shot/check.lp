@@ -18,21 +18,29 @@ goal_id(GoalID) :- goal_output(GoalID, _, _).
 % Output-dimension canonicalization
 % Keep the smallest terminal value that still satisfies all actual downstream
 % consumers and any goal the produced output satisfies at horizon t.
+% Precomputed retained candidates let us skip the volatile check entirely for
+% non-ambiguous output categories in the plain multi-shot path.
 % ----------------------------------------------------------------
 
-% Precompute relevant terminals per port to avoid evaluating the taxonomy hierarchy
-% against the solver's occurs/1 domain.
+has_precomputed_output_port_candidates :-
+    precomputed_output_port_candidate(_, _, _).
+
 port_terminal_value(Port, V, Cat) :-
     dimension(Port, (BaseV, Cat)),
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V).
 
-% 1. Identify non-terminal outputs and their candidates
-output_dim_candidate(t, TProd, ToolProd, Port, V, Cat) :-
+output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),
     occurs(TProd, output(ToolProd, _, Port)),
-    port_terminal_value(Port, V, Cat).
+    precomputed_output_port_candidate_requires_check(Port, V, Cat).
+
+output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat) :-
+    query(t),
+    occurs(TProd, output(ToolProd, _, Port)),
+    port_terminal_value(Port, V, Cat),
+    not has_precomputed_output_port_candidates.
 
 % 2. Identify the requirements of actual consumers of an output
 output_consumer_req(t, TProd, ToolProd, Port, ReqV, Cat) :-
@@ -41,8 +49,7 @@ output_consumer_req(t, TProd, ToolProd, Port, ReqV, Cat) :-
     port_requires(PortIn, ReqV, Cat).
 
 output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
     output_consumer_req(t, TProd, ToolProd, Port, ReqV, Cat),
     not compatible(V, ReqV).
 
@@ -62,14 +69,12 @@ artifact_id_of(out(T, Tool, Port), ArtID) :-
 
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
     chosen_output_goal_requirement(t, TProd, ToolProd, Port, _, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Cat) :-
-    query(t),
-    output_dim_candidate(t, TProd, ToolProd, Port, V, Cat),
+    output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Cat).
 

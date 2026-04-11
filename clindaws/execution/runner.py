@@ -19,7 +19,7 @@ from uuid import uuid4
 import clingo
 
 from clindaws.core.config import load_config, SnakeConfig
-from clindaws.execution.direct_python_precompute import apply_direct_python_precompute
+from clindaws.execution.precompute import apply_precompute
 from clindaws.core.models import (
     FactBundle,
     GroundingRunResult,
@@ -1125,11 +1125,18 @@ def _select_fact_bundle(
                         f"with {fact_bundle.fact_count} facts.",
                     )
                 else:
-                    _report(progress_callback, "Step 1b: Python direct precompute started.")
-                    optimized_direct_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
+                    _report(progress_callback, "Step 1b: Python precompute started.")
+                    optimized_direct_bundle = apply_precompute(
+                        mode,
+                        config,
+                        ontology,
+                        tools,
+                        fact_bundle,
+                        optimized_programs=True,
+                    )
                     _report(
                         progress_callback,
-                        "Step 1b complete: Python direct precompute emitted "
+                        "Step 1b complete: Python precompute emitted "
                         f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
                     )
                     fact_bundle = optimized_direct_bundle
@@ -1150,14 +1157,30 @@ def _select_fact_bundle(
                             f"({optimized_direct_bundle.fact_count} facts vs {compressed_candidate_bundle.fact_count}).",
                         )
             else:
-                _report(progress_callback, "Step 1b: Python direct precompute started.")
-                optimized_direct_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
+                _report(progress_callback, "Step 1b: Python precompute started.")
+                optimized_direct_bundle = apply_precompute(
+                    mode,
+                    config,
+                    ontology,
+                    tools,
+                    fact_bundle,
+                    optimized_programs=True,
+                )
                 _report(
                     progress_callback,
-                    "Step 1b complete: Python direct precompute emitted "
+                    "Step 1b complete: Python precompute emitted "
                     f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
                 )
                 fact_bundle = optimized_direct_bundle
+        else:
+            fact_bundle = apply_precompute(
+                mode,
+                config,
+                ontology,
+                tools,
+                fact_bundle,
+                optimized_programs=False,
+            )
 
     elif mode_config.translation_pathway == "normal":
         fact_bundle = replace(
@@ -1166,11 +1189,18 @@ def _select_fact_bundle(
             internal_solver_mode="single-shot",
         )
         if optimized:
-            _report(progress_callback, "Step 1b: Python direct precompute started.")
-            fact_bundle = apply_direct_python_precompute(mode, config, ontology, tools, fact_bundle)
+            _report(progress_callback, "Step 1b: Python precompute started.")
+            fact_bundle = apply_precompute(
+                mode,
+                config,
+                ontology,
+                tools,
+                fact_bundle,
+                optimized_programs=True,
+            )
             _report(
                 progress_callback,
-                "Step 1b complete: Python direct precompute emitted "
+                "Step 1b complete: Python precompute emitted "
                 f"{fact_bundle.python_precompute_fact_count} helper facts.",
             )
 
@@ -1767,5 +1797,3 @@ def run_ground_only(
         run_log_path=run_log_path,
         run_summary_path=run_summary_path,
     )
-
-

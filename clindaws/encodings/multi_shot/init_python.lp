@@ -26,3 +26,6 @@ artifact_unit(Slot, U)     :- holds(0, unit(Slot, U)).
 eligible(0, Port, Artifact) :-
     direct_port_initial_artifact(Port, Artifact),
     holds(0, avail(Artifact)).
+
+workflow_input_lineage(0, WF, WF) :-
+    holds(0, avail(WF)).

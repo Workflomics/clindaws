@@ -134,21 +134,15 @@ eligible(t, Port, Artifact) :-
    eligible(t-1, Port, SlotLow),
    not occurs(t, bind(_, _, SlotLow)).
 
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Carry forward workflow-input lineage only; input-usage checks do not need the
+% full produced-artifact transitive closure.
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
-
-% Carry forward ancestors from previous steps; the artifact graph is monotone.
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_ancestor(t-1, Artifact, Ancestor).
-
-% Only compute fresh ancestry for artifacts produced at THIS step.
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Ancestor).
-
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(t, Mid, Ancestor).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(t-1, Artifact, WF).
 
 
 % ----------------------------------------------------------------
@@ -178,12 +172,23 @@ holds(t, dim(out(t, Tool, Port), V, Cat)) :-
     is_terminal(V).
 
 % Output dimensions — Case B: non-terminal, planner picks terminal descendant
+output_port_has_precomputed_candidates(Port, Cat) :-
+    precomputed_output_port_candidate(Port, _, Cat).
+
+1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
+    precomputed_output_port_candidate(Port, Descendant, Cat) } 1 :-
+    occurs(t, output(Tool, _, Port)),
+    dimension(Port, (V, Cat)),
+    not is_terminal(V),
+    output_port_has_precomputed_candidates(Port, Cat).
+
 1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
     compatible(Descendant, V),
     is_terminal(Descendant) } 1 :-
     occurs(t, output(Tool, _, Port)),
     dimension(Port, (V, Cat)),
-    not is_terminal(V).
+    not is_terminal(V),
+    not output_port_has_precomputed_candidates(Port, Cat).
 
 holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
     occurs(t, output_dim(Tool, Port, Descendant, Cat)).

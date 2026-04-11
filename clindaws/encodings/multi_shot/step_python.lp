@@ -136,18 +136,15 @@ slot_used_at_step(t, Rep, Rank) :-
    not slot_used_before(t, Rep, SmallerRank),
    not slot_used_at_step(t, Rep, SmallerRank).
 
-% Artifact ancestry over committed runs.
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Carry forward workflow-input lineage only; input-usage checks do not need the
+% full produced-artifact transitive closure.
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
-
-% Carry forward ancestors from previous steps; the artifact graph is monotone.
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Ancestor).
-
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(Mid, Ancestor).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(t-1, Artifact, WF).
 
 % Direct-only chain-pruning rules that tried to canonicalize repeated-input and
 % repeated-tool witnesses were removed here. They reduced duplicates, but they

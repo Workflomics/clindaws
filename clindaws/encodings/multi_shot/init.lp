@@ -51,3 +51,6 @@ initial_bindable(Port, WF) :-
 eligible(0, Port, WF) :-
     holds(0, avail(WF)),
     initial_bindable(Port, WF).
+
+workflow_input_lineage(0, WF, WF) :-
+    holds(0, avail(WF)).
