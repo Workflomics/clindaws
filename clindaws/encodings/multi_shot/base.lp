@@ -38,6 +38,25 @@ output_port_has_category(ProducerPort, Category) :-
     output_port(_, ProducerPort),
     dimension(ProducerPort, (_, Category)).
 
+output_port_terminal_candidate(ProducerPort, OutputValue, Category) :-
+    output_port(_, ProducerPort),
+    dimension(ProducerPort, (OutputValue, Category)),
+    is_terminal(OutputValue).
+
+output_port_terminal_candidate(ProducerPort, OutputValue, Category) :-
+    output_port(_, ProducerPort),
+    dimension(ProducerPort, (DeclaredValue, Category)),
+    not is_terminal(DeclaredValue),
+    compatible(OutputValue, DeclaredValue),
+    is_terminal(OutputValue).
+
+output_port_singleton_terminal(ProducerPort, OutputValue, Category) :-
+    output_port_terminal_candidate(ProducerPort, OutputValue, Category),
+    1 = #count {
+        CandidateValue :
+            output_port_terminal_candidate(ProducerPort, CandidateValue, Category)
+    }.
+
 declared_output_value_supports_requirement(OutputValue, ReqV) :-
     is_terminal(Terminal),
     compatible(Terminal, OutputValue),

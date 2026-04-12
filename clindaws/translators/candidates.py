@@ -202,7 +202,7 @@ def _collect_compressed_dynamic_bindability_surface(
 ) -> tuple[
     dict[str, set[str]],
     dict[str, dict[int, set[str]]],
-    dict[tuple[int, str], int],
+    dict[int, set[tuple[str, int]]],
     dict[str, int],
 ]:
     relevant_candidate_ids = {
@@ -225,7 +225,7 @@ def _collect_compressed_dynamic_bindability_surface(
 
     reverse_edges: dict[str, set[str]] = defaultdict(set)
     produced_bindable_ports: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
-    signature_bindable_ports: dict[tuple[int, str], int] = {}
+    signature_bindable_ports: dict[int, set[tuple[str, int]]] = defaultdict(set)
     considered_pairs = 0
     dropped_pairs = 0
 
@@ -257,10 +257,7 @@ def _collect_compressed_dynamic_bindability_surface(
         retained_producer_port = int(retained_output_port["port_idx"])
         produced_bindable_ports[consumer_candidate][consumer_port].add(producer_candidate)
         reverse_edges[consumer_candidate].add(producer_candidate)
-        signature_key = (signature_id, producer_candidate)
-        existing_port = signature_bindable_ports.get(signature_key)
-        if existing_port is None or retained_producer_port < existing_port:
-            signature_bindable_ports[signature_key] = retained_producer_port
+        signature_bindable_ports[signature_id].add((producer_candidate, retained_producer_port))
 
     return (
         reverse_edges,
@@ -273,7 +270,10 @@ def _collect_compressed_dynamic_bindability_surface(
                 for ports_by_source in produced_bindable_ports.values()
                 for producer_candidates in ports_by_source.values()
             ),
-            "dynamic_signature_bindable_ports_emitted": len(signature_bindable_ports),
+            "dynamic_signature_bindable_ports_emitted": sum(
+                len(producer_ports)
+                for producer_ports in signature_bindable_ports.values()
+            ),
             "dynamic_bindable_pairs_dropped": dropped_pairs,
         },
     )

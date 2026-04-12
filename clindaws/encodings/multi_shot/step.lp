@@ -164,34 +164,21 @@ available(out(t, Tool, Port)) :- holds(t, avail(out(t, Tool, Port))).
 artifact_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
 artifact_unit(out(t, Tool, Port), U)   :- holds(t, unit(out(t, Tool, Port), U)).
 
-% Output dimensions — Case A: terminal value
-
-holds(t, dim(out(t, Tool, Port), V, Cat)) :-
+% Output dimensions — each output category picks one terminal value.
+% This avoids accumulating every declared terminal on one artifact when a port
+% lists multiple alternatives within the same dimension.
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    output_port_terminal_candidate(Port, Value, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    is_terminal(V).
+    output_port_has_category(Port, Cat),
+    not output_port_singleton_terminal(Port, _, Cat).
 
-% Output dimensions — Case B: non-terminal, planner picks terminal descendant
-output_port_has_precomputed_candidates(Port, Cat) :-
-    precomputed_output_port_candidate(Port, _, Cat).
-
-1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
-    precomputed_output_port_candidate(Port, Descendant, Cat) } 1 :-
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
     occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    not is_terminal(V),
-    output_port_has_precomputed_candidates(Port, Cat).
+    output_port_singleton_terminal(Port, Value, Cat).
 
-1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
-    compatible(Descendant, V),
-    is_terminal(Descendant) } 1 :-
-    occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    not is_terminal(V),
-    not output_port_has_precomputed_candidates(Port, Cat).
-
-holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
-    occurs(t, output_dim(Tool, Port, Descendant, Cat)).
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output_dim(Tool, Port, Value, Cat)).
 
 % ----------------------------------------------------------------
 % From unit_reasoning.lp — unit production from tool outputs

@@ -9,3 +9,9 @@ Example2,multi-shot,4,false,,false,8,78,85,129.05,54,54,3,true,false
 Example2,multi-shot,5,false,,false,8,114,14599,190.58,17510,1000,296,true,false
 Example2,single-shot,5,false,,false,10,402,18639,44.03,17456,1000,296,true,false
 Example2,single-shot,5,false,,false,9,219,11935,44.27,17456,1000,296,true,false
+Example2,multi-shot,1,false,"6,compete",false,10,19,2,48.62,0,0,0,true,false
+Example2,multi-shot,2,false,"6,compete",false,10,30,10,64.69,0,0,0,true,false
+Example2,multi-shot,3,false,"6,compete",false,10,65,34,111.50,0,0,0,true,false
+Example2,multi-shot,4,false,"6,compete",false,10,113,96,204.34,54,54,3,true,false
+Example2,multi-shot,5,false,"6,compete",false,10,160,2707,357.11,17510,1000,296,true,false
+Example2,multi-shot,6,false,"6,compete",false,10,236,10714,561.20,72966,1000,1000,true,false

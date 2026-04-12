@@ -46,7 +46,7 @@ class CompressedCandidateOptimizationResult:
 
 
 def _factor_signature_support_classes(
-    signature_bindable_ports: Mapping[tuple[int, str], int],
+    signature_bindable_ports: Mapping[int, set[tuple[str, int]]],
 ) -> tuple[
     dict[int, int],
     dict[int, tuple[tuple[str, int], ...]],
@@ -54,21 +54,17 @@ def _factor_signature_support_classes(
 ]:
     """Compress identical signature support sets into shared support classes."""
 
-    ports_by_signature: dict[int, list[tuple[str, int]]] = defaultdict(list)
-    for (signature_id, producer_candidate), producer_port in signature_bindable_ports.items():
-        ports_by_signature[signature_id].append((producer_candidate, int(producer_port)))
-
     support_class_by_key: dict[tuple[tuple[str, int], ...], int] = {}
     signature_support_class_by_id: dict[int, int] = {}
     support_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]] = {}
 
-    for signature_id, producer_ports in sorted(ports_by_signature.items()):
-        support_key = tuple(sorted(producer_ports))
+    for signature_id, producer_ports in sorted(signature_bindable_ports.items()):
+        support_key = tuple(sorted((producer_candidate, int(producer_port)) for producer_candidate, producer_port in producer_ports))
         support_class_id = support_class_by_key.setdefault(support_key, len(support_class_by_key))
         signature_support_class_by_id[signature_id] = support_class_id
         support_class_bindable_ports.setdefault(support_class_id, support_key)
 
-    raw_signature_supports = len(ports_by_signature)
+    raw_signature_supports = len(signature_bindable_ports)
     factored_supports = len(support_class_bindable_ports)
     return (
         signature_support_class_by_id,

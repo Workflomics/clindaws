@@ -26,10 +26,7 @@ has_precomputed_output_port_candidates :-
     precomputed_output_port_candidate(_, _, _).
 
 port_terminal_value(Port, V, Cat) :-
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V).
+    output_port_terminal_candidate(Port, V, Cat).
 
 output_dim_check_candidate(t, TProd, ToolProd, Port, V, Cat) :-
     query(t),

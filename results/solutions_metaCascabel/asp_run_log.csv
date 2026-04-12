@@ -3,3 +3,5 @@ metaCascabel,multi-shot,17,false,,false,36,474,4693,1024.66,72,72,18,true,false
 metaCascabel,single-shot,17,false,,false,27,3188,3622,53.03,72,72,18,true,false
 metaCascabel,single-shot,17,false,,false,33,1823,2143,53.92,72,72,18,true,false
 metaCascabel,single-shot,17,false,,false,33,789,1169,54.22,72,72,18,true,false
+metaCascabel,multi-shot,17,true,,true,31,276,1160,538.25,72,72,18,true,false
+metaCascabel,multi-shot,17,false,"6,compete",false,33,515,4567,1863.94,72,72,18,true,false
