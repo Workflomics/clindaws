@@ -161,6 +161,22 @@ def _report(progress_callback: ProgressCallback, message: str) -> None:
         progress_callback(message)
 
 
+def _stored_solution_quota_reached(
+    *,
+    unique_count: int,
+    raw_count: int,
+    solution_limit: int,
+    capture_raw_models: bool,
+) -> bool:
+    """Return whether stored solution collection has reached its configured cap."""
+
+    if unique_count >= solution_limit:
+        return True
+    if capture_raw_models and raw_count >= solution_limit:
+        return True
+    return False
+
+
 def _artifact_is_produced_output(symbol: clingo.Symbol) -> bool:
     return (
         symbol.type == clingo.SymbolType.Function
@@ -486,7 +502,12 @@ def _solve_multi_shot_with_programs(
 
             horizon = 1
             while horizon <= config.solution_length_max:
-                if not solve_all_horizons and len(unique_collected) >= config.solutions:
+                if not solve_all_horizons and _stored_solution_quota_reached(
+                    unique_count=len(unique_collected),
+                    raw_count=len(raw_collected),
+                    solution_limit=config.solutions,
+                    capture_raw_models=capture_raw_models,
+                ):
                     break
 
                 _report(progress_callback, f"Grounding: horizon {horizon}...")
@@ -644,6 +665,13 @@ def _solve_multi_shot_with_programs(
                     f"unique tool sequences stored={unique_workflows_stored}, "
                     f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
                 )
+                if not solve_all_horizons and _stored_solution_quota_reached(
+                    unique_count=len(unique_collected),
+                    raw_count=len(raw_collected),
+                    solution_limit=config.solutions,
+                    capture_raw_models=capture_raw_models,
+                ):
+                    break
                 if unique_collected and not solve_all_horizons and stop_on_solution:
                     break
                 horizon += 1
