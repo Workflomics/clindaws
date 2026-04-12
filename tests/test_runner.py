@@ -1,14 +1,18 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from clindaws.core.models import FactBundle, HorizonRecord
 from clindaws.execution.runner import (
     COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
+    RunContext,
     _mode_config,
     _select_fact_bundle,
     _solve_callback_profile_payload,
+    run_once,
 )
+from clindaws.execution.solver import program_paths_for_mode
 
 
 def _fact_bundle(*, internal_schema: str = "", internal_solver_mode: str = "") -> FactBundle:
@@ -133,6 +137,63 @@ class RunnerSummaryTests(unittest.TestCase):
                 "Step 1b complete: selected compressed-candidate optimized schema with 1 facts.",
             ],
         )
+
+    def test_program_paths_map_optimized_multi_shot_to_compressed_candidate(self) -> None:
+        paths = program_paths_for_mode("multi-shot", optimized=True)
+
+        self.assertTrue(paths)
+        self.assertTrue(all("multi_shot_compressed_candidate" in str(path) for path in paths))
+
+    def test_run_once_timeout_returns_without_writing_run_artifacts(self) -> None:
+        config = SimpleNamespace(
+            timeout_sec=10.0,
+            solutions_dir_path=Path("/tmp/unused-solutions-dir"),
+            number_of_generated_graphs=0,
+            debug_mode=False,
+        )
+        ctx = RunContext(
+            config=config,
+            solution_dir=Path("/tmp/unused-output-dir"),
+            fact_bundle=_fact_bundle(
+                internal_schema="compressed_candidate_optimized",
+                internal_solver_mode="multi-shot-compressed-candidate",
+            ),
+            translation_sec=0.1,
+            translation_peak_rss_mb=12.0,
+            effective_translation_strategy="hybrid",
+            resolved_translation_builder=COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
+            run_metadata={},
+        )
+
+        with (
+            patch("clindaws.execution.runner._prepare_run_context", return_value=ctx),
+            patch(
+                "clindaws.execution.runner._run_solve_in_worker",
+                return_value=(SimpleNamespace(
+                    raw_solutions=(),
+                    solutions=(),
+                    base_grounding_peak_rss_mb=0.0,
+                    base_grounding_sec=0.0,
+                    grounding_sec=0.0,
+                    solving_sec=0.0,
+                    horizon_records=(),
+                ), True),
+            ),
+        ):
+            result = run_once(
+                "dummy-config.json",
+                mode="multi-shot",
+                grounding_strategy="hybrid",
+                optimized=True,
+                render_graphs=False,
+            )
+
+        self.assertTrue(result.timed_out)
+        self.assertEqual(result.completed_stage, "run_timeout")
+        self.assertIsNone(result.run_log_path)
+        self.assertIsNone(result.run_summary_path)
+        self.assertIsNone(result.answer_set_path)
+        self.assertIsNone(result.workflow_signature_path)
 
 
 if __name__ == "__main__":

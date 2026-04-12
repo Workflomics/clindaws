@@ -236,6 +236,49 @@ def _empty_solve_output():
     )
 
 
+def _timed_out_run_result(
+    *,
+    config,
+    mode: str,
+    grounding_strategy: str,
+    fact_bundle,
+    translation_sec: float,
+    translation_peak_rss_mb: float,
+    solve_start: float,
+    completed_stage: str,
+) -> RunResult:
+    solving_sec = max(0.0, perf_counter() - solve_start) if completed_stage == "run_timeout" else 0.0
+    return RunResult(
+        config=config,
+        mode=mode,
+        grounding_strategy=grounding_strategy,
+        fact_bundle=fact_bundle,
+        solutions=(),
+        timings=TimingBreakdown(
+            translation_sec=translation_sec,
+            grounding_sec=0.0,
+            solving_sec=solving_sec,
+            rendering_sec=0.0,
+        ),
+        translation_peak_rss_mb=translation_peak_rss_mb,
+        base_grounding_peak_rss_mb=0.0,
+        base_grounding_sec=0.0,
+        horizon_records=(),
+        translation_path=None,
+        answer_set_path=None,
+        solution_summary_path=None,
+        workflow_signature_path=None,
+        graph_paths=(),
+        raw_models_seen=0,
+        raw_answer_sets_found=0,
+        unique_solutions_found=0,
+        timed_out=True,
+        completed_stage=completed_stage,
+        run_log_path=None,
+        run_summary_path=None,
+    )
+
+
 def _drain_progress_queue(
     progress_queue: multiprocessing.queues.Queue | None,
     progress_callback: ProgressCallback,
@@ -1430,9 +1473,16 @@ def run_once(
             progress_callback,
             f"Translation already exceeded timeout ({config.timeout_sec}s); skipping solve.",
         )
-
-    if remaining_timeout <= 0:
-        solve_output = _empty_solve_output()
+        return _timed_out_run_result(
+            config=config,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_bundle=fact_bundle,
+            translation_sec=translation_sec,
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            solve_start=_solve_start,
+            completed_stage="translation_timeout",
+        )
     else:
         try:
             solve_output, _timed_out = _run_solve_in_worker(
@@ -1474,6 +1524,19 @@ def run_once(
                     max_workers=max_workers,
                 )
             raise
+
+    if _timed_out:
+        _report(progress_callback, "Configured timeout reached; stopping run immediately.")
+        return _timed_out_run_result(
+            config=config,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_bundle=fact_bundle,
+            translation_sec=translation_sec,
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            solve_start=_solve_start,
+            completed_stage="run_timeout",
+        )
 
     csv_writers = _RunCsvWriters(
         csv_dir=config.solutions_dir_path,
@@ -1587,25 +1650,12 @@ def run_once(
         rendering_sec = perf_counter() - render_start
         _report(progress_callback, f"Step 4 complete: output writing/rendering finished after {rendering_sec:.3f}s.")
 
-    if _timed_out:
-        _elapsed_since_solve_start_ms = round((perf_counter() - _solve_start) * 1000)
-        csv_writers.step_writer.log_timeout(elapsed_ms=_elapsed_since_solve_start_ms)
-    _timeout_solving_sec = (
-        max((perf_counter() - _solve_start), solve_output.solving_sec)
-        if _timed_out and remaining_timeout > 0
-        else solve_output.solving_sec
-    )
-    _completed_stage = (
-        "translation_timeout" if _timed_out and remaining_timeout <= 0
-        else "run_timeout" if _timed_out
-        else "run"
-    )
     csv_writers.summary_writer.log_summary(
-        completed_stage=_completed_stage,
+        completed_stage="run",
         timings=TimingBreakdown(
             translation_sec=translation_sec,
             grounding_sec=solve_output.grounding_sec,
-            solving_sec=_timeout_solving_sec,
+            solving_sec=solve_output.solving_sec,
             rendering_sec=rendering_sec,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
@@ -1616,7 +1666,7 @@ def run_once(
         raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
         solutions_found=len(solutions),
         grounded_horizons=tuple(record.horizon for record in solve_output.horizon_records),
-        effective_parallel_mode=effective_parallel_mode,
+            effective_parallel_mode=effective_parallel_mode,
     )
     run_log_path = csv_writers.run_log_path
     run_summary_path = csv_writers.run_summary_path
@@ -1630,7 +1680,7 @@ def run_once(
         timings=TimingBreakdown(
             translation_sec=translation_sec,
             grounding_sec=solve_output.grounding_sec,
-            solving_sec=_timeout_solving_sec,
+            solving_sec=solve_output.solving_sec,
             rendering_sec=rendering_sec,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
@@ -1645,8 +1695,8 @@ def run_once(
         raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
         raw_answer_sets_found=len(solve_output.raw_solutions),
         unique_solutions_found=len(solutions),
-        timed_out=_timed_out,
-        completed_stage=_completed_stage,
+        timed_out=False,
+        completed_stage="run",
         run_log_path=run_log_path,
         run_summary_path=run_summary_path,
     )

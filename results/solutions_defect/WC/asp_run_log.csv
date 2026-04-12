@@ -9,3 +9,13 @@ defect_concentration,multi-shot,7,true,,true,10,24,12,62.33,0,0,0,true,false
 defect_concentration,multi-shot,8,true,,true,10,31,23,81.36,0,0,0,true,false
 defect_concentration,multi-shot,9,true,,true,10,40,907,107.70,2304,1500,864,true,false
 defect_concentration,multi-shot,10,true,,true,10,51,1028,147.02,4536,1500,1500,true,false
+defect_concentration,multi-shot,1,true,,true,15,6,0,41.47,0,0,0,true,false
+defect_concentration,multi-shot,2,true,,true,15,3,0,41.55,0,0,0,true,false
+defect_concentration,multi-shot,3,true,,true,15,5,1,41.92,0,0,0,true,false
+defect_concentration,multi-shot,4,true,,true,15,8,2,43.81,0,0,0,true,false
+defect_concentration,multi-shot,5,true,,true,15,12,4,47.47,0,0,0,true,false
+defect_concentration,multi-shot,6,true,,true,15,17,7,55.42,0,0,0,true,false
+defect_concentration,multi-shot,7,true,,true,15,25,11,67.28,0,0,0,true,false
+defect_concentration,multi-shot,8,true,,true,15,32,17,85.06,0,0,0,true,false
+defect_concentration,multi-shot,9,true,,true,15,44,946,113.83,2304,1500,864,true,false
+defect_concentration,multi-shot,10,true,,true,15,60,728,141.83,3480,1500,1500,true,false

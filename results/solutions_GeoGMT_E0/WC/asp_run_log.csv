@@ -1,0 +1,15 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+E0,multi-shot,1,true,"6,compete",true,18,9,1,43.19,0,0,0,true,false
+E0,multi-shot,2,true,"6,compete",true,18,14,6,56.31,0,0,0,true,false
+E0,multi-shot,3,true,"6,compete",true,18,35,19,89.56,0,0,0,true,false
+E0,multi-shot,4,true,"6,compete",true,18,61,53,149.41,0,0,0,true,false
+E0,multi-shot,5,true,"6,compete",true,18,98,268,254.16,0,0,0,true,false
+E0,multi-shot,6,true,"6,compete",true,18,143,3717,894.41,10664,100,86,true,false
+E0,multi-shot,7,true,"6,compete",true,18,188,388,1097.80,11047,100,100,true,false
+E0,multi-shot,1,true,"6,compete",true,14,9,1,40.83,0,0,0,true,false
+E0,multi-shot,2,true,"6,compete",true,14,14,6,53.50,0,0,0,true,false
+E0,multi-shot,3,true,"6,compete",true,14,33,17,88.42,0,0,0,true,false
+E0,multi-shot,4,true,"6,compete",true,14,56,43,153.72,0,0,0,true,false
+E0,multi-shot,5,true,"6,compete",true,14,91,412,264.27,0,0,0,true,false
+E0,multi-shot,6,true,"6,compete",true,14,134,3342,744.67,10664,100,86,true,false
+E0,multi-shot,7,true,"6,compete",true,14,184,197,960.44,10704,100,100,true,false

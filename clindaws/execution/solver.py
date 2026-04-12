@@ -135,14 +135,14 @@ def _single_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
     )
 
 
-def _multi_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
+def _multi_shot_program_paths() -> tuple[Path, ...]:
     base = ENCODINGS_ROOT / "multi_shot"
     return (
-        base / ("base_python.lp" if optimized else "base.lp"),
-        base / ("init_python.lp" if optimized else "init.lp"),
-        base / ("step_python.lp" if optimized else "step.lp"),
+        base / "base.lp",
+        base / "init.lp",
+        base / "step.lp",
         base / "constraints.lp",
-        base / ("check_python.lp" if optimized else "check.lp"),
+        base / "check.lp",
         base / "ape_extract.lp",
         base / "tool_inclusion.lp",
         base / "tool_dependency.lp",
@@ -179,7 +179,9 @@ def program_paths_for_mode(
     if mode == "single-shot":
         return _single_shot_program_paths(optimized=optimized)
     if mode == "multi-shot":
-        return _multi_shot_program_paths(optimized=optimized)
+        if optimized:
+            return _multi_shot_compressed_candidate_program_paths()
+        return _multi_shot_program_paths()
     if mode == "multi-shot-compressed-candidate":
         return _multi_shot_compressed_candidate_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")

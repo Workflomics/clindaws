@@ -1,29 +1,33 @@
 #program check(t).
 #external query(t).
 
+goal_output_candidate(t, GoalID, out(TProd, ToolProd, Port)) :-
+    query(t),
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    dynamic_candidate_output_goal_satisfies(ProducerCandidate, Port, GoalID).
+
 goal_dim_match(t, GoalID, WF, RequirementID) :-
     query(t),
+    goal_output_candidate(t, GoalID, WF),
     compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
-    available(WF),
     artifact_dim(WF, ActualV, Category),
     dynamic_profile_accepts(ProfileId, ActualV).
 
 goal_dim_missing(t, GoalID, WF, RequirementID) :-
     query(t),
+    goal_output_candidate(t, GoalID, WF),
     compressed_goal_requirement_profile(GoalID, RequirementID, _, _),
-    available(WF),
     not goal_dim_match(t, GoalID, WF, RequirementID).
 
 goal_satisfied_by(t, GoalID, WF) :-
     query(t),
-    available(WF),
+    goal_output_candidate(t, GoalID, WF),
     goal_id(GoalID),
     goal_dim_match(t, GoalID, WF, _),
     not goal_dim_missing(t, GoalID, WF, _).
 
 goal_satisfied_by_output(t, GoalID, WF) :-
-    goal_satisfied_by(t, GoalID, WF),
-    not holds(0, avail(WF)).
+    goal_satisfied_by(t, GoalID, WF).
 
 goal_satisfied(t, GoalID) :-
     query(t),
@@ -96,4 +100,3 @@ output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category) :-
    occurs(TProd, output_dim(ToolProd, Port, V, Category)),
    output_dim_supported(t, TProd, ToolProd, Port, V, Category),
    output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category).
-
