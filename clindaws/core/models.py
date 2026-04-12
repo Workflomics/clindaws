@@ -177,6 +177,7 @@ class HorizonRecord:
     models_stored: int
     unique_workflows_seen: int
     unique_workflows_stored: int
+    diagnostic_counts_enabled: bool = True
     available_artifacts_at_step: int | None = None
     eligible_artifacts_at_step: int | None = None
     eligible_workflow_inputs_at_step: int | None = None
@@ -211,6 +212,7 @@ class RunResult:
     raw_models_seen: int = 0
     raw_answer_sets_found: int = 0
     unique_solutions_found: int = 0
+    diagnostic_counts_enabled: bool = True
     timed_out: bool = False
     completed_stage: str = "run"
     run_log_path: Path | None = None

@@ -16,7 +16,7 @@ from clindaws.core.models import FactBundle, HorizonRecord, SnakeConfig
 from clindaws.core.runtime_stats import current_peak_rss_mb
 from clindaws.core.workflow import (
     canonicalize_shown_symbols,
-    extract_workflow_signature_key,
+    extract_canonical_workflow_keys,
     workflow_signature_length,
 )
 
@@ -72,6 +72,38 @@ def _projection_runtime_facts(*, mode: str, project_models: bool) -> str:
     if mode in {"multi-shot", "single-shot"} and not project_models:
         facts.append("full_workflow_input_witnesses.\n")
     return "".join(facts)
+
+
+def _format_progress_counts(
+    *,
+    diagnostic_counts_enabled: bool,
+    capture_raw_models: bool,
+    models_seen: int,
+    models_stored: int,
+    unique_workflows_seen: int,
+    unique_workflows_stored: int,
+    seen_tool_sequence_count: int,
+    stored_tool_sequence_count: int,
+) -> str:
+    """Format solve progress counts based on the active reporting mode."""
+
+    if not diagnostic_counts_enabled:
+        return (
+            f"workflow candidates stored={unique_workflows_stored}, "
+            f"unique tool sequences stored={stored_tool_sequence_count}"
+        )
+    parts = [f"raw models seen={models_seen}"]
+    if capture_raw_models:
+        parts.append(f"raw models stored={models_stored}")
+    parts.extend(
+        [
+            f"workflow candidates seen={unique_workflows_seen}",
+            f"workflow candidates stored={unique_workflows_stored}",
+            f"unique tool sequences seen={seen_tool_sequence_count}",
+            f"unique tool sequences stored={stored_tool_sequence_count}",
+        ]
+    )
+    return ", ".join(parts)
 
 
 @dataclass(frozen=True)
@@ -164,17 +196,11 @@ def _report(progress_callback: ProgressCallback, message: str) -> None:
 def _stored_solution_quota_reached(
     *,
     unique_count: int,
-    raw_count: int,
     solution_limit: int,
-    capture_raw_models: bool,
 ) -> bool:
     """Return whether stored solution collection has reached its configured cap."""
 
-    if unique_count >= solution_limit:
-        return True
-    if capture_raw_models and raw_count >= solution_limit:
-        return True
-    return False
+    return unique_count >= solution_limit
 
 
 def _artifact_is_produced_output(symbol: clingo.Symbol) -> bool:
@@ -456,6 +482,7 @@ def _solve_multi_shot_with_programs(
     stop_on_solution: bool = True,
     horizon_parts_builder: Callable[[int], tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]] | None = None,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     solve_start_horizon: int | None = None,
     parallel_mode: str | None = None,
     project_models: bool = False,
@@ -504,9 +531,7 @@ def _solve_multi_shot_with_programs(
             while horizon <= config.solution_length_max:
                 if not solve_all_horizons and _stored_solution_quota_reached(
                     unique_count=len(unique_collected),
-                    raw_count=len(raw_collected),
                     solution_limit=config.solutions,
-                    capture_raw_models=capture_raw_models,
                 ):
                     break
 
@@ -543,6 +568,7 @@ def _solve_multi_shot_with_programs(
 
                 query_symbol = clingo.Function("query", [clingo.Number(horizon)])
                 control.assign_external(query_symbol, True)
+                any_model_seen = False
                 models_seen = 0
                 models_stored = 0
                 unique_workflows_seen = 0
@@ -552,6 +578,8 @@ def _solve_multi_shot_with_programs(
                 workflow_signature_key_sec = 0.0
                 canonicalization_sec = 0.0
                 seen_unique_keys: set[tuple[object, ...]] = set()
+                seen_tool_sequence_keys: set[tuple[object, ...]] = set()
+                stored_tool_sequence_keys: set[tuple[object, ...]] = set()
                 try:
                     if not solving_started:
                         _report(progress_callback, "Step 3: solving started.")
@@ -566,13 +594,19 @@ def _solve_multi_shot_with_programs(
                                     nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                                     nonlocal model_callback_sec, shown_symbols_sec
                                     nonlocal workflow_signature_key_sec, canonicalization_sec
+                                    nonlocal any_model_seen
                                     callback_start = perf_counter()
-                                    models_seen += 1
+                                    any_model_seen = True
+                                    if diagnostic_counts_enabled:
+                                        models_seen += 1
                                     start = perf_counter()
                                     shown_symbols = tuple(model.symbols(shown=True))
                                     shown_symbols_sec += perf_counter() - start
                                     start = perf_counter()
-                                    workflow_key = extract_workflow_signature_key(shown_symbols)
+                                    tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
+                                        shown_symbols,
+                                        tool_input_signatures,
+                                    )
                                     workflow_signature_key_sec += perf_counter() - start
                                     workflow_length = workflow_signature_length(workflow_key)
                                     in_length_window = (
@@ -580,9 +614,12 @@ def _solve_multi_shot_with_programs(
                                         <= workflow_length
                                         <= config.solution_length_max
                                     )
-                                    if workflow_key not in seen_unique_keys:
-                                        seen_unique_keys.add(workflow_key)
-                                        unique_workflows_seen += 1
+                                    if diagnostic_counts_enabled:
+                                        if tool_sequence_key not in seen_tool_sequence_keys:
+                                            seen_tool_sequence_keys.add(tool_sequence_key)
+                                        if workflow_key not in seen_unique_keys:
+                                            seen_unique_keys.add(workflow_key)
+                                            unique_workflows_seen += 1
                                     store_raw = (
                                         in_length_window
                                         and
@@ -595,7 +632,9 @@ def _solve_multi_shot_with_programs(
                                         workflow_key not in stored_unique_keys
                                         and len(unique_collected) < config.solutions
                                     )
-                                    canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                                    if store_raw:
+                                        raw_collected.append(shown_symbols)
+                                        models_stored += 1
                                     if store_unique:
                                         start = perf_counter()
                                         canonical_shown = canonicalize_shown_symbols(
@@ -603,16 +642,12 @@ def _solve_multi_shot_with_programs(
                                             tool_input_signatures,
                                         )
                                         canonicalization_sec += perf_counter() - start
-                                    if store_raw:
-                                        raw_collected.append(shown_symbols)
-                                        models_stored += 1
-                                    if store_unique:
                                         stored_unique_keys.add(workflow_key)
-                                        unique_collected.append(canonical_shown if canonical_shown is not None else shown_symbols)
+                                        stored_tool_sequence_keys.add(tool_sequence_key)
+                                        unique_collected.append(canonical_shown)
                                         unique_workflows_stored += 1
                                     elif (
                                         solve_all_horizons
-                                        and (not capture_raw_models or len(raw_collected) >= config.solutions)
                                         and len(unique_collected) >= config.solutions
                                     ):
                                         model_callback_sec += perf_counter() - callback_start
@@ -638,11 +673,12 @@ def _solve_multi_shot_with_programs(
                     grounding_sec=ground_elapsed,
                     solving_sec=solve_elapsed,
                     peak_rss_mb=current_peak_rss_mb(),
-                    satisfiable=models_seen > 0,
+                    satisfiable=any_model_seen,
                     models_seen=models_seen,
                     models_stored=models_stored,
                     unique_workflows_seen=unique_workflows_seen,
                     unique_workflows_stored=unique_workflows_stored,
+                    diagnostic_counts_enabled=diagnostic_counts_enabled,
                     available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
                     eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
                     eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
@@ -660,16 +696,21 @@ def _solve_multi_shot_with_programs(
                 _report(
                     progress_callback,
                     f"Solving progress: horizon {horizon} finished after {solve_elapsed:.3f}s, "
-                    f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                    f"unique tool sequences seen={unique_workflows_seen}, "
-                    f"unique tool sequences stored={unique_workflows_stored}, "
-                    f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
+                    f"{_format_progress_counts(
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        capture_raw_models=capture_raw_models,
+                        models_seen=models_seen,
+                        models_stored=models_stored,
+                        unique_workflows_seen=unique_workflows_seen,
+                        unique_workflows_stored=unique_workflows_stored,
+                        seen_tool_sequence_count=len(seen_tool_sequence_keys),
+                        stored_tool_sequence_count=len(stored_tool_sequence_keys),
+                    )}, "
+                    f"satisfiable={'yes' if any_model_seen else 'no'}.",
                 )
                 if not solve_all_horizons and _stored_solution_quota_reached(
                     unique_count=len(unique_collected),
-                    raw_count=len(raw_collected),
                     solution_limit=config.solutions,
-                    capture_raw_models=capture_raw_models,
                 ):
                     break
                 if unique_collected and not solve_all_horizons and stop_on_solution:
@@ -701,6 +742,7 @@ def _solve_single_shot_with_programs(
     horizon_record_callback: HorizonRecordCallback = None,
     solve_all_horizons: bool = False,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
@@ -756,6 +798,7 @@ def _solve_single_shot_with_programs(
                     _report(progress_callback, "Step 3: solving started.")
                     solving_started = True
                 _report(progress_callback, f"Solving: single-shot horizon {horizon}...")
+                any_model_seen = False
                 models_seen = 0
                 models_stored = 0
                 unique_workflows_seen = 0
@@ -765,6 +808,8 @@ def _solve_single_shot_with_programs(
                 workflow_signature_key_sec = 0.0
                 canonicalization_sec = 0.0
                 seen_unique_keys: set[tuple[object, ...]] = set()
+                seen_tool_sequence_keys: set[tuple[object, ...]] = set()
+                stored_tool_sequence_keys: set[tuple[object, ...]] = set()
                 start = perf_counter()
 
                 def _solve() -> None:
@@ -773,13 +818,19 @@ def _solve_single_shot_with_programs(
                             nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                             nonlocal model_callback_sec, shown_symbols_sec
                             nonlocal workflow_signature_key_sec, canonicalization_sec
+                            nonlocal any_model_seen
                             callback_start = perf_counter()
-                            models_seen += 1
+                            any_model_seen = True
+                            if diagnostic_counts_enabled:
+                                models_seen += 1
                             sample_start = perf_counter()
                             shown_symbols = tuple(model.symbols(shown=True))
                             shown_symbols_sec += perf_counter() - sample_start
                             sample_start = perf_counter()
-                            workflow_key = extract_workflow_signature_key(shown_symbols)
+                            tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
+                                shown_symbols,
+                                tool_input_signatures,
+                            )
                             workflow_signature_key_sec += perf_counter() - sample_start
                             workflow_length = workflow_signature_length(workflow_key)
                             in_length_window = (
@@ -787,9 +838,12 @@ def _solve_single_shot_with_programs(
                                 <= workflow_length
                                 <= config.solution_length_max
                             )
-                            if workflow_key not in seen_unique_keys:
-                                seen_unique_keys.add(workflow_key)
-                                unique_workflows_seen += 1
+                            if diagnostic_counts_enabled:
+                                if tool_sequence_key not in seen_tool_sequence_keys:
+                                    seen_tool_sequence_keys.add(tool_sequence_key)
+                                if workflow_key not in seen_unique_keys:
+                                    seen_unique_keys.add(workflow_key)
+                                    unique_workflows_seen += 1
                             store_raw = (
                                 in_length_window
                                 and
@@ -802,7 +856,9 @@ def _solve_single_shot_with_programs(
                                 workflow_key not in stored_unique_keys
                                 and len(unique_solutions) < config.solutions
                             )
-                            canonical_shown: tuple[clingo.Symbol, ...] | None = None
+                            if store_raw:
+                                raw_solutions.append(shown_symbols)
+                                models_stored += 1
                             if store_unique:
                                 sample_start = perf_counter()
                                 canonical_shown = canonicalize_shown_symbols(
@@ -810,16 +866,12 @@ def _solve_single_shot_with_programs(
                                     tool_input_signatures,
                                 )
                                 canonicalization_sec += perf_counter() - sample_start
-                            if store_raw:
-                                raw_solutions.append(shown_symbols)
-                                models_stored += 1
-                            if store_unique:
                                 stored_unique_keys.add(workflow_key)
-                                unique_solutions.append(canonical_shown if canonical_shown is not None else shown_symbols)
+                                stored_tool_sequence_keys.add(tool_sequence_key)
+                                unique_solutions.append(canonical_shown)
                                 unique_workflows_stored += 1
                             elif (
                                 solve_all_horizons
-                                and (not capture_raw_models or len(raw_solutions) >= config.solutions)
                                 and len(unique_solutions) >= config.solutions
                             ):
                                 model_callback_sec += perf_counter() - callback_start
@@ -837,11 +889,12 @@ def _solve_single_shot_with_programs(
                     grounding_sec=ground_elapsed,
                     solving_sec=solve_elapsed,
                     peak_rss_mb=current_peak_rss_mb(),
-                    satisfiable=models_seen > 0,
+                    satisfiable=any_model_seen,
                     models_seen=models_seen,
                     models_stored=models_stored,
                     unique_workflows_seen=unique_workflows_seen,
                     unique_workflows_stored=unique_workflows_stored,
+                    diagnostic_counts_enabled=diagnostic_counts_enabled,
                     model_callback_sec=model_callback_sec,
                     shown_symbols_sec=shown_symbols_sec,
                     workflow_signature_key_sec=workflow_signature_key_sec,
@@ -853,10 +906,17 @@ def _solve_single_shot_with_programs(
                 _report(
                     progress_callback,
                     f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
-                    f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                    f"unique tool sequences seen={unique_workflows_seen}, "
-                    f"unique tool sequences stored={unique_workflows_stored}, "
-                    f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
+                    f"{_format_progress_counts(
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        capture_raw_models=capture_raw_models,
+                        models_seen=models_seen,
+                        models_stored=models_stored,
+                        unique_workflows_seen=unique_workflows_seen,
+                        unique_workflows_stored=unique_workflows_stored,
+                        seen_tool_sequence_count=len(seen_tool_sequence_keys),
+                        stored_tool_sequence_count=len(stored_tool_sequence_keys),
+                    )}, "
+                    f"satisfiable={'yes' if any_model_seen else 'no'}.",
                 )
         except KeyboardInterrupt:
             _report(progress_callback, "Interrupted/timeout: returning partial results.")
@@ -890,6 +950,7 @@ def _solve_single_shot_once(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
@@ -925,12 +986,15 @@ def _solve_single_shot_once(
     models_stored = 0
     unique_workflows_seen = 0
     unique_workflows_stored = 0
+    any_model_seen = False
     model_callback_sec = 0.0
     shown_symbols_sec = 0.0
     workflow_signature_key_sec = 0.0
     canonicalization_sec = 0.0
     grounding_parts: list[tuple[str, float]] = []
     seen_unique_keys: set[tuple[object, ...]] = set()
+    seen_tool_sequence_keys: set[tuple[object, ...]] = set()
+    stored_tool_sequence_keys: set[tuple[object, ...]] = set()
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -980,13 +1044,19 @@ def _solve_single_shot_once(
                 nonlocal workflow_signature_key_sec, canonicalization_sec
                 with control.solve(yield_=True) as handle:
                     for model in handle:
+                        nonlocal any_model_seen
                         callback_start = perf_counter()
-                        models_seen += 1
+                        any_model_seen = True
+                        if diagnostic_counts_enabled:
+                            models_seen += 1
                         sample_start = perf_counter()
                         shown_symbols = tuple(model.symbols(shown=True))
                         shown_symbols_sec += perf_counter() - sample_start
                         sample_start = perf_counter()
-                        workflow_key = extract_workflow_signature_key(shown_symbols)
+                        tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
+                            shown_symbols,
+                            tool_input_signatures,
+                        )
                         workflow_signature_key_sec += perf_counter() - sample_start
                         workflow_length = workflow_signature_length(workflow_key)
                         in_length_window = (
@@ -994,9 +1064,12 @@ def _solve_single_shot_once(
                             <= workflow_length
                             <= config.solution_length_max
                         )
-                        if workflow_key not in seen_unique_keys:
-                            seen_unique_keys.add(workflow_key)
-                            unique_workflows_seen += 1
+                        if diagnostic_counts_enabled:
+                            if tool_sequence_key not in seen_tool_sequence_keys:
+                                seen_tool_sequence_keys.add(tool_sequence_key)
+                            if workflow_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_key)
+                                unique_workflows_seen += 1
 
                         store_raw = (
                             in_length_window
@@ -1012,13 +1085,16 @@ def _solve_single_shot_once(
                             raw_solutions.append(shown_symbols)
                             models_stored += 1
                         if store_unique:
-                            unique_workflows_stored += 1
-                            stored_unique_keys.add(workflow_key)
                             sample_start = perf_counter()
-                            unique_solutions.append(
-                                canonicalize_shown_symbols(shown_symbols, tool_input_signatures)
+                            canonical_shown = canonicalize_shown_symbols(
+                                shown_symbols,
+                                tool_input_signatures,
                             )
                             canonicalization_sec += perf_counter() - sample_start
+                            unique_workflows_stored += 1
+                            stored_unique_keys.add(workflow_key)
+                            stored_tool_sequence_keys.add(tool_sequence_key)
+                            unique_solutions.append(canonical_shown)
 
                         model_callback_sec += perf_counter() - callback_start
                         if len(unique_solutions) >= config.solutions:
@@ -1033,10 +1109,17 @@ def _solve_single_shot_once(
             _report(
                 progress_callback,
                 f"Solving progress: single-shot finished after {solve_elapsed:.3f}s, "
-                f"raw models seen={models_seen}, raw models stored={models_stored}, "
-                f"unique tool sequences seen={unique_workflows_seen}, "
-                f"unique tool sequences stored={unique_workflows_stored}, "
-                f"satisfiable={'yes' if models_seen > 0 else 'no'}.",
+                f"{_format_progress_counts(
+                    diagnostic_counts_enabled=diagnostic_counts_enabled,
+                    capture_raw_models=capture_raw_models,
+                    models_seen=models_seen,
+                    models_stored=models_stored,
+                    unique_workflows_seen=unique_workflows_seen,
+                    unique_workflows_stored=unique_workflows_stored,
+                    seen_tool_sequence_count=len(seen_tool_sequence_keys),
+                    stored_tool_sequence_count=len(stored_tool_sequence_keys),
+                )}, "
+                f"satisfiable={'yes' if any_model_seen else 'no'}.",
             )
     except KeyboardInterrupt:
         _report(progress_callback, "Interrupted/timeout: returning partial results.")
@@ -1048,11 +1131,12 @@ def _solve_single_shot_once(
         grounding_sec=ground_elapsed,
         solving_sec=solve_elapsed,
         peak_rss_mb=base_grounding_peak_rss_mb,
-        satisfiable=models_seen > 0,
+        satisfiable=any_model_seen,
         models_seen=models_seen,
         models_stored=models_stored,
         unique_workflows_seen=unique_workflows_seen,
         unique_workflows_stored=unique_workflows_stored,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
         model_callback_sec=model_callback_sec,
         shown_symbols_sec=shown_symbols_sec,
         workflow_signature_key_sec=workflow_signature_key_sec,
@@ -1082,6 +1166,7 @@ def solve_single_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
@@ -1095,6 +1180,7 @@ def solve_single_shot(
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
         capture_raw_models=capture_raw_models,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )
@@ -1304,6 +1390,7 @@ def solve_multi_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
@@ -1320,6 +1407,7 @@ def solve_multi_shot(
         stop_on_solution=False,
         horizon_parts_builder=_multi_shot_horizon_parts,
         capture_raw_models=capture_raw_models,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )
@@ -1363,6 +1451,7 @@ def solve_multi_shot_compressed_candidate(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
     capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
@@ -1385,6 +1474,7 @@ def solve_multi_shot_compressed_candidate(
             initial_seed_program=None,
         ),
         capture_raw_models=capture_raw_models,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )

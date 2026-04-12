@@ -17,10 +17,12 @@ def _progress(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def _format_count_summary(*, workflows: int, raw_models: int) -> str:
-    """Format canonical workflow and raw model counts consistently."""
+def _format_count_summary(*, workflows: int, raw_models: int, diagnostic_counts_enabled: bool) -> str:
+    """Format canonical workflow and optional raw model counts consistently."""
 
-    return f"workflows={workflows} raw_models={raw_models}"
+    if diagnostic_counts_enabled:
+        return f"workflows={workflows} raw_models={raw_models}"
+    return f"workflows={workflows}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -94,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-raw-answer-sets",
         action="store_true",
         help="Write raw witness-level answer sets for debugging.",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable solve-time diagnostic counters for raw models and workflow candidates seen.",
     )
     parser.add_argument(
         "--optimized",
@@ -226,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
             graph_format=args.graph_format,
             render_graphs=not args.no_graphs,
             write_raw_answer_sets=args.write_raw_answer_sets,
+            debug=args.debug,
             progress_callback=_progress,
             optimized=args.optimized,
             max_workers=args.translation_workers,
@@ -251,15 +259,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Workflow signatures written to: {run_result.workflow_signature_path}")
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "
-            f"{_format_count_summary(workflows=run_result.unique_solutions_found, raw_models=run_result.raw_models_seen)} "
+            f"{_format_count_summary(workflows=run_result.unique_solutions_found, raw_models=run_result.raw_models_seen, diagnostic_counts_enabled=run_result.diagnostic_counts_enabled)} "
             f"translation={run_result.timings.translation_sec:.3f}s "
             f"grounding={run_result.timings.grounding_sec:.3f}s "
             f"solving={run_result.timings.solving_sec:.3f}s "
             f"total={run_result.timings.total_sec:.3f}s"
         )
-        if run_result.raw_models_seen != run_result.unique_solutions_found:
+        if run_result.diagnostic_counts_enabled and run_result.raw_models_seen != run_result.unique_solutions_found:
             print(
-                "Count basis: workflows are unique tool sequences; "
+                "Count basis: workflows are canonical workflow candidates; "
                 "raw_models are pre-canonical answer sets seen by clingo."
             )
         for path in run_result.graph_paths:

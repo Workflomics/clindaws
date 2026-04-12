@@ -142,6 +142,8 @@ class RunContext:
     config: SnakeConfig
     solution_dir: Path
     fact_bundle: FactBundle
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]]
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]]
     translation_sec: float
     translation_peak_rss_mb: float
     effective_translation_strategy: str
@@ -163,6 +165,27 @@ def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     if translation_pathway == "ape_multi_shot":
         return "ape_clingo_legacy"
     return grounding_strategy
+
+
+def _workflow_input_dims_from_config(config: SnakeConfig) -> dict[str, dict[str, tuple[str, ...]]]:
+    return {
+        f"wf_input_{index}": {
+            str(dim): tuple(str(value) for value in values)
+            for dim, values in item.items()
+        }
+        for index, item in enumerate(config.inputs)
+    }
+
+
+def _tool_output_dims_lookup(tools: tuple) -> dict[tuple[str, int], dict[str, tuple[str, ...]]]:
+    output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] = {}
+    for tool in tools:
+        for port_index, output_spec in enumerate(getattr(tool, "outputs", ())):
+            output_dims[(str(tool.mode_id), port_index)] = {
+                str(dim): tuple(str(value) for value in values)
+                for dim, values in output_spec.dimensions.items()
+            }
+    return output_dims
 
 
 def _load_tools_for_mode(config, translation_pathway: str):
@@ -277,6 +300,7 @@ def _timed_out_run_result(
         raw_models_seen=0,
         raw_answer_sets_found=0,
         unique_solutions_found=0,
+        diagnostic_counts_enabled=False,
         timed_out=True,
         completed_stage=completed_stage,
         run_log_path=None,
@@ -306,6 +330,7 @@ def _solve_worker_entrypoint(
     config,
     fact_bundle,
     capture_raw_models: bool,
+    diagnostic_counts_enabled: bool,
     parallel_mode: str | None,
     project_models: bool,
     result_queue: multiprocessing.queues.Queue,
@@ -320,6 +345,7 @@ def _solve_worker_entrypoint(
             fact_bundle,
             progress_callback=_worker_progress,
             capture_raw_models=capture_raw_models,
+            diagnostic_counts_enabled=diagnostic_counts_enabled,
             parallel_mode=parallel_mode,
             project_models=project_models,
         )
@@ -357,6 +383,7 @@ def _run_solve_in_worker(
     config,
     fact_bundle,
     capture_raw_models: bool,
+    diagnostic_counts_enabled: bool,
     parallel_mode: str | None,
     project_models: bool,
     remaining_timeout: float,
@@ -372,6 +399,7 @@ def _run_solve_in_worker(
             "config": config,
             "fact_bundle": fact_bundle,
             "capture_raw_models": capture_raw_models,
+            "diagnostic_counts_enabled": diagnostic_counts_enabled,
             "parallel_mode": parallel_mode,
             "project_models": project_models,
             "result_queue": result_queue,
@@ -1344,6 +1372,8 @@ def _prepare_run_context(
         config=config,
         solution_dir=solution_dir,
         fact_bundle=fact_bundle,
+        workflow_input_dims=_workflow_input_dims_from_config(config),
+        tool_output_dims=_tool_output_dims_lookup(tools),
         translation_sec=translation_sec,
         translation_peak_rss_mb=translation_peak_rss_mb,
         effective_translation_strategy=effective_translation_strategy,
@@ -1462,6 +1492,7 @@ def run_once(
     graph_format: str = "png",
     render_graphs: bool = True,
     write_raw_answer_sets: bool = False,
+    debug: bool = False,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
     max_workers: int = 1,
@@ -1491,6 +1522,8 @@ def run_once(
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
 
     effective_project_models = _effective_project_models(mode, project_models)
+    diagnostic_counts_enabled = bool(debug or write_raw_answer_sets)
+    capture_raw_models = bool(write_raw_answer_sets)
     if effective_parallel_mode:
         _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
     remaining_timeout = config.timeout_sec - translation_sec
@@ -1518,7 +1551,8 @@ def run_once(
                 mode=internal_solver_mode,
                 config=config,
                 fact_bundle=fact_bundle,
-                capture_raw_models=True,
+                capture_raw_models=capture_raw_models,
+                diagnostic_counts_enabled=diagnostic_counts_enabled,
                 parallel_mode=effective_parallel_mode,
                 project_models=effective_project_models,
                 remaining_timeout=remaining_timeout,
@@ -1548,6 +1582,7 @@ def run_once(
                     graph_format=graph_format,
                     render_graphs=render_graphs,
                     write_raw_answer_sets=write_raw_answer_sets,
+                    debug=debug,
                     progress_callback=progress_callback,
                     optimized=True,
                     max_workers=max_workers,
@@ -1593,11 +1628,23 @@ def run_once(
         csv_writers.step_writer.log_horizon(record)
 
     candidate_solutions = tuple(
-        reconstruct_solution(index + 1, symbols, dict(fact_bundle.tool_labels))
+        reconstruct_solution(
+            index + 1,
+            symbols,
+            dict(fact_bundle.tool_labels),
+            workflow_input_dims=ctx.workflow_input_dims,
+            tool_output_dims=ctx.tool_output_dims,
+        )
         for index, symbols in enumerate(solve_output.raw_solutions)
     )
     solutions = tuple(
-        reconstruct_solution(index + 1, symbols, dict(fact_bundle.tool_labels))
+        reconstruct_solution(
+            index + 1,
+            symbols,
+            dict(fact_bundle.tool_labels),
+            workflow_input_dims=ctx.workflow_input_dims,
+            tool_output_dims=ctx.tool_output_dims,
+        )
         for index, symbols in enumerate(solve_output.solutions)
     )
 
@@ -1647,7 +1694,7 @@ def run_once(
     if not _timed_out:
         _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
         render_start = perf_counter()
-        if write_raw_answer_sets or config.debug_mode:
+        if write_raw_answer_sets:
             answer_set_path = solution_dir / _answer_sets_filename(
                 config=config,
                 mode=mode,
@@ -1673,7 +1720,7 @@ def run_once(
         if render_graphs:
             figures_dir = solution_dir / "Figures"
             max_graphs = config.number_of_generated_graphs
-            for solution in candidate_solutions[:max_graphs]:
+            for solution in solutions[:max_graphs]:
                 graph_path_list.extend(render_solution_graphs(figures_dir, solution, graph_format))
         graph_paths = tuple(graph_path_list)
         rendering_sec = perf_counter() - render_start
@@ -1691,11 +1738,15 @@ def run_once(
         base_grounding_sec=solve_output.base_grounding_sec,
         base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
         horizon_records=solve_output.horizon_records,
-        raw_solutions_found=len(solve_output.raw_solutions),
-        raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
+        raw_solutions_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
+        raw_models_seen=(
+            sum(record.models_seen for record in solve_output.horizon_records)
+            if diagnostic_counts_enabled
+            else 0
+        ),
         solutions_found=len(solutions),
         grounded_horizons=tuple(record.horizon for record in solve_output.horizon_records),
-            effective_parallel_mode=effective_parallel_mode,
+        effective_parallel_mode=effective_parallel_mode,
     )
     run_log_path = csv_writers.run_log_path
     run_summary_path = csv_writers.run_summary_path
@@ -1721,9 +1772,14 @@ def run_once(
         solution_summary_path=None,
         workflow_signature_path=workflow_signature_path,
         graph_paths=graph_paths,
-        raw_models_seen=sum(record.models_seen for record in solve_output.horizon_records),
-        raw_answer_sets_found=len(solve_output.raw_solutions),
+        raw_models_seen=(
+            sum(record.models_seen for record in solve_output.horizon_records)
+            if diagnostic_counts_enabled
+            else 0
+        ),
+        raw_answer_sets_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
         unique_solutions_found=len(solutions),
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
         timed_out=False,
         completed_stage="run",
         run_log_path=run_log_path,

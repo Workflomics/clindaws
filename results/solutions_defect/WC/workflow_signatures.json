@@ -1,0 +1,3784 @@
+{
+  "workflow_signatures": [
+    {
+      "index": 1,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 2,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 3,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 4,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 5,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 6,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 7,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 8,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 9,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 10,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 11,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 12,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 13,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 14,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 15,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 16,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 17,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 18,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 19,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 20,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 21,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 22,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 23,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 24,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 25,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 26,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 27,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 28,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 29,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 30,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 31,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 32,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 33,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 34,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 35,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 36,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 37,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 38,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 39,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 40,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 41,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 42,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 43,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 44,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 45,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 46,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 47,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 48,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 49,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 50,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 51,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 52,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 53,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 54,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 55,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 56,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 57,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 58,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 59,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 60,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t3:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 61,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 62,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 63,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 64,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 65,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 66,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 67,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 68,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 69,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 70,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t2:out0",
+        "t5:in1<-wf_input_1",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t6:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 71,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 72,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 73,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 74,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 75,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 76,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 77,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 78,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 79,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 80,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-t5:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 81,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 82,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-t2:out0",
+        "t6:in0<-t4:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t5:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 83,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 84,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 85,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 86,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out0",
+        "t5:in0<-wf_input_0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t4:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t5:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 87,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 88,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 89,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 90,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 91,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 92,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "calc_chemical_potential_A",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-wf_input_0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t3:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 93,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 94,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "calc_chemical_potential_A",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-wf_input_0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t2:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t4:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 95,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 96,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 97,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 98,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "calc_chemical_potential_A",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t1:out0",
+        "t3:in1<-wf_input_0",
+        "t4:in0<-t3:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t3:out0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t6:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 99,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 100,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 101,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 102,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 103,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 104,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 105,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_vasp",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 106,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 107,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 108,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_sphinx",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 109,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_sphinx",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 110,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_sphinx",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_sphinx",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 111,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 112,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 113,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 114,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "relax_structure",
+        "calc_chemical_potential_A",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-wf_input_0",
+        "t7:in0<-t5:out0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t7:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t6:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 115,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 116,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t3:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 117,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 118,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calc_chemical_potential_A",
+        "calculate_defect_formation_energy",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-wf_input_0",
+        "t8:in0<-t4:out0",
+        "t8:in1<-t6:out0",
+        "t9:in0<-t8:out0",
+        "t9:in1<-t7:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 119,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 120,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_gpaw",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 121,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 122,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_gpaw",
+        "relax_structure",
+        "run_gpaw",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 123,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Al",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 124,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "create_vacancy_Fe",
+        "run_vasp",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out0",
+        "t5:in0<-t3:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t4:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 125,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Al",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 126,
+      "length": 9,
+      "tools": [
+        "create_project",
+        "create_structure_bulk",
+        "run_vasp",
+        "create_vacancy_Fe",
+        "relax_structure",
+        "run_vasp",
+        "calculate_defect_formation_energy",
+        "calc_chemical_potential_A",
+        "calc_defect_concentration"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out0",
+        "t4:in0<-t2:out0",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out0",
+        "t6:in0<-t5:out0",
+        "t7:in0<-t3:out0",
+        "t7:in1<-t6:out0",
+        "t8:in0<-wf_input_0",
+        "t9:in0<-t7:out0",
+        "t9:in1<-t8:out0"
+      ],
+      "goals": []
+    }
+  ]
+}

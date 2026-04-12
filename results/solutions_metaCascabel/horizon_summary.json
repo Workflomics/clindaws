@@ -1,0 +1,80 @@
+{
+  "mode": "multi-shot",
+  "grounding_strategy": "hybrid",
+  "internal_schema": "legacy_direct_check_precompute",
+  "internal_solver_mode": "multi-shot",
+  "earliest_solution_step": 13,
+  "effective_solve_start_horizon": 17,
+  "python_precompute_enabled": false,
+  "python_precompute_fact_count": 182,
+  "python_precompute_stats": {
+    "precompute_plain_output_port_candidate_categories_compressed": 0,
+    "precompute_plain_output_port_candidate_categories_requiring_check": 0,
+    "precompute_plain_output_port_candidate_categories_retained": 182,
+    "precompute_plain_output_port_candidates": 182,
+    "precompute_plain_output_port_candidates_dense": 182,
+    "precompute_plain_output_port_candidates_dropped": 0,
+    "precompute_plain_output_port_candidates_requiring_check": 0
+  },
+  "backend_stats": {},
+  "workflow_input_compression": {
+    "workflow_input_collapsed_members": 0,
+    "workflow_input_equivalence_classes": 4,
+    "workflow_input_planner_visible_count_compressed": 4,
+    "workflow_input_planner_visible_count_uncompressed": 4,
+    "workflow_input_planner_visible_reduction_if_compressed": 0,
+    "workflow_input_repeated_equivalence_classes": 0,
+    "workflow_input_slots": 0,
+    "workflow_input_compression_active": false,
+    "workflow_input_planner_visible_count_effective": 4
+  },
+  "solve_callback_profile": {
+    "model_callback_sec": 0.14021791936829686,
+    "shown_symbols_sec": 0.01975046016741544,
+    "workflow_signature_key_sec": 0.06041475897654891,
+    "canonicalization_sec": 0.05958845722489059,
+    "other_callback_sec": 0.0004642429994419217,
+    "model_callback_share_of_solving_sec": 0.034516292821294044
+  },
+  "effective_parallel_mode": "6,compete",
+  "translation_peak_rss_mb": 39.59375,
+  "base_grounding_peak_rss_mb": 52.84375,
+  "base_grounding_sec": 0.023449584026820958,
+  "timed_out": false,
+  "horizons": [
+    {
+      "horizon": 17,
+      "grounding_sec": 0.4288606260670349,
+      "solving_sec": 4.0623690410284325,
+      "peak_rss_mb": 2050.296875,
+      "satisfiable": true,
+      "models_seen": 72,
+      "models_stored": 72,
+      "unique_workflows_seen": 18,
+      "unique_workflows_stored": 18,
+      "available_artifacts_at_step": 1551,
+      "eligible_artifacts_at_step": 2367,
+      "eligible_workflow_inputs_at_step": 4,
+      "eligible_produced_outputs_at_step": 2363,
+      "bind_choice_domain_size_at_step": 2228,
+      "model_callback_sec": 0.14021791936829686,
+      "shown_symbols_sec": 0.01975046016741544,
+      "workflow_signature_key_sec": 0.06041475897654891,
+      "canonicalization_sec": 0.05958845722489059,
+      "grounding_parts": [
+        [
+          "step",
+          0.15755324997007847
+        ],
+        [
+          "constraint_step",
+          0.09526508406270295
+        ],
+        [
+          "check",
+          0.17604229203425348
+        ]
+      ]
+    }
+  ]
+}

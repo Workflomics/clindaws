@@ -20,12 +20,9 @@ ape_bind(t, Port, WF) :-
     workflow_input_slot_source(Slot, WF).
 #show ape_bind/3.
 
-% Type annotations for tool outputs created at THIS step only.
-% The out(t,...) pattern ensures the atom is derived only when the output
-% is first produced, preventing redefinition across incremental steps.
-% Workflow-input annotations are emitted as base facts by ClingoSynthesisEngine.
-ape_holds_dim(out(t, Tool, Port), V, Cat) :- artifact_dim(out(t, Tool, Port), V, Cat).
-#show ape_holds_dim/3.
+% Produced outputs created at THIS step only.
+ape_output(out(t, Tool, Port)) :- occurs(t, output(Tool, _, Port)).
+#show ape_output/1.
 
 % Workflow outputs are emitted from the chosen goal-satisfying artifacts only.
 ape_goal_out(t, GoalID, WF) :- chosen_goal_output(t, GoalID, WF).

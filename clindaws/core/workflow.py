@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cmp_to_key
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import clingo
 
@@ -22,8 +22,8 @@ class _MutableArtifact:
     dims: dict[str, set[str]]
 
 
-_LEGACY_PORT_SUFFIX_RE = re.compile(r"_p(\d+)$")
-_STRUCTURED_PORT_SUFFIX_RE = re.compile(r",\s*(\d+)\)$")
+_LEGACY_PORT_SUFFIX_RE = re.compile(r"_p(?:ort_)?(\d+)$")
+_STRUCTURED_PORT_SUFFIX_RE = re.compile(r"_port_(\d+)$")
 
 
 def _symbol_text(symbol: clingo.Symbol) -> str:
@@ -98,20 +98,22 @@ def _is_descendant(
     return False
 
 
-def canonicalize_shown_symbols(
+def _parse_shown_workflow_symbols(
     symbols: Iterable[clingo.Symbol],
-    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
-) -> tuple[clingo.Symbol, ...]:
-    """Normalize shown ape_bind atoms to a SAT-style canonical ordering."""
-
-    symbol_list = list(symbols)
+) -> tuple[
+    dict[int, str],
+    dict[int, dict[str, str]],
+    dict[str, clingo.Symbol],
+    set[str],
+    list[clingo.Symbol],
+]:
     step_tools: dict[int, str] = {}
     bindings_by_step: dict[int, dict[str, str]] = defaultdict(dict)
     artifact_symbols: dict[str, clingo.Symbol] = {}
     output_refs: set[str] = set()
     other_symbols: list[clingo.Symbol] = []
 
-    for symbol in symbol_list:
+    for symbol in symbols:
         if symbol.type != clingo.SymbolType.Function:
             other_symbols.append(symbol)
             continue
@@ -132,11 +134,41 @@ def canonicalize_shown_symbols(
                 artifact_symbols.setdefault(artifact_id, args[0])
                 if artifact_id.startswith("out(") and artifact_id.endswith(")"):
                     output_refs.add(artifact_id)
+            elif name == "ape_output":
+                artifact_id = _workflow_key(args[0])
+                artifact_symbols.setdefault(artifact_id, args[0])
+                if artifact_id.startswith("out(") and artifact_id.endswith(")"):
+                    output_refs.add(artifact_id)
             elif name == "ape_goal_out":
                 artifact_id = _workflow_key(args[2])
                 artifact_symbols.setdefault(artifact_id, args[2])
             other_symbols.append(symbol)
 
+    return step_tools, bindings_by_step, artifact_symbols, output_refs, other_symbols
+
+
+def _input_signature(
+    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+    tool_id: str | None,
+    port_id: str,
+) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
+    if tool_id is None:
+        return None
+    port_index = _port_index(port_id)
+    if port_index is None:
+        return None
+    signatures = tool_input_signatures.get(tool_id, ())
+    if 0 <= port_index < len(signatures):
+        return signatures[port_index]
+    return None
+
+
+def _canonicalize_binding_assignments(
+    step_tools: dict[int, str],
+    bindings_by_step: dict[int, dict[str, str]],
+    output_refs: set[str],
+    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+) -> None:
     parents: dict[str, tuple[str, ...]] = {}
     for output_ref in output_refs:
         created_at, _, _ = _artifact_from_key(output_ref, {})
@@ -158,29 +190,27 @@ def canonicalize_shown_symbols(
             return -1
         return 1
 
-    def _signature(tool_id: str | None, port_id: str) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
-        if tool_id is None:
-            return None
-        port_index = _port_index(port_id)
-        if port_index is None:
-            return None
-        signatures = tool_input_signatures.get(tool_id, ())
-        if 0 <= port_index < len(signatures):
-            return signatures[port_index]
-        return None
-
-    # Canonicalize same-signature join ports directly.
     for time in sorted(bindings_by_step):
         tool_id = step_tools.get(time)
         if tool_id is None:
             continue
         sig_groups: dict[tuple[tuple[str, tuple[str, ...]], ...], list[str]] = defaultdict(list)
         for port_id in bindings_by_step[time]:
-            signature = _signature(tool_id, port_id)
+            signature = _input_signature(tool_input_signatures, tool_id, port_id)
             if signature is not None:
                 sig_groups[signature].append(port_id)
         for ports in sig_groups.values():
             if len(ports) < 2:
+                continue
+            producer_tools: set[str] = set()
+            for port_id in ports:
+                artifact_id = bindings_by_step[time][port_id]
+                created_at, producer_tool, _ = _artifact_from_key(artifact_id, {})
+                if created_at <= 0 or producer_tool is None:
+                    producer_tools = set()
+                    break
+                producer_tools.add(producer_tool)
+            if len(producer_tools) != 1:
                 continue
             ordered_ports = sorted(ports, key=_port_sort_key)
             ordered_artifacts = sorted(
@@ -190,15 +220,13 @@ def canonicalize_shown_symbols(
             for port_id, artifact_id in zip(ordered_ports, ordered_artifacts):
                 bindings_by_step[time][port_id] = artifact_id
 
-    # Canonicalize paired single-input producers based on the later symmetric join
-    # they feed: the lower join port gets the older source artifact.
     for time in sorted(bindings_by_step):
         tool_id = step_tools.get(time)
         if tool_id is None:
             continue
         sig_groups: dict[tuple[tuple[str, tuple[str, ...]], ...], list[str]] = defaultdict(list)
         for port_id in bindings_by_step[time]:
-            signature = _signature(tool_id, port_id)
+            signature = _input_signature(tool_input_signatures, tool_id, port_id)
             if signature is not None:
                 sig_groups[signature].append(port_id)
         for ports in sig_groups.values():
@@ -207,7 +235,6 @@ def canonicalize_shown_symbols(
             consumer_ports = sorted(ports, key=_port_sort_key)
             producer_infos: list[tuple[str, int, str, str, str]] = []
             producer_signatures: set[tuple[tuple[str, tuple[str, ...]], ...]] = set()
-            producer_tools: set[str] = set()
             for port_id in consumer_ports:
                 artifact_id = bindings_by_step[time][port_id]
                 created_at, producer_tool, _ = _artifact_from_key(artifact_id, {})
@@ -220,14 +247,17 @@ def canonicalize_shown_symbols(
                     producer_infos = []
                     break
                 producer_port_id, source_artifact = next(iter(producer_bindings.items()))
-                producer_signature = _signature(producer_tool_at_time, producer_port_id)
+                producer_signature = _input_signature(
+                    tool_input_signatures,
+                    producer_tool_at_time,
+                    producer_port_id,
+                )
                 if producer_signature is None:
                     producer_infos = []
                     break
                 producer_infos.append((port_id, created_at, producer_tool_at_time, producer_port_id, source_artifact))
                 producer_signatures.add(producer_signature)
-                producer_tools.add(producer_tool_at_time)
-            if len(producer_infos) < 2 or len(producer_signatures) != 1 or len(producer_tools) < 2:
+            if len(producer_infos) < 2 or len(producer_signatures) != 1:
                 continue
             ordered_infos = sorted(producer_infos, key=lambda item: _port_sort_key(item[0]))
             ordered_sources = sorted(
@@ -236,6 +266,21 @@ def canonicalize_shown_symbols(
             )
             for (_, producer_time, _, producer_port_id, _), source_artifact in zip(ordered_infos, ordered_sources):
                 bindings_by_step[producer_time][producer_port_id] = source_artifact
+
+
+def canonicalize_shown_symbols(
+    symbols: Iterable[clingo.Symbol],
+    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+) -> tuple[clingo.Symbol, ...]:
+    """Normalize shown ape_bind atoms to a SAT-style canonical ordering."""
+
+    step_tools, bindings_by_step, artifact_symbols, output_refs, other_symbols = _parse_shown_workflow_symbols(symbols)
+    _canonicalize_binding_assignments(
+        step_tools,
+        bindings_by_step,
+        output_refs,
+        tool_input_signatures,
+    )
 
     canonical_binds = [
         clingo.Function(
@@ -251,6 +296,44 @@ def canonicalize_shown_symbols(
         for port_index in [_port_index(port_id)]
     ]
     return tuple(sorted([*other_symbols, *canonical_binds], key=str))
+
+
+def extract_canonical_workflow_keys(
+    symbols: Iterable[clingo.Symbol],
+    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+) -> tuple[tuple[object, ...], tuple[object, ...]]:
+    """Extract canonical tool-sequence and workflow-candidate keys in one pass."""
+
+    step_tools, bindings_by_step, _, output_refs, _ = _parse_shown_workflow_symbols(symbols)
+    _canonicalize_binding_assignments(
+        step_tools,
+        bindings_by_step,
+        output_refs,
+        tool_input_signatures,
+    )
+
+    ordered_steps = tuple(tool_id for _, tool_id in sorted(step_tools.items()))
+    binding_signatures = tuple(
+        sorted(
+            _binding_signature(
+                time,
+                Binding(port_id=port_id, artifact_id=artifact_id),
+            )
+            for time in sorted(bindings_by_step)
+            for port_id, artifact_id in sorted(bindings_by_step[time].items(), key=lambda item: _port_sort_key(item[0]))
+        )
+    )
+    output_signatures = tuple(sorted(_normalize_artifact_ref(ref_id) for ref_id in output_refs))
+    tool_sequence_key = ("steps", ordered_steps)
+    workflow_key = (
+        "steps",
+        ordered_steps,
+        "bindings",
+        binding_signatures,
+        "outputs",
+        output_signatures,
+    )
+    return tool_sequence_key, workflow_key
 
 
 def _canonical_solution_key(
@@ -321,15 +404,10 @@ def _workflow_signature_key(
     return ("steps", tuple(step.tool_id for step in steps))
 
 
-def extract_workflow_signature_key(
+def extract_tool_sequence_key(
     symbols: Iterable[clingo.Symbol],
 ) -> tuple[object, ...]:
-    """Extract the default workflow key directly from shown atoms.
-
-    The current workflow identity is the ordered tool sequence, so the hot
-    solve path only needs ``tool_at_time/2`` atoms and can avoid full
-    canonicalization/reconstruction for non-stored models.
-    """
+    """Extract the ordered tool sequence from shown atoms."""
 
     step_tools: list[tuple[int, str]] = []
     for symbol in symbols:
@@ -342,10 +420,62 @@ def extract_workflow_signature_key(
     return ("steps", tuple(tool_id for _, tool_id in step_tools))
 
 
+def extract_workflow_signature_key(
+    symbols: Iterable[clingo.Symbol],
+) -> tuple[object, ...]:
+    """Extract a workflow-candidate key directly from shown atoms.
+
+    The key is intentionally richer than the plain tool sequence: it includes
+    bindings and produced outputs so solver-side deduplication matches the
+    APE-style workflow support set rather than only sequence-level support.
+    """
+
+    step_tools: list[tuple[int, str]] = []
+    binding_signatures: list[str] = []
+    output_signatures: set[str] = set()
+    for symbol in symbols:
+        if symbol.type != clingo.SymbolType.Function:
+            continue
+        if symbol.name == "tool_at_time":
+            time = int(str(symbol.arguments[0]))
+            tool_id = _symbol_text(symbol.arguments[1])
+            step_tools.append((time, tool_id))
+            continue
+        if symbol.name == "ape_bind":
+            binding_signatures.append(
+                _binding_signature(
+                    int(str(symbol.arguments[0])),
+                    Binding(
+                        port_id=_symbol_text(symbol.arguments[1]),
+                        artifact_id=_workflow_key(symbol.arguments[2]),
+                    ),
+                )
+            )
+            continue
+        if symbol.name == "ape_holds_dim":
+            artifact_id = _workflow_key(symbol.arguments[0])
+            if artifact_id.startswith("out(") and artifact_id.endswith(")"):
+                output_signatures.add(_normalize_artifact_ref(artifact_id))
+            continue
+        if symbol.name == "ape_output":
+            artifact_id = _workflow_key(symbol.arguments[0])
+            output_signatures.add(_normalize_artifact_ref(artifact_id))
+            continue
+    step_tools.sort()
+    return (
+        "steps",
+        tuple(tool_id for _, tool_id in step_tools),
+        "bindings",
+        tuple(sorted(set(binding_signatures))),
+        "outputs",
+        tuple(sorted(output_signatures)),
+    )
+
+
 def workflow_signature_length(workflow_key: tuple[object, ...]) -> int:
     """Return the workflow length encoded in the default signature key."""
 
-    if len(workflow_key) == 2 and workflow_key[0] == "steps" and isinstance(workflow_key[1], tuple):
+    if len(workflow_key) >= 2 and workflow_key[0] == "steps" and isinstance(workflow_key[1], tuple):
         return len(workflow_key[1])
     return 0
 
@@ -354,6 +484,8 @@ def reconstruct_solution(
     index: int,
     symbols: Iterable[clingo.Symbol],
     tool_labels: dict[str, str],
+    workflow_input_dims: Mapping[str, Mapping[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: Mapping[tuple[str, int], Mapping[str, tuple[str, ...]]] | None = None,
 ) -> WorkflowSolution:
     """Reconstruct a workflow solution from shown symbols."""
 
@@ -361,6 +493,33 @@ def reconstruct_solution(
     bindings_by_step: dict[int, list[Binding]] = defaultdict(list)
     artifacts: dict[str, _MutableArtifact] = {}
     goal_candidates: dict[int, list[str]] = defaultdict(list)
+    workflow_input_dims = workflow_input_dims or {}
+    tool_output_dims = tool_output_dims or {}
+
+    def _ensure_artifact(
+        ref_id: str,
+        *,
+        initial_dims: Mapping[str, tuple[str, ...]] | None = None,
+    ) -> _MutableArtifact:
+        artifact = artifacts.get(ref_id)
+        if artifact is None:
+            created_at, created_by_tool, created_by_label = _artifact_from_key(ref_id, tool_labels)
+            dims = defaultdict(set)
+            if initial_dims is not None:
+                for dim, values in initial_dims.items():
+                    dims[dim].update(values)
+            artifact = _MutableArtifact(
+                ref_id=ref_id,
+                created_at=created_at,
+                created_by_tool=created_by_tool,
+                created_by_label=created_by_label,
+                dims=dims,
+            )
+            artifacts[ref_id] = artifact
+        elif initial_dims is not None:
+            for dim, values in initial_dims.items():
+                artifact.dims.setdefault(dim, set()).update(values)
+        return artifact
 
     for symbol in symbols:
         if symbol.type != clingo.SymbolType.Function:
@@ -381,34 +540,33 @@ def reconstruct_solution(
                     artifact_id=_workflow_key(args[2]),
                 )
             )
+        elif name == "ape_output":
+            ref_id = _workflow_key(args[0])
+            created_at, created_by_tool, _ = _artifact_from_key(ref_id, tool_labels)
+            if created_by_tool is None:
+                _ensure_artifact(ref_id)
+                continue
+            port_text = ref_id[4:-1].split(",", 2)[2].strip().strip('"')
+            port_index = _port_index(port_text)
+            output_dims = (
+                tool_output_dims.get((created_by_tool, port_index), {})
+                if port_index is not None
+                else {}
+            )
+            _ensure_artifact(ref_id, initial_dims=output_dims)
         elif name == "ape_holds_dim":
             ref_id = _workflow_key(args[0])
             value = _symbol_text(args[1])
             dim = _symbol_text(args[2])
-            if ref_id not in artifacts:
-                created_at, created_by_tool, created_by_label = _artifact_from_key(ref_id, tool_labels)
-                artifacts[ref_id] = _MutableArtifact(
-                    ref_id=ref_id,
-                    created_at=created_at,
-                    created_by_tool=created_by_tool,
-                    created_by_label=created_by_label,
-                    dims=defaultdict(set),
-                )
-            artifacts[ref_id].dims.setdefault(dim, set()).add(value)
+            _ensure_artifact(ref_id).dims.setdefault(dim, set()).add(value)
         elif name == "ape_goal_out":
             goal_index = int(str(args[1]))
             goal_candidates[goal_index].append(_workflow_key(args[2]))
 
     for artifact_id in {binding.artifact_id for bindings in bindings_by_step.values() for binding in bindings}:
         if artifact_id not in artifacts:
-            created_at, created_by_tool, created_by_label = _artifact_from_key(artifact_id, tool_labels)
-            artifacts[artifact_id] = _MutableArtifact(
-                ref_id=artifact_id,
-                created_at=created_at,
-                created_by_tool=created_by_tool,
-                created_by_label=created_by_label,
-                dims=defaultdict(set),
-            )
+            input_dims = workflow_input_dims.get(artifact_id, {})
+            _ensure_artifact(artifact_id, initial_dims=input_dims)
 
     outputs_by_step: dict[int, list[str]] = defaultdict(list)
     for artifact in artifacts.values():
