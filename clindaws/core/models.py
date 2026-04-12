@@ -83,6 +83,7 @@ class FactBundle:
     tool_stats: tuple[ToolExpansionStat, ...]
     cache_stats: Mapping[str, int]
     emit_stats: Mapping[str, int]
+    backend_stats: Mapping[str, object] = field(default_factory=dict)
     earliest_solution_step: int = 1
     python_precomputed_facts: str = ""
     python_precompute_enabled: bool = False

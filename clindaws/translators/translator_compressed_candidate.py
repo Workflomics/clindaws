@@ -218,6 +218,10 @@ def build_compressed_candidate_fact_bundle(
         tools=optimization.relevant_tools,
         tool_stats=list(optimization.tool_stats),
         cache_stats={**ontology.cache_stats(), **optimization.cache_stats},
+        backend_stats={
+            "compressed_candidate_phase_timings": dict(sorted(optimization.phase_timings.items())),
+            "translation_workers": max_workers,
+        },
         earliest_solution_step=optimization.earliest_solution_step,
     )
 

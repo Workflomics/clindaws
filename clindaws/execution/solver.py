@@ -381,32 +381,6 @@ def _dynamic_horizon_parts(
     return tuple(parts)
 
 
-def _dynamic_prefix_horizon_parts(
-    horizon: int,
-    *,
-    initial_step_program: str | None,
-    initial_seed_program: str | None,
-    include_constraint_step: bool,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    """Lean dynamic horizon parts for prefix horizons below solution_length.min.
-
-    Prefix horizons still need to build the reachable workflow state for later
-    solved horizons, but they do not need query-time validation. Constraint
-    summaries only need to be accumulated here when translated constraints are
-    present.
-    """
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
-    if initial_step_program is not None and horizon == 1:
-        parts.append((initial_step_program, (clingo.Number(horizon),)))
-    else:
-        if initial_seed_program is not None and horizon > 1:
-            parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
-        parts.append(("step", (clingo.Number(horizon),)))
-    if include_constraint_step:
-        parts.append(("constraint_step", (clingo.Number(horizon),)))
-    return tuple(parts)
-
-
 def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
     parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
     if horizon == 1:
@@ -414,19 +388,6 @@ def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Sym
     parts.append(("step", (clingo.Number(horizon),)))
     parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
-    return tuple(parts)
-
-
-def _multi_shot_prefix_horizon_parts(
-    horizon: int,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    """Lean legacy multi-shot horizon parts below the first solvable horizon."""
-
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
-    if horizon == 1:
-        parts.append(("init", ()))
-    parts.append(("step", (clingo.Number(horizon),)))
-    parts.append(("constraint_step", (clingo.Number(horizon),)))
     return tuple(parts)
 
 
@@ -1237,9 +1198,6 @@ def solve_multi_shot_compressed_candidate(
 ) -> SolveOutput:
     """Solve using the compressed-candidate multi-shot encoding."""
 
-    has_translated_constraints = _has_translated_constraints(facts)
-    effective_solve_start = max(config.solution_length_min, facts.earliest_solution_step)
-
     return _solve_multi_shot_with_programs(
         config,
         facts,
@@ -1251,22 +1209,12 @@ def solve_multi_shot_compressed_candidate(
         initial_step_program="step_initial",
         solve_all_horizons=False,
         stop_on_solution=False,
-        horizon_parts_builder=lambda horizon: (
-            _dynamic_prefix_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-                include_constraint_step=has_translated_constraints,
-            )
-            if horizon < effective_solve_start
-            else _dynamic_horizon_parts(
-                horizon,
-                initial_step_program="step_initial",
-                initial_seed_program=None,
-            )
+        horizon_parts_builder=lambda horizon: _dynamic_horizon_parts(
+            horizon,
+            initial_step_program="step_initial",
+            initial_seed_program=None,
         ),
         capture_raw_models=capture_raw_models,
-        solve_start_horizon=effective_solve_start,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )

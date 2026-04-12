@@ -18,6 +18,9 @@ is_workflow_input(WF) :- holds(0, avail(WF)).
 workflow_input(WF) :-
     is_workflow_input(WF).
 
+workflow_input_lineage(0, WF, WF) :-
+    holds(0, avail(WF)).
+
 
 
 tool_has_input(Tool) :-

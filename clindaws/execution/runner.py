@@ -412,7 +412,7 @@ def _run_metadata_payload(*, config, ontology, tools) -> dict[str, object]:
 
 
 def _compressed_candidate_engaged(fact_bundle) -> bool:
-    return fact_bundle.internal_schema == "compressed_candidate_fallback"
+    return fact_bundle.internal_solver_mode == "multi-shot-compressed-candidate"
 
 
 def _sanitize_filename_token(value: str) -> str:
@@ -997,6 +997,7 @@ def _translation_summary_payload(
         "predicate_counts": dict(sorted(fact_bundle.predicate_counts.items())),
         "translation_cache_stats": dict(sorted(fact_bundle.cache_stats.items())),
         "translation_emit_stats": dict(sorted(fact_bundle.emit_stats.items())),
+        "backend_stats": fact_bundle.backend_stats,
         "translation_schema_predicates": schema_presence,
         "encoding_schema": encoding_summary,
         "expansion_totals": {
@@ -1080,7 +1081,7 @@ def _effective_parallel_mode(
         return parallel_mode
     if mode != "multi-shot" or fact_bundle.internal_schema not in {
         "direct_precompute_legacy",
-        "compressed_candidate_fallback",
+        "compressed_candidate_optimized",
     }:
         return None
     cpu_count = os.cpu_count() or 1
@@ -1111,26 +1112,9 @@ def _compressed_candidate_internal_bundle(
 ):
     return replace(
         build_compressed_candidate_fact_bundle(config, ontology, tools, max_workers=max_workers),
-        internal_schema="compressed_candidate_fallback",
+        internal_schema="compressed_candidate_optimized",
         internal_solver_mode="multi-shot-compressed-candidate",
     )
-
-
-def _should_consider_direct_candidate_fallback(
-    mode: str,
-    *,
-    optimized: bool,
-    tools,
-) -> bool:
-    return (
-        mode == "multi-shot"
-        and optimized
-        and len(tools) >= 200
-    )
-
-
-def _should_force_direct_candidate_fallback(tools) -> bool:
-    return len(tools) >= 500
 
 
 def _effective_internal_solver_mode(mode: str, fact_bundle) -> str:
@@ -1179,68 +1163,23 @@ def _select_fact_bundle(
     if mode_config.translation_pathway == "ape_multi_shot":
         fact_bundle = _legacy_direct_bundle(config, ontology, tools)
         if optimized:
-            if _should_consider_direct_candidate_fallback(mode, optimized=optimized, tools=tools):
-                compressed_candidate_tools = load_candidate_tool_annotations(
-                    config.tool_annotations_path,
-                    config.ontology_prefix,
-                )
-                if _should_force_direct_candidate_fallback(tools):
-                    _report(progress_callback, "Step 1b: forcing compressed-candidate internal fallback for heavy direct run.")
-                    fact_bundle = _compressed_candidate_internal_bundle(config, ontology, compressed_candidate_tools, max_workers=max_workers)
-                    resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
-                    _report(
-                        progress_callback,
-                        "Step 1b complete: selected compressed-candidate internal schema "
-                        f"with {fact_bundle.fact_count} facts.",
-                    )
-                else:
-                    _report(progress_callback, "Step 1b: Python precompute started.")
-                    optimized_direct_bundle = apply_precompute(
-                        mode,
-                        config,
-                        ontology,
-                        tools,
-                        fact_bundle,
-                        optimized_programs=True,
-                    )
-                    _report(
-                        progress_callback,
-                        "Step 1b complete: Python precompute emitted "
-                        f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
-                    )
-                    fact_bundle = optimized_direct_bundle
-                    _report(progress_callback, "Step 1c: evaluating compressed-candidate internal fallback.")
-                    compressed_candidate_bundle = _compressed_candidate_internal_bundle(config, ontology, compressed_candidate_tools, max_workers=max_workers)
-                    if compressed_candidate_bundle.fact_count < fact_bundle.fact_count:
-                        fact_bundle = compressed_candidate_bundle
-                        resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
-                        _report(
-                            progress_callback,
-                            "Step 1c complete: selected compressed-candidate internal schema "
-                            f"({compressed_candidate_bundle.fact_count} facts vs {optimized_direct_bundle.fact_count}).",
-                        )
-                    else:
-                        _report(
-                            progress_callback,
-                            "Step 1c complete: kept legacy direct optimization path "
-                            f"({optimized_direct_bundle.fact_count} facts vs {compressed_candidate_bundle.fact_count}).",
-                        )
-            else:
-                _report(progress_callback, "Step 1b: Python precompute started.")
-                optimized_direct_bundle = apply_precompute(
-                    mode,
-                    config,
-                    ontology,
-                    tools,
-                    fact_bundle,
-                    optimized_programs=True,
-                )
-                _report(
-                    progress_callback,
-                    "Step 1b complete: Python precompute emitted "
-                    f"{optimized_direct_bundle.python_precompute_fact_count} helper facts.",
-                )
-                fact_bundle = optimized_direct_bundle
+            compressed_candidate_tools = load_candidate_tool_annotations(
+                config.tool_annotations_path,
+                config.ontology_prefix,
+            )
+            _report(progress_callback, "Step 1b: compressed-candidate optimization started.")
+            fact_bundle = _compressed_candidate_internal_bundle(
+                config,
+                ontology,
+                compressed_candidate_tools,
+                max_workers=max_workers,
+            )
+            resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
+            _report(
+                progress_callback,
+                "Step 1b complete: selected compressed-candidate optimized schema "
+                f"with {fact_bundle.fact_count} facts.",
+            )
         else:
             fact_bundle = apply_precompute(
                 mode,
@@ -1585,13 +1524,11 @@ def run_once(
                 "internal_schema": fact_bundle.internal_schema,
                 "internal_solver_mode": internal_solver_mode,
                 "earliest_solution_step": fact_bundle.earliest_solution_step,
-                "effective_solve_start_horizon": max(
-                    config.solution_length_min,
-                    fact_bundle.earliest_solution_step,
-                ),
+                "effective_solve_start_horizon": config.solution_length_min,
                 "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                 "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                 "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                "backend_stats": fact_bundle.backend_stats,
                 "workflow_input_compression": _workflow_input_compression_payload(
                     config=config,
                     mode=mode,
@@ -1819,6 +1756,7 @@ def run_ground_only(
                 "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                 "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                 "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                "backend_stats": fact_bundle.backend_stats,
                 "workflow_input_compression": _workflow_input_compression_payload(
                     config=config,
                     mode=mode,

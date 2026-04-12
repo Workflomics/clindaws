@@ -88,17 +88,15 @@ bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, Produ
    dynamic_candidate_input_category(Candidate, Port, Category),
    not bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category).
 
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Carry workflow-input lineage only; input-usage checks do not need full
+% produced-artifact transitive ancestry in the optimized backend.
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
-
-% Carry forward ancestors from previous steps; the artifact graph is monotone.
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Ancestor).
-
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(Mid, Ancestor).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(t-1, Artifact, WF).
 
 % Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
@@ -107,53 +105,12 @@ artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
    ArtifactHigh < ArtifactLow.
 
-repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2) :-
-    candidate_has_repeated_signature_inputs(Candidate),
-    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
-    occurs(T1, use_dynamic_candidate(Tool, Candidate)),
-    occurs(T2, use_dynamic_candidate(Tool, Candidate)),
-    T1 < T2,
-    occurs(T1, bind(Tool, Port1, WF1)),
-    occurs(T2, bind(Tool, Port2, WF2)),
-    artifact_ancestor(WF1, WF2).
-
-:- repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2).
-
-repeated_same_candidate_symmetric_join_swap(
-    t, T1, Tool, Candidate, T2, JoinTool, JoinCandidate, JoinPortHigh, JoinPortLow
-) :-
-    occurs(t, use_dynamic_candidate(JoinTool, JoinCandidate)),
-    occurs(t, bind(JoinTool, JoinPortHigh, out(T1, Tool, _))),
-    occurs(t, bind(JoinTool, JoinPortLow, out(T2, Tool, _))),
-    repeated_same_candidate_join_guard(Candidate),
-    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
-    occurs(T1, use_dynamic_candidate(Tool, Candidate)),
-    occurs(T2, use_dynamic_candidate(Tool, Candidate)),
-    T1 < T2.
-
-:- repeated_same_candidate_symmetric_join_swap(
-       t, T1, Tool, Candidate, T2, JoinTool, JoinCandidate, JoinPortHigh, JoinPortLow).
-
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),
    occurs(t, bind(Tool, Port2, WF2)),
    Port1 < Port2,
    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
    equivalent_workflow_inputs(WF2, WF1).
-
-repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port) :-
-    TPrev < t,
-    occurs(TPrev, use_dynamic_candidate(PrevTool, Candidate)),
-    occurs(t, use_dynamic_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, _, out(TPrev, PrevTool, _))),
-    occurs(TPrev, bind(PrevTool, PortPrev, PrevWF)),
-    occurs(t, bind(Tool, Port, WF)),
-    holds(0, avail(PrevWF)),
-    holds(0, avail(WF)),
-    same_candidate_input_signature(Candidate, PortPrev, Candidate, Port).
-
-:- repeated_candidate_chain_input(t, TPrev, PrevWF, PortPrev, Tool, Candidate, WF, Port),
-   WF < PrevWF.
 
 :- query(t),
    occurs(t, use_dynamic_candidate(Tool, Candidate)),

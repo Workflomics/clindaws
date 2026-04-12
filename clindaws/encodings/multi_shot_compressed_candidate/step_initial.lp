@@ -42,34 +42,12 @@ occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
     occurs(t, use_dynamic_candidate(Tool, Candidate)),
     dynamic_candidate_input_port(Candidate, Port).
 
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Carry workflow-input lineage only; input-usage checks do not need full
+% produced-artifact transitive ancestry in the optimized backend.
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
-
-% Transitive closure of artifact graph (global, non-timestamped)
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Ancestor).
-
-artifact_ancestor(out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(Mid, Ancestor).
-
-
-% paired_symmetric_producers and repeated_same_candidate_symmetric_join_swap are
-% omitted here: both require T1 < T2 < TJ, which needs at least 3 time steps.
-% At t=1 these rules are dead code. They are enforced in step.lp at t>=3.
-
-repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2) :-
-    candidate_has_repeated_signature_inputs(Candidate),
-    same_candidate_input_signature(Candidate, Port1, Candidate, Port2),
-    occurs(T1, use_dynamic_candidate(Tool, Candidate)),
-    occurs(T2, use_dynamic_candidate(Tool, Candidate)),
-    T1 < T2,
-    occurs(T1, bind(Tool, Port1, WF1)),
-    occurs(T2, bind(Tool, Port2, WF2)),
-    artifact_ancestor(t, WF1, WF2).
-
-:- repeated_same_candidate_ancestor_inversion(t, T1, Tool, Candidate, Port1, WF1, T2, Port2, WF2).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(0, Artifact, WF).
 
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),

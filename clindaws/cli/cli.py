@@ -98,14 +98,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="For direct modes, precompute selected static helper relations and bindability facts in Python before grounding.",
+        help="Enable the optimized backend. For multi-shot this uses the compressed-candidate optimizer; for single-shot it enables direct Python precompute.",
     )
     parser.add_argument(
         "--translation-workers",
         type=int,
         default=1,
         metavar="N",
-        help="Number of parallel worker processes for per-tool candidate expansion. Default 1 (sequential). Values >1 use ProcessPoolExecutor.",
+        help="Number of worker processes for optimized compressed-candidate translation. Default 1 (sequential). Values >1 use ProcessPoolExecutor.",
     )
     parser.add_argument(
         "--ground-only",

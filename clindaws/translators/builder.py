@@ -32,6 +32,7 @@ def _finalize_fact_bundle(
     tools: tuple[ToolMode, ...],
     tool_stats: list[ToolExpansionStat],
     cache_stats: dict[str, int],
+    backend_stats: dict[str, object] | None = None,
     earliest_solution_step: int = 1,
 ) -> FactBundle:
     tool_labels, tool_input_signatures, workflow_input_ids = _bundle_metadata(config, tools)
@@ -46,6 +47,7 @@ def _finalize_fact_bundle(
         tool_stats=tuple(tool_stats),
         cache_stats=cache_stats,
         emit_stats=writer.stats(),
+        backend_stats=backend_stats or {},
         earliest_solution_step=earliest_solution_step,
     )
 def _build_roots(
