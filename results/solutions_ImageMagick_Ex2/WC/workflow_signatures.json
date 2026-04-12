@@ -1,0 +1,6840 @@
+{
+  "workflow_signatures": [
+    {
+      "index": 1,
+      "length": 4,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 2,
+      "length": 4,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 3,
+      "length": 4,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 4,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-wf_input_0",
+        "t4:in1<-t2:out[level_colors_out_0_port_0]",
+        "t5:in0<-t3:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 5,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "append_vertically"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-wf_input_0",
+        "t4:in1<-t2:out[level_colors_out_0_port_0]",
+        "t5:in0<-t3:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 6,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "append_horizontally"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-wf_input_0",
+        "t4:in1<-t2:out[level_colors_out_0_port_0]",
+        "t5:in0<-t3:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 7,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 8,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 9,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 10,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "compress"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 11,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "to_bitmap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 12,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 13,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "auto_level"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 14,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 15,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "half_size"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 16,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 17,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 18,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "rotate_90"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 19,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 20,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 21,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 22,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "negate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 23,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "intense_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 24,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "hue"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 25,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 26,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "mild_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 27,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap",
+        "black_white"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 28,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t2:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 29,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "rotate_90",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[rotate_90_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 30,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_2",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 31,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_contrast",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_contrast_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 32,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "compress",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[compress_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 33,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_contrast",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_contrast_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 34,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "auto_level",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[auto_level_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 35,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "to_bitmap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[to_bitmap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 36,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_sharpen",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_sharpen_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 37,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_bright",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_bright_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 38,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_blur",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_blur_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 39,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "black_white",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[black_white_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 40,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "negate",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[negate_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 41,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_bright",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_bright_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 42,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_dark",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_dark_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 43,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "hue",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[hue_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 44,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_saturate",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_saturate_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 45,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_blur",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_blur_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 46,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_sharpen",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_sharpen_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 47,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "half_size",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[half_size_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 48,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "append_horizontally",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t2:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[append_horizontally_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 49,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "append_vertically",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[append_vertically_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 50,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_saturate",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[intense_saturate_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 51,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_dark",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in0<-t4:out[mild_dark_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 52,
+      "length": 5,
+      "tools": [
+        "generate_canvas",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[generate_canvas_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 53,
+      "length": 5,
+      "tools": [
+        "compress",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[compress_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 54,
+      "length": 5,
+      "tools": [
+        "to_bitmap",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[to_bitmap_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 55,
+      "length": 5,
+      "tools": [
+        "intense_contrast",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_contrast_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 56,
+      "length": 5,
+      "tools": [
+        "mild_contrast",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_contrast_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 57,
+      "length": 5,
+      "tools": [
+        "auto_level",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[auto_level_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_1"
+      ],
+      "goals": []
+    },
+    {
+      "index": 58,
+      "length": 5,
+      "tools": [
+        "black_white",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[black_white_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[black_white_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 59,
+      "length": 5,
+      "tools": [
+        "negate",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[negate_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[negate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 60,
+      "length": 5,
+      "tools": [
+        "mild_bright",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[mild_bright_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[mild_bright_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 61,
+      "length": 5,
+      "tools": [
+        "intense_bright",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[intense_bright_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[intense_bright_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 62,
+      "length": 5,
+      "tools": [
+        "mild_dark",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[mild_dark_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[mild_dark_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 63,
+      "length": 5,
+      "tools": [
+        "intense_dark",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[intense_dark_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[intense_dark_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 64,
+      "length": 5,
+      "tools": [
+        "hue",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[hue_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[hue_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 65,
+      "length": 5,
+      "tools": [
+        "mild_saturate",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[mild_saturate_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[mild_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 66,
+      "length": 5,
+      "tools": [
+        "intense_blur",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[intense_blur_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[intense_blur_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 67,
+      "length": 5,
+      "tools": [
+        "intense_saturate",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[intense_saturate_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[intense_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 68,
+      "length": 5,
+      "tools": [
+        "mild_blur",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[mild_blur_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[mild_blur_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 69,
+      "length": 5,
+      "tools": [
+        "mild_sharpen",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[mild_sharpen_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[mild_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 70,
+      "length": 5,
+      "tools": [
+        "intense_sharpen",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[intense_sharpen_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[intense_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 71,
+      "length": 5,
+      "tools": [
+        "rotate_90",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[rotate_90_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[rotate_90_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 72,
+      "length": 5,
+      "tools": [
+        "append_vertically",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[append_vertically_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[append_vertically_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 73,
+      "length": 5,
+      "tools": [
+        "half_size",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[half_size_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[half_size_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 74,
+      "length": 5,
+      "tools": [
+        "overlap",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[overlap_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[overlap_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 75,
+      "length": 5,
+      "tools": [
+        "append_horizontally",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[append_horizontally_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[append_horizontally_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 76,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 77,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "alpha_filter",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[alpha_filter_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 78,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "to_bitmap",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[to_bitmap_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[to_bitmap_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 79,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "auto_level",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[auto_level_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[auto_level_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 80,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_contrast",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 81,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_contrast",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 82,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "compress",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[compress_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[compress_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 83,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "generate_canvas",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t3:in0<-wf_input_0",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[generate_canvas_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 84,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "black_white",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[black_white_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[black_white_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 85,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "negate",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[negate_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[negate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 86,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_bright",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 87,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_bright",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 88,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_dark",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 89,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_dark",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 90,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "hue",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[hue_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[hue_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 91,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_saturate",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 92,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_saturate",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 93,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_blur",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_blur_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_blur_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 94,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_blur",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 95,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_sharpen",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 96,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_sharpen",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 97,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "rotate_90",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 98,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "half_size",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[half_size_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[half_size_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 99,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "append_horizontally",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 100,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "append_vertically",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 101,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "overlap",
+        "cut",
+        "overlap",
+        "level_colors"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[overlap_out_0_port_0]",
+        "t3:in1<-t1:out[color_filter_out_0_port_0]",
+        "t4:in0<-t2:out[overlap_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-wf_input_2"
+      ],
+      "goals": []
+    },
+    {
+      "index": 102,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "generate_canvas",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t3:in0<-t2:out[generate_canvas_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 103,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "compress",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[compress_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[compress_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 104,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "auto_level",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[auto_level_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[auto_level_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 105,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_contrast",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 106,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_contrast",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 107,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "black_white",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[black_white_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[black_white_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 108,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "negate",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[negate_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[negate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 109,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_bright",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 110,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_bright",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 111,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_dark",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 112,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_dark",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 113,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "hue",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[hue_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[hue_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 114,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_saturate",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 115,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_saturate",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 116,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_blur",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_blur_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_blur_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 117,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_blur",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 118,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "mild_sharpen",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 119,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "intense_sharpen",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 120,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "rotate_90",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 121,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "half_size",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[half_size_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[half_size_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 122,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "append_horizontally",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 123,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "append_vertically",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 124,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "overlap",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_0",
+        "t3:in0<-t2:out[overlap_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[overlap_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 125,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_2",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 126,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "compress"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 127,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "to_bitmap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 128,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "auto_level"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 129,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 130,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "append_vertically"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 131,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "append_horizontally"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 132,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 133,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "black_white"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 134,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "negate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 135,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 136,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 137,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 138,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 139,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "hue"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 140,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 141,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 142,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 143,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 144,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "mild_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 145,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "intense_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 146,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "rotate_90"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 147,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "cut",
+        "overlap",
+        "level_colors",
+        "half_size"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out[color_filter_out_0_port_0]",
+        "t3:in0<-t2:out[cut_out_0_port_0]",
+        "t3:in1<-t2:out[cut_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-wf_input_1",
+        "t5:in0<-t4:out[level_colors_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 148,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "alpha_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[alpha_filter_out_0_port_0]",
+        "t5:in0<-t1:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 149,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_sharpen",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_sharpen_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 150,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "rotate_90",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[rotate_90_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 151,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "half_size",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[half_size_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[half_size_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 152,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "append_horizontally",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[append_horizontally_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 153,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "append_vertically",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[append_vertically_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 154,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "overlap",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[overlap_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[overlap_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 155,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_sharpen",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_sharpen_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 156,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_blur",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_blur_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 157,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_blur",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_blur_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 158,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_saturate",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_saturate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 159,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_saturate",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_saturate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 160,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "hue",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[hue_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[hue_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 161,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_dark",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_dark_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 162,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_dark",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_dark_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 163,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_bright",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_bright_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 164,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_bright",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_bright_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 165,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "negate",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[negate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 166,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "black_white",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[black_white_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[black_white_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 167,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "intense_contrast",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[intense_contrast_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 168,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "mild_contrast",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[mild_contrast_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 169,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "auto_level",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[auto_level_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 170,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "compress",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[compress_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[compress_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 171,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "generate_canvas",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[generate_canvas_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 172,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 173,
+      "length": 5,
+      "tools": [
+        "generate_canvas",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[generate_canvas_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 174,
+      "length": 5,
+      "tools": [
+        "mild_contrast",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_contrast_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 175,
+      "length": 5,
+      "tools": [
+        "auto_level",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[auto_level_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 176,
+      "length": 5,
+      "tools": [
+        "compress",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[compress_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 177,
+      "length": 5,
+      "tools": [
+        "to_bitmap",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[to_bitmap_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 178,
+      "length": 5,
+      "tools": [
+        "intense_contrast",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_contrast_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_contrast_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 179,
+      "length": 5,
+      "tools": [
+        "black_white",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[black_white_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 180,
+      "length": 5,
+      "tools": [
+        "negate",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[negate_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 181,
+      "length": 5,
+      "tools": [
+        "mild_bright",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_bright_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 182,
+      "length": 5,
+      "tools": [
+        "intense_bright",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_bright_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 183,
+      "length": 5,
+      "tools": [
+        "mild_dark",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_dark_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 184,
+      "length": 5,
+      "tools": [
+        "intense_dark",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_dark_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 185,
+      "length": 5,
+      "tools": [
+        "hue",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[hue_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 186,
+      "length": 5,
+      "tools": [
+        "mild_saturate",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_saturate_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 187,
+      "length": 5,
+      "tools": [
+        "intense_saturate",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_saturate_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_saturate_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 188,
+      "length": 5,
+      "tools": [
+        "mild_blur",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_blur_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_blur_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 189,
+      "length": 5,
+      "tools": [
+        "intense_blur",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_blur_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 190,
+      "length": 5,
+      "tools": [
+        "mild_sharpen",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[mild_sharpen_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 191,
+      "length": 5,
+      "tools": [
+        "intense_sharpen",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[intense_sharpen_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 192,
+      "length": 5,
+      "tools": [
+        "rotate_90",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[rotate_90_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 193,
+      "length": 5,
+      "tools": [
+        "half_size",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[half_size_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[half_size_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 194,
+      "length": 5,
+      "tools": [
+        "append_horizontally",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-t1:out[append_horizontally_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[append_horizontally_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 195,
+      "length": 5,
+      "tools": [
+        "append_vertically",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[append_vertically_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 196,
+      "length": 5,
+      "tools": [
+        "overlap",
+        "color_filter",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-t1:out[overlap_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[overlap_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 197,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "hue",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[hue_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 198,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "generate_canvas",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[generate_canvas_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 199,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_bright",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_bright_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 200,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_bright",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_bright_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 201,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_dark",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_dark_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 202,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_dark",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_dark_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 203,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_saturate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_saturate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 204,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_blur",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_blur_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 205,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_sharpen",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_sharpen_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 206,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_saturate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_saturate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 207,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "append_horizontally",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[append_horizontally_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 208,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_sharpen",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_sharpen_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 209,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "append_vertically",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[append_vertically_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 210,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "half_size",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[half_size_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 211,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_blur",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_blur_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 212,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "rotate_90",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[rotate_90_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 213,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "negate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[negate_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 214,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "black_white",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[black_white_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 215,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "compress",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[compress_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 216,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "intense_contrast",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[intense_contrast_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 217,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "mild_contrast",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[mild_contrast_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 218,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "overlap",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[overlap_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 219,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "auto_level",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[auto_level_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 220,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "to_bitmap",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t2:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[to_bitmap_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 221,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_bright",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_bright_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 222,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "level_colors",
+        "alpha_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[alpha_filter_out_0_port_0]",
+        "t5:in0<-t1:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 223,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t1:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 224,
+      "length": 5,
+      "tools": [
+        "mild_sharpen",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_sharpen_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 225,
+      "length": 5,
+      "tools": [
+        "intense_sharpen",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_sharpen_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 226,
+      "length": 5,
+      "tools": [
+        "rotate_90",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[rotate_90_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 227,
+      "length": 5,
+      "tools": [
+        "half_size",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[half_size_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 228,
+      "length": 5,
+      "tools": [
+        "append_horizontally",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-t1:out[append_horizontally_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 229,
+      "length": 5,
+      "tools": [
+        "append_vertically",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-t1:out[append_vertically_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 230,
+      "length": 5,
+      "tools": [
+        "overlap",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_0",
+        "t2:in0<-t1:out[overlap_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 231,
+      "length": 5,
+      "tools": [
+        "intense_blur",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_blur_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 232,
+      "length": 5,
+      "tools": [
+        "mild_blur",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_blur_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 233,
+      "length": 5,
+      "tools": [
+        "intense_saturate",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_saturate_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 234,
+      "length": 5,
+      "tools": [
+        "mild_saturate",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_saturate_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 235,
+      "length": 5,
+      "tools": [
+        "hue",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[hue_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 236,
+      "length": 5,
+      "tools": [
+        "intense_dark",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_dark_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 237,
+      "length": 5,
+      "tools": [
+        "mild_dark",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_dark_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 238,
+      "length": 5,
+      "tools": [
+        "intense_bright",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_bright_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 239,
+      "length": 5,
+      "tools": [
+        "mild_bright",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_bright_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 240,
+      "length": 5,
+      "tools": [
+        "negate",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[negate_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 241,
+      "length": 5,
+      "tools": [
+        "black_white",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[black_white_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 242,
+      "length": 5,
+      "tools": [
+        "intense_contrast",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[intense_contrast_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 243,
+      "length": 5,
+      "tools": [
+        "mild_contrast",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[mild_contrast_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 244,
+      "length": 5,
+      "tools": [
+        "auto_level",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[auto_level_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 245,
+      "length": 5,
+      "tools": [
+        "to_bitmap",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[to_bitmap_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 246,
+      "length": 5,
+      "tools": [
+        "compress",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out[compress_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 247,
+      "length": 5,
+      "tools": [
+        "generate_canvas",
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t2:in0<-t1:out[generate_canvas_out_0_port_0]",
+        "t2:in1<-wf_input_1",
+        "t3:in0<-wf_input_0",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 248,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t3:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 249,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "overlap",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[overlap_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 250,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "hue",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[hue_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 251,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_sharpen",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_sharpen_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 252,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "append_vertically",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[append_vertically_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 253,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "to_bitmap",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[to_bitmap_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 254,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "compress",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[compress_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 255,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "auto_level",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[auto_level_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 256,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_contrast",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_contrast_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 257,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_dark",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_dark_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 258,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_dark",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_dark_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 259,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_saturate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_saturate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 260,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_saturate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_saturate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 261,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_blur",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_blur_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 262,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "rotate_90",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[rotate_90_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 263,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "append_horizontally",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[append_horizontally_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 264,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "mild_sharpen",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[mild_sharpen_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 265,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "half_size",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[half_size_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 266,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "black_white",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[black_white_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 267,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_bright",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_bright_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 268,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_blur",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_blur_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 269,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "intense_contrast",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[intense_contrast_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 270,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "negate",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t2:out[level_colors_out_0_port_0]",
+        "t4:in0<-t3:out[negate_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 271,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "level_colors",
+        "generate_canvas",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t2:in1<-wf_input_2",
+        "t4:in0<-t3:out[generate_canvas_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t2:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 272,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "to_bitmap",
+        "color_filter",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_2",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in0<-t2:out[to_bitmap_out_0_port_0]",
+        "t3:in1<-wf_input_1",
+        "t4:in0<-t1:out[level_colors_out_0_port_0]",
+        "t4:in1<-t3:out[color_filter_out_0_port_0]",
+        "t5:in0<-t1:out[level_colors_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 273,
+      "length": 5,
+      "tools": [
+        "color_filter",
+        "to_bitmap",
+        "level_colors",
+        "cut",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-wf_input_0",
+        "t3:in0<-t2:out[to_bitmap_out_0_port_0]",
+        "t3:in1<-wf_input_2",
+        "t4:in0<-t3:out[level_colors_out_0_port_0]",
+        "t4:in1<-t1:out[color_filter_out_0_port_0]",
+        "t5:in0<-t4:out[cut_out_0_port_0]",
+        "t5:in1<-t4:out[cut_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 274,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 275,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_sharpen"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 276,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "append_horizontally"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 277,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "append_vertically"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 278,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "negate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 279,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 280,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_dark"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 281,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "hue"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 282,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 283,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "black_white"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 284,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_saturate"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 285,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 286,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 287,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 288,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_bright"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 289,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "rotate_90"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 290,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "intense_blur"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 291,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "mild_contrast"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 292,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "auto_level"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 293,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "half_size"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 294,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "to_bitmap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 295,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "compress"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    },
+    {
+      "index": 296,
+      "length": 5,
+      "tools": [
+        "level_colors",
+        "color_filter",
+        "cut",
+        "overlap",
+        "overlap"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t1:in1<-wf_input_1",
+        "t2:in0<-t1:out[level_colors_out_0_port_0]",
+        "t2:in1<-wf_input_2",
+        "t3:in0<-t1:out[level_colors_out_0_port_0]",
+        "t3:in1<-t2:out[color_filter_out_0_port_0]",
+        "t4:in0<-t3:out[cut_out_0_port_0]",
+        "t4:in1<-t3:out[cut_out_0_port_0]",
+        "t5:in0<-t4:out[overlap_out_0_port_0]",
+        "t5:in1<-t4:out[overlap_out_0_port_0]"
+      ],
+      "goals": []
+    }
+  ]
+}

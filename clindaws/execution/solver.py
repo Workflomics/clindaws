@@ -28,17 +28,7 @@ BaseGroundingCallback = Callable[[float, float], None] | None
 HorizonRecordCallback = Callable[[HorizonRecord], None] | None
 
 
-SINGLE_SHOT_OVERLAY_PREFIX = """
-#show tool_at_time/2.
-#show ape_bind/3.
-#show ape_holds_dim/3.
-
-ape_bind(T, Port, WF) :- occurs(T, bind(_, Port, WF)).
-ape_holds_dim(WF, V, Cat) :- holds(0, avail(WF)), holds(0, dim(WF, V, Cat)).
-ape_holds_dim(out(T, Tool, Port), V, Cat) :-
-    occurs(T, output(Tool, _, Port)),
-    holds(T, dim(out(T, Tool, Port), V, Cat)).
-"""
+SINGLE_SHOT_OVERLAY_PREFIX = ""
 
 
 def _single_shot_overlay(min_length: int, horizon: int) -> str:
@@ -46,8 +36,7 @@ def _single_shot_overlay(min_length: int, horizon: int) -> str:
         SINGLE_SHOT_OVERLAY_PREFIX,
         f":- not holds({horizon}, goal).",
         ":- occurs(T, run(_)), not occurs(T-1, run(_)), T > 1.",
-        ":- holds(T-1, goal), occurs(T, run(_)).",
-        ":- time(T), 2 { occurs(T, run(_)) }.",
+        ":- occurs(T, run(ToolA)), occurs(T, run(ToolB)), ToolA < ToolB.",
     ]
     if min_length > 1:
         overlay.append(f":- holds({min_length - 1}, goal).")
@@ -80,7 +69,7 @@ def _projection_runtime_facts(*, mode: str, project_models: bool) -> str:
     """Return runtime fact toggles derived from the chosen solve policy."""
 
     facts: list[str] = []
-    if mode == "multi-shot" and not project_models:
+    if mode in {"multi-shot", "single-shot"} and not project_models:
         facts.append("full_workflow_input_witnesses.\n")
     return "".join(facts)
 
@@ -110,29 +99,9 @@ class GroundingOutput:
 
 
 def _single_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
-    base = ENCODINGS_ROOT / "single_shot"
-    return (
-        base / "show.lp",
-        base / ("pre_compute_python.lp" if optimized else "pre_compute.lp"),
-        base / "propagation.lp",
-
-        base / ("tool_choice_python.lp" if optimized else "tool_choice.lp"),
-        base / "output_production.lp",
-        base / "reachability.lp",
-        base / "goal.lp",
-        base / "usefulness.lp",
-        base / "constraints.lp",
-        base / "tool_taxonomy_logic.lp",
-        base / "user_constraints.lp",
-        base / "generated_constraints.lp",
-        base / "plan_constraints.lp",
-        base / "temporal_constraint.lp",
-        base / "artifact_precedes.lp",
-        base / "tool_inclusion_constraints.lp",
-
-        base / "input_usage_constraints.lp",
-        base / "output_usage_constraints.lp",
-    )
+    if optimized:
+        raise ValueError("--optimized is not yet supported for single-shot.")
+    return _multi_shot_program_paths()
 
 
 def _multi_shot_program_paths() -> tuple[Path, ...]:
@@ -400,6 +369,29 @@ def _multi_shot_grounding_horizon_parts(
     if horizon == 1:
         parts.append(("init", ()))
     parts.append(("step", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
+def _single_shot_horizon_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    if horizon == 1:
+        parts.append(("init", ()))
+    parts.append(("step", (clingo.Number(horizon),)))
+    parts.append(("constraint_step", (clingo.Number(horizon),)))
+    return tuple(parts)
+
+
+def _single_shot_full_ground_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = [("init", ())]
+    for current_horizon in range(1, horizon + 1):
+        parts.append(("step", (clingo.Number(current_horizon),)))
+        parts.append(("constraint_step", (clingo.Number(current_horizon),)))
+    parts.append(("check", (clingo.Number(horizon),)))
+    parts.append(("single_shot", ()))
     return tuple(parts)
 
 
@@ -873,7 +865,7 @@ def _solve_single_shot_once(
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
-    """Ground once with time(1..max_length) and solve in a single shot."""
+    """Ground the plain multi-shot programs once and solve at max horizon."""
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
@@ -890,14 +882,17 @@ def _solve_single_shot_once(
     for program_path in program_paths:
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    runtime_facts = _projection_runtime_facts(mode="single-shot", project_models=project_models)
+    if runtime_facts:
+        control.add("base", [], runtime_facts)
     if facts.python_precomputed_facts:
         control.add("base", [], facts.python_precomputed_facts)
-    control.add("base", [], f"time(1..{horizon}).\n")
-    control.add("base", [], static_overlay)
+    control.add("single_shot", [], static_overlay)
 
     ground_elapsed = 0.0
     solve_elapsed = 0.0
     base_grounding_peak_rss_mb = 0.0
+    base_grounding_sec = 0.0
     models_seen = 0
     models_stored = 0
     unique_workflows_seen = 0
@@ -906,17 +901,40 @@ def _solve_single_shot_once(
     shown_symbols_sec = 0.0
     workflow_signature_key_sec = 0.0
     canonicalization_sec = 0.0
+    grounding_parts: list[tuple[str, float]] = []
+    seen_unique_keys: set[tuple[object, ...]] = set()
 
     try:
         with _interrupt_guard(control) as is_interrupted:
             _report(progress_callback, "Step 2: grounding started.")
-            _report(progress_callback, f"Grounding: single-shot (time 1..{horizon})...")
+            _report(progress_callback, "Grounding: base program...")
             start = perf_counter()
             _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
-            ground_elapsed = perf_counter() - start
+            base_grounding_sec = perf_counter() - start
+            ground_elapsed = base_grounding_sec
             base_grounding_peak_rss_mb = current_peak_rss_mb()
             if base_grounding_callback is not None:
-                base_grounding_callback(ground_elapsed, base_grounding_peak_rss_mb)
+                base_grounding_callback(base_grounding_sec, base_grounding_peak_rss_mb)
+            _report(
+                progress_callback,
+                f"Grounding progress: base program finished after {base_grounding_sec:.3f}s.",
+            )
+            full_ground_parts = _single_shot_full_ground_parts(horizon)
+            _report(progress_callback, f"Grounding: single-shot full program (1..{horizon})...")
+            start = perf_counter()
+            _run_interruptible(
+                lambda: control.ground(
+                    [(name, list(args)) for name, args in full_ground_parts]
+                ),
+                is_interrupted,
+            )
+            full_ground_elapsed = perf_counter() - start
+            ground_elapsed += full_ground_elapsed
+            grounding_parts.append(("single_shot_full", full_ground_elapsed))
+            _report(
+                progress_callback,
+                f"Grounding progress: single-shot full program finished after {full_ground_elapsed:.3f}s.",
+            )
             _report(
                 progress_callback,
                 f"Grounding progress: single-shot finished after {ground_elapsed:.3f}s.",
@@ -925,6 +943,8 @@ def _solve_single_shot_once(
             _report(progress_callback, "Step 3: solving started.")
             _report(progress_callback, "Solving: single-shot...")
             start = perf_counter()
+            query_symbol = clingo.Function("query", [clingo.Number(horizon)])
+            control.assign_external(query_symbol, True)
 
             def _solve() -> None:
                 nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
@@ -940,29 +960,48 @@ def _solve_single_shot_once(
                         sample_start = perf_counter()
                         workflow_key = extract_workflow_signature_key(shown_symbols)
                         workflow_signature_key_sec += perf_counter() - sample_start
-                        
-                        if workflow_key not in stored_unique_keys:
+                        workflow_length = workflow_signature_length(workflow_key)
+                        in_length_window = (
+                            config.solution_length_min
+                            <= workflow_length
+                            <= config.solution_length_max
+                        )
+                        if workflow_key not in seen_unique_keys:
+                            seen_unique_keys.add(workflow_key)
                             unique_workflows_seen += 1
-                            if len(unique_solutions) < config.solutions:
-                                unique_workflows_stored += 1
-                                stored_unique_keys.add(workflow_key)
-                                sample_start = perf_counter()
-                                unique_solutions.append(
-                                    canonicalize_shown_symbols(shown_symbols, tool_input_signatures)
-                                )
-                                canonicalization_sec += perf_counter() - sample_start
-                                if capture_raw_models:
-                                    raw_solutions.append(shown_symbols)
-                                    models_stored += 1
-                        else:
-                            unique_workflows_seen += 1
+
+                        store_raw = (
+                            in_length_window
+                            and capture_raw_models
+                            and len(raw_solutions) < config.solutions
+                        )
+                        store_unique = (
+                            in_length_window
+                            and workflow_key not in stored_unique_keys
+                            and len(unique_solutions) < config.solutions
+                        )
+                        if store_raw:
+                            raw_solutions.append(shown_symbols)
+                            models_stored += 1
+                        if store_unique:
+                            unique_workflows_stored += 1
+                            stored_unique_keys.add(workflow_key)
+                            sample_start = perf_counter()
+                            unique_solutions.append(
+                                canonicalize_shown_symbols(shown_symbols, tool_input_signatures)
+                            )
+                            canonicalization_sec += perf_counter() - sample_start
 
                         model_callback_sec += perf_counter() - callback_start
                         if len(unique_solutions) >= config.solutions:
                             break
 
-            _run_interruptible(_solve, is_interrupted)
-            solve_elapsed = perf_counter() - start
+            try:
+                _run_interruptible(_solve, is_interrupted)
+                solve_elapsed = perf_counter() - start
+            finally:
+                control.release_external(query_symbol)
+                control.cleanup()
             _report(
                 progress_callback,
                 f"Solving progress: single-shot finished after {solve_elapsed:.3f}s, "
@@ -990,6 +1029,7 @@ def _solve_single_shot_once(
         shown_symbols_sec=shown_symbols_sec,
         workflow_signature_key_sec=workflow_signature_key_sec,
         canonicalization_sec=canonicalization_sec,
+        grounding_parts=tuple(grounding_parts),
     )
     if horizon_record_callback is not None:
         horizon_record_callback(record)
@@ -998,7 +1038,7 @@ def _solve_single_shot_once(
         raw_solutions=tuple(raw_solutions),
         solutions=tuple(unique_solutions),
         base_grounding_peak_rss_mb=base_grounding_peak_rss_mb,
-        base_grounding_sec=ground_elapsed,
+        base_grounding_sec=base_grounding_sec,
         grounding_sec=ground_elapsed,
         solving_sec=solve_elapsed,
         horizon_records=(record,),
@@ -1041,14 +1081,23 @@ def ground_single_shot(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
 ) -> GroundingOutput:
-    """Ground the single-shot encoding without solving."""
+    """Ground the one-shot single-shot backend without solving."""
 
     control = _make_grounding_control()
     for program_path in _single_shot_program_paths(optimized=facts.python_precompute_enabled):
         control.load(str(program_path))
     control.add("base", [], facts.facts)
+    runtime_facts = _projection_runtime_facts(mode="single-shot", project_models=False)
+    if runtime_facts:
+        control.add("base", [], runtime_facts)
     if facts.python_precomputed_facts:
         control.add("base", [], facts.python_precomputed_facts)
+    if stage == "full":
+        control.add(
+            "single_shot",
+            [],
+            _single_shot_overlay(config.solution_length_min, config.solution_length_max),
+        )
 
     total_grounding = 0.0
     base_grounding_peak_rss_mb = 0.0
@@ -1072,17 +1121,27 @@ def ground_single_shot(
 
             if stage == "full":
                 horizon = config.solution_length_max
-                control.add("base", [], f"time(1..{horizon}).\n")
-                control.add("base", [], _single_shot_overlay(config.solution_length_min, horizon))
-                _report(progress_callback, f"Grounding: single-shot (time 1..{horizon})...")
+                grounding_parts: list[tuple[str, float]] = []
+                full_ground_parts = _single_shot_full_ground_parts(horizon)
+                _report(progress_callback, f"Grounding: single-shot full program (1..{horizon})...")
                 start = perf_counter()
-                _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
-                elapsed = perf_counter() - start
-                total_grounding += elapsed
+                _run_interruptible(
+                    lambda: control.ground(
+                        [(name, list(args)) for name, args in full_ground_parts]
+                    ),
+                    is_interrupted,
+                )
+                full_ground_elapsed = perf_counter() - start
+                total_grounding += full_ground_elapsed
+                grounding_parts.append(("single_shot_full", full_ground_elapsed))
+                _report(
+                    progress_callback,
+                    f"Grounding progress: single-shot full program finished after {full_ground_elapsed:.3f}s.",
+                )
                 grounded_horizons.append(horizon)
                 record = HorizonRecord(
                     horizon=horizon,
-                    grounding_sec=elapsed,
+                    grounding_sec=total_grounding - base_grounding_sec,
                     solving_sec=0.0,
                     peak_rss_mb=current_peak_rss_mb(),
                     satisfiable=False,
@@ -1090,13 +1149,14 @@ def ground_single_shot(
                     models_stored=0,
                     unique_workflows_seen=0,
                     unique_workflows_stored=0,
+                    grounding_parts=tuple(grounding_parts),
                 )
                 horizon_records.append(record)
                 if horizon_record_callback is not None:
                     horizon_record_callback(record)
                 _report(
                     progress_callback,
-                    f"Grounding progress: single-shot finished after {elapsed:.3f}s.",
+                    f"Grounding progress: single-shot finished after {total_grounding:.3f}s.",
                 )
             elif stage != "base":
                 raise ValueError(f"Unsupported ground-only stage: {stage}")

@@ -119,7 +119,10 @@ class RunnerSummaryTests(unittest.TestCase):
         )
 
         with (
-            patch("clindaws.execution.runner._legacy_direct_bundle", return_value=direct_bundle) as legacy_bundle,
+            patch(
+                "clindaws.execution.runner._ape_multi_shot_direct_bundle",
+                return_value=direct_bundle,
+            ) as legacy_bundle,
             patch(
                 "clindaws.execution.runner.load_candidate_tool_annotations",
                 return_value=("candidate_tool",),
@@ -141,7 +144,12 @@ class RunnerSummaryTests(unittest.TestCase):
                 max_workers=7,
             )
 
-        legacy_bundle.assert_called_once_with(config, ontology, ("direct_tool",))
+        legacy_bundle.assert_called_once_with(
+            config,
+            ontology,
+            ("direct_tool",),
+            internal_solver_mode="multi-shot",
+        )
         load_candidates.assert_called_once_with("/tmp/tools.json", "ont:")
         compressed_candidate_bundle.assert_called_once_with(
             config,
@@ -174,13 +182,52 @@ class RunnerSummaryTests(unittest.TestCase):
         self.assertTrue(paths)
         self.assertTrue(all("multi_shot_compressed_candidate" not in str(path) for path in paths))
 
-    def test_program_paths_map_single_shot_to_clindaws_encoding_home(self) -> None:
+    def test_program_paths_map_single_shot_to_plain_multi_shot_backend(self) -> None:
         paths = program_paths_for_mode("single-shot", optimized=False)
 
         self.assertTrue(paths)
-        self.assertTrue(all("clindaws/encodings/single_shot" in str(path) for path in paths))
-        self.assertTrue(all("/encodings/single_shot" in str(path) for path in paths))
-        self.assertTrue(all("/snakeAPE/encodings/single_shot" not in str(path) for path in paths))
+        self.assertTrue(all("clindaws/encodings/multi_shot" in str(path) for path in paths))
+        self.assertTrue(all("multi_shot_compressed_candidate" not in str(path) for path in paths))
+
+    def test_single_shot_uses_ape_multi_shot_translation_pathway(self) -> None:
+        self.assertEqual(_mode_config("single-shot").translation_pathway, "ape_multi_shot")
+
+    def test_select_fact_bundle_uses_multi_shot_direct_builder_for_single_shot(self) -> None:
+        config = SimpleNamespace(
+            tool_annotations_path="/tmp/tools.json",
+            ontology_prefix="ont:",
+        )
+        ontology = object()
+        single_shot_bundle = _fact_bundle(
+            internal_schema="legacy_direct",
+            internal_solver_mode="single-shot",
+        )
+
+        with (
+            patch(
+                "clindaws.execution.runner.build_fact_bundle_ape_multi_shot",
+                return_value=single_shot_bundle,
+            ) as build_bundle,
+            patch(
+                "clindaws.execution.runner.apply_precompute",
+                return_value=single_shot_bundle,
+            ) as apply_precompute,
+        ):
+            fact_bundle, resolved_translation_builder = _select_fact_bundle(
+                mode_config=_mode_config("single-shot"),
+                mode="single-shot",
+                config=config,
+                ontology=ontology,
+                tools=("multi_shot_tool",),
+                optimized=False,
+                effective_translation_strategy="ape_clingo_legacy",
+                progress_callback=None,
+            )
+
+        build_bundle.assert_called_once_with(config, ontology, ("multi_shot_tool",))
+        apply_precompute.assert_called_once()
+        self.assertEqual(fact_bundle.internal_solver_mode, "single-shot")
+        self.assertEqual(resolved_translation_builder, "runtime_legacy")
 
     def test_run_ground_only_supports_single_shot(self) -> None:
         config = SimpleNamespace(

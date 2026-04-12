@@ -98,7 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="Enable the optimized backend. For multi-shot this uses the compressed-candidate optimizer; for single-shot it enables direct Python precompute.",
+        help="Enable the optimized backend. For multi-shot this uses the compressed-candidate optimizer. Single-shot optimized mode is not implemented yet.",
     )
     parser.add_argument(
         "--translation-workers",

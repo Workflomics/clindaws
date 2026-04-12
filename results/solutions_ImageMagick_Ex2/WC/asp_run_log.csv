@@ -1,1 +1,11 @@
 test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+Example2,single-shot,5,false,,false,6,7,0,43.83,0,0,0,true,false
+Example2,single-shot,5,false,,false,6,8,0,43.78,0,0,0,true,false
+Example2,single-shot,5,false,,false,6,371,20732,44.19,17456,1000,296,true,false
+Example2,multi-shot,1,false,,false,8,17,1,49.38,0,0,0,true,false
+Example2,multi-shot,2,false,,false,8,23,7,58.09,0,0,0,true,false
+Example2,multi-shot,3,false,,false,8,46,22,84.33,0,0,0,true,false
+Example2,multi-shot,4,false,,false,8,78,85,129.05,54,54,3,true,false
+Example2,multi-shot,5,false,,false,8,114,14599,190.58,17510,1000,296,true,false
+Example2,single-shot,5,false,,false,10,402,18639,44.03,17456,1000,296,true,false
+Example2,single-shot,5,false,,false,9,219,11935,44.27,17456,1000,296,true,false

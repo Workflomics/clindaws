@@ -1,0 +1,13 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+defect_concentration,multi-shot,1,false,,false,13,15,1,45.44,0,0,0,true,false
+defect_concentration,multi-shot,2,false,,false,13,7,1,45.95,0,0,0,true,false
+defect_concentration,multi-shot,3,false,,false,13,7,1,46.58,0,0,0,true,false
+defect_concentration,multi-shot,4,false,,false,13,11,3,49.42,0,0,0,true,false
+defect_concentration,multi-shot,5,false,,false,13,15,5,52.77,0,0,0,true,false
+defect_concentration,multi-shot,6,false,,false,13,21,8,58.61,0,0,0,true,false
+defect_concentration,multi-shot,7,false,,false,13,29,12,70.16,0,0,0,true,false
+defect_concentration,multi-shot,8,false,,false,13,36,19,81.19,0,0,0,true,false
+defect_concentration,multi-shot,9,false,,false,13,44,226,98.27,336,336,126,true,false
+defect_concentration,multi-shot,10,false,,false,13,58,1959,128.92,3120,1500,1080,true,false
+defect_concentration,single-shot,10,false,,false,7,440,3690,43.05,2784,1500,1080,true,false
+defect_concentration,single-shot,10,false,,false,12,388,2867,43.28,2784,1500,1080,true,false

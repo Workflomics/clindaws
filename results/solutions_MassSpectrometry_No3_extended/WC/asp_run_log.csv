@@ -1,0 +1,6 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+No3,multi-shot,4,false,,false,281,2377,26499,1446.20,5768,1000,44,true,false
+No3,multi-shot,4,true,"6,compete",true,361,872,679,616.53,60,60,44,true,false
+No3,multi-shot,5,true,"6,compete",true,359,1929,3651,1395.53,1530,1000,878,true,false
+No3,multi-shot,5,true,"6,compete",true,403,2496,4515,1511.45,1530,1000,878,true,false
+No3,multi-shot,5,true,"6,compete",true,372,2287,3851,1514.20,1530,1000,878,true,false

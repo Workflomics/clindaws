@@ -1,0 +1,5 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+metaCascabel,multi-shot,17,false,,false,36,474,4693,1024.66,72,72,18,true,false
+metaCascabel,single-shot,17,false,,false,27,3188,3622,53.03,72,72,18,true,false
+metaCascabel,single-shot,17,false,,false,33,1823,2143,53.92,72,72,18,true,false
+metaCascabel,single-shot,17,false,,false,33,789,1169,54.22,72,72,18,true,false

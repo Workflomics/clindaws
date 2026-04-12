@@ -1,0 +1,220 @@
+{
+  "mode": "multi-shot",
+  "grounding_strategy": "hybrid",
+  "internal_schema": "legacy_direct_check_precompute",
+  "internal_solver_mode": "multi-shot",
+  "earliest_solution_step": 1,
+  "effective_solve_start_horizon": 1,
+  "python_precompute_enabled": false,
+  "python_precompute_fact_count": 70,
+  "python_precompute_stats": {
+    "precompute_plain_output_port_candidate_categories_compressed": 0,
+    "precompute_plain_output_port_candidate_categories_requiring_check": 0,
+    "precompute_plain_output_port_candidate_categories_retained": 70,
+    "precompute_plain_output_port_candidates": 70,
+    "precompute_plain_output_port_candidates_dense": 70,
+    "precompute_plain_output_port_candidates_dropped": 0,
+    "precompute_plain_output_port_candidates_requiring_check": 0
+  },
+  "backend_stats": {},
+  "workflow_input_compression": {
+    "workflow_input_collapsed_members": 1,
+    "workflow_input_equivalence_classes": 2,
+    "workflow_input_planner_visible_count_compressed": 3,
+    "workflow_input_planner_visible_count_uncompressed": 3,
+    "workflow_input_planner_visible_reduction_if_compressed": 0,
+    "workflow_input_repeated_equivalence_classes": 1,
+    "workflow_input_slots": 2,
+    "workflow_input_compression_active": false,
+    "workflow_input_planner_visible_count_effective": 3
+  },
+  "solve_callback_profile": {
+    "model_callback_sec": 1.9680413666646928,
+    "shown_symbols_sec": 1.3046792533714324,
+    "workflow_signature_key_sec": 0.5925292188767344,
+    "canonicalization_sec": 0.055937324883416295,
+    "other_callback_sec": 0.014895569533109665,
+    "model_callback_share_of_solving_sec": 0.13374760845062947
+  },
+  "effective_parallel_mode": null,
+  "translation_peak_rss_mb": 38.734375,
+  "base_grounding_peak_rss_mb": 44.5625,
+  "base_grounding_sec": 0.007806292036548257,
+  "timed_out": false,
+  "horizons": [
+    {
+      "horizon": 1,
+      "grounding_sec": 0.009256666991859674,
+      "solving_sec": 0.0012062920723110437,
+      "peak_rss_mb": 49.375,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "available_artifacts_at_step": 38,
+      "eligible_artifacts_at_step": 1075,
+      "eligible_workflow_inputs_at_step": 45,
+      "eligible_produced_outputs_at_step": 1030,
+      "bind_choice_domain_size_at_step": 45,
+      "model_callback_sec": 0.0,
+      "shown_symbols_sec": 0.0,
+      "workflow_signature_key_sec": 0.0,
+      "canonicalization_sec": 0.0,
+      "grounding_parts": [
+        [
+          "init",
+          0.0005542499711737037
+        ],
+        [
+          "step",
+          0.0056605839636176825
+        ],
+        [
+          "constraint_step",
+          0.00037650007288903
+        ],
+        [
+          "check",
+          0.0026653329841792583
+        ]
+      ]
+    },
+    {
+      "horizon": 2,
+      "grounding_sec": 0.02320520905777812,
+      "solving_sec": 0.007458915933966637,
+      "peak_rss_mb": 58.09375,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "available_artifacts_at_step": 69,
+      "eligible_artifacts_at_step": 2002,
+      "eligible_workflow_inputs_at_step": 45,
+      "eligible_produced_outputs_at_step": 1957,
+      "bind_choice_domain_size_at_step": 972,
+      "model_callback_sec": 0.0,
+      "shown_symbols_sec": 0.0,
+      "workflow_signature_key_sec": 0.0,
+      "canonicalization_sec": 0.0,
+      "grounding_parts": [
+        [
+          "step",
+          0.014469042071141303
+        ],
+        [
+          "constraint_step",
+          0.0019224999705329537
+        ],
+        [
+          "check",
+          0.006813667016103864
+        ]
+      ]
+    },
+    {
+      "horizon": 3,
+      "grounding_sec": 0.045814123935997486,
+      "solving_sec": 0.022006165934726596,
+      "peak_rss_mb": 84.328125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "available_artifacts_at_step": 104,
+      "eligible_artifacts_at_step": 3032,
+      "eligible_workflow_inputs_at_step": 45,
+      "eligible_produced_outputs_at_step": 2987,
+      "bind_choice_domain_size_at_step": 2002,
+      "model_callback_sec": 0.0,
+      "shown_symbols_sec": 0.0,
+      "workflow_signature_key_sec": 0.0,
+      "canonicalization_sec": 0.0,
+      "grounding_parts": [
+        [
+          "step",
+          0.02693241590168327
+        ],
+        [
+          "constraint_step",
+          0.003990040975622833
+        ],
+        [
+          "check",
+          0.014891667058691382
+        ]
+      ]
+    },
+    {
+      "horizon": 4,
+      "grounding_sec": 0.07764804211910814,
+      "solving_sec": 0.08539891697000712,
+      "peak_rss_mb": 129.046875,
+      "satisfiable": true,
+      "models_seen": 54,
+      "models_stored": 54,
+      "unique_workflows_seen": 3,
+      "unique_workflows_stored": 3,
+      "available_artifacts_at_step": 139,
+      "eligible_artifacts_at_step": 4062,
+      "eligible_workflow_inputs_at_step": 45,
+      "eligible_produced_outputs_at_step": 4017,
+      "bind_choice_domain_size_at_step": 3032,
+      "model_callback_sec": 0.005135921412147582,
+      "shown_symbols_sec": 0.0027609631652012467,
+      "workflow_signature_key_sec": 0.001646373770199716,
+      "canonicalization_sec": 0.000668209046125412,
+      "grounding_parts": [
+        [
+          "step",
+          0.042934833094477654
+        ],
+        [
+          "constraint_step",
+          0.0065337090054526925
+        ],
+        [
+          "check",
+          0.028179500019177794
+        ]
+      ]
+    },
+    {
+      "horizon": 5,
+      "grounding_sec": 0.11393087496981025,
+      "solving_sec": 14.598520791972987,
+      "peak_rss_mb": 190.578125,
+      "satisfiable": true,
+      "models_seen": 17456,
+      "models_stored": 946,
+      "unique_workflows_seen": 296,
+      "unique_workflows_stored": 293,
+      "available_artifacts_at_step": 174,
+      "eligible_artifacts_at_step": 5092,
+      "eligible_workflow_inputs_at_step": 45,
+      "eligible_produced_outputs_at_step": 5047,
+      "bind_choice_domain_size_at_step": 4062,
+      "model_callback_sec": 1.9629054452525452,
+      "shown_symbols_sec": 1.3019182902062312,
+      "workflow_signature_key_sec": 0.5908828451065347,
+      "canonicalization_sec": 0.05526911583729088,
+      "grounding_parts": [
+        [
+          "step",
+          0.05894054193049669
+        ],
+        [
+          "constraint_step",
+          0.010760792065411806
+        ],
+        [
+          "check",
+          0.04422954097390175
+        ]
+      ]
+    }
+  ]
+}

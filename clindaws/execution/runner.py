@@ -101,8 +101,8 @@ class _ModeConfig:
 _MODE_CONFIGS = {
     "single-shot": _ModeConfig(
         solver_family="single-shot",
-        solver_approach="legacy",
-        translation_pathway="normal",
+        solver_approach="one-shot",
+        translation_pathway="ape_multi_shot",
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
@@ -1139,14 +1139,29 @@ def _effective_parallel_mode(
     return f"{workers},compete"
 
 
+def _ape_multi_shot_direct_bundle(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools,
+    *,
+    internal_solver_mode: str,
+):
+    return replace(
+        build_fact_bundle_ape_multi_shot(config, ontology, tools),
+        internal_schema="legacy_direct",
+        internal_solver_mode=internal_solver_mode,
+    )
+
+
 def _legacy_direct_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools,
 ):
-    return replace(
-        build_fact_bundle_ape_multi_shot(config, ontology, tools),
-        internal_schema="legacy_direct",
+    return _ape_multi_shot_direct_bundle(
+        config,
+        ontology,
+        tools,
         internal_solver_mode="multi-shot",
     )
 
@@ -1209,8 +1224,15 @@ def _select_fact_bundle(
     resolved_translation_builder = mode_config.translation_builder
 
     if mode_config.translation_pathway == "ape_multi_shot":
-        fact_bundle = _legacy_direct_bundle(config, ontology, tools)
+        fact_bundle = _ape_multi_shot_direct_bundle(
+            config,
+            ontology,
+            tools,
+            internal_solver_mode="single-shot" if mode == "single-shot" else "multi-shot",
+        )
         if optimized:
+            if mode == "single-shot":
+                raise ValueError("--optimized is not yet supported for single-shot.")
             compressed_candidate_tools = load_candidate_tool_annotations(
                 config.tool_annotations_path,
                 config.ontology_prefix,
@@ -1282,8 +1304,10 @@ def _prepare_run_context(
     """Load config and build the fact bundle for a run."""
 
     mode_config = _mode_config(mode)
-    if optimized and mode not in {"single-shot", "multi-shot"}:
-        raise ValueError("--optimized supports only single-shot and multi-shot.")
+    if optimized and mode == "single-shot":
+        raise ValueError("--optimized is not yet supported for single-shot.")
+    if optimized and mode != "multi-shot":
+        raise ValueError("--optimized supports only multi-shot.")
     config = load_config(config_path)
     config = config.model_copy(update={
         "solutions": solutions if solutions is not None else config.solutions,

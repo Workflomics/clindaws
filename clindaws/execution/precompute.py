@@ -1159,7 +1159,7 @@ def apply_precompute(
     if mode not in {"single-shot", "multi-shot"}:
         return fact_bundle
 
-    if not optimized_programs and mode != "multi-shot":
+    if not optimized_programs and mode not in {"single-shot", "multi-shot"}:
         return fact_bundle
 
     parsed = _parse_direct_facts(fact_bundle.facts)
