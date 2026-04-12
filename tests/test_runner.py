@@ -7,6 +7,7 @@ from clindaws.core.models import FactBundle, HorizonRecord
 from clindaws.execution.runner import (
     COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
     RunContext,
+    _effective_parallel_mode,
     _mode_config,
     _select_fact_bundle,
     _solve_callback_profile_payload,
@@ -144,6 +145,12 @@ class RunnerSummaryTests(unittest.TestCase):
         self.assertTrue(paths)
         self.assertTrue(all("multi_shot_compressed_candidate" in str(path) for path in paths))
 
+    def test_program_paths_map_plain_multi_shot_to_direct_backend(self) -> None:
+        paths = program_paths_for_mode("multi-shot", optimized=False)
+
+        self.assertTrue(paths)
+        self.assertTrue(all("multi_shot_compressed_candidate" not in str(path) for path in paths))
+
     def test_run_once_timeout_returns_without_writing_run_artifacts(self) -> None:
         config = SimpleNamespace(
             timeout_sec=10.0,
@@ -194,6 +201,20 @@ class RunnerSummaryTests(unittest.TestCase):
         self.assertIsNone(result.run_summary_path)
         self.assertIsNone(result.answer_set_path)
         self.assertIsNone(result.workflow_signature_path)
+
+    def test_effective_parallel_mode_defaults_to_six_compete_for_large_optimized_multi_shot(self) -> None:
+        fact_bundle = _fact_bundle(internal_schema="compressed_candidate_optimized")
+        fact_bundle = FactBundle(
+            **{
+                **fact_bundle.__dict__,
+                "tool_labels": {f"tool_{index}": f"Tool {index}" for index in range(200)},
+            }
+        )
+
+        with patch("clindaws.execution.runner.os.cpu_count", return_value=12):
+            effective_parallel_mode = _effective_parallel_mode("multi-shot", None, fact_bundle)
+
+        self.assertEqual(effective_parallel_mode, "6,compete")
 
 
 if __name__ == "__main__":

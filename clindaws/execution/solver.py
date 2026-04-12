@@ -1143,7 +1143,7 @@ def solve_multi_shot(
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _multi_shot_program_paths(optimized=facts.python_precompute_enabled),
+        _multi_shot_program_paths(),
         mode="multi-shot",
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
@@ -1169,7 +1169,7 @@ def ground_multi_shot(
     """Ground the multi-shot encoding without solving."""
 
     control = _make_grounding_control()
-    for program_path in _multi_shot_program_paths(optimized=facts.python_precompute_enabled):
+    for program_path in _multi_shot_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     if facts.python_precomputed_facts:

@@ -1130,7 +1130,7 @@ def _effective_parallel_mode(
     cpu_count = os.cpu_count() or 1
     if cpu_count < 2 or len(fact_bundle.tool_labels) < 200:
         return None
-    workers = min(cpu_count, 4)
+    workers = min(cpu_count, 6)
     return f"{workers},compete"
 
 
