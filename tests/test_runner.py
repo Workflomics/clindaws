@@ -8,9 +8,11 @@ from clindaws.execution.runner import (
     COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
     RunContext,
     _effective_parallel_mode,
+    _load_tools_for_mode,
     _mode_config,
     _select_fact_bundle,
     _solve_callback_profile_payload,
+    run_ground_only,
     run_once,
 )
 from clindaws.execution.solver import program_paths_for_mode
@@ -34,6 +36,27 @@ def _fact_bundle(*, internal_schema: str = "", internal_solver_mode: str = "") -
 
 
 class RunnerSummaryTests(unittest.TestCase):
+    def test_load_tools_for_plain_multi_shot_preserves_duplicate_outputs(self) -> None:
+        config = SimpleNamespace(
+            tool_annotations_path="/tmp/tools.json",
+            ontology_prefix="ont:",
+        )
+
+        with (
+            patch(
+                "clindaws.execution.runner.load_multi_shot_tool_annotations",
+                return_value=("multi_shot_tool",),
+            ) as load_multi_shot,
+            patch("clindaws.execution.runner.load_direct_tool_annotations") as load_direct,
+            patch("clindaws.execution.runner.load_candidate_tool_annotations") as load_candidate,
+        ):
+            tools = _load_tools_for_mode(config, "ape_multi_shot")
+
+        load_multi_shot.assert_called_once_with("/tmp/tools.json", "ont:")
+        load_direct.assert_not_called()
+        load_candidate.assert_not_called()
+        self.assertEqual(tools, ("multi_shot_tool",))
+
     def test_solve_callback_profile_aggregates_horizon_timings(self) -> None:
         payload = _solve_callback_profile_payload(
             (
@@ -150,6 +173,73 @@ class RunnerSummaryTests(unittest.TestCase):
 
         self.assertTrue(paths)
         self.assertTrue(all("multi_shot_compressed_candidate" not in str(path) for path in paths))
+
+    def test_program_paths_map_single_shot_to_clindaws_encoding_home(self) -> None:
+        paths = program_paths_for_mode("single-shot", optimized=False)
+
+        self.assertTrue(paths)
+        self.assertTrue(all("clindaws/encodings/single_shot" in str(path) for path in paths))
+        self.assertTrue(all("/encodings/single_shot" in str(path) for path in paths))
+        self.assertTrue(all("/snakeAPE/encodings/single_shot" not in str(path) for path in paths))
+
+    def test_run_ground_only_supports_single_shot(self) -> None:
+        config = SimpleNamespace(
+            solutions_dir_path=Path("/tmp/single-shot-ground-only"),
+            solution_length_max=4,
+            debug_mode=False,
+            config_path=Path("/tmp/dummy-config.json"),
+            ontology_path=Path("/tmp/dummy-ontology.owl"),
+            tool_annotations_path=Path("/tmp/dummy-tools.json"),
+        )
+        ctx = RunContext(
+            config=config,
+            solution_dir=Path("/tmp/single-shot-ground-only"),
+            fact_bundle=_fact_bundle(
+                internal_schema="legacy_direct",
+                internal_solver_mode="single-shot",
+            ),
+            translation_sec=0.1,
+            translation_peak_rss_mb=12.0,
+            effective_translation_strategy="hybrid",
+            resolved_translation_builder="runtime_legacy",
+            run_metadata={
+                "config_path": str(config.config_path),
+                "ontology_used": str(config.ontology_path),
+                "ontology_entry_count": 0,
+                "tool_annotation_used": str(config.tool_annotations_path),
+                "tool_count": 0,
+                "constraints_used": None,
+                "constraint_count": 0,
+            },
+        )
+        grounding_output = SimpleNamespace(
+            grounded_horizons=(4,),
+            horizon_records=(),
+            base_grounding_peak_rss_mb=0.0,
+            base_grounding_sec=0.2,
+            grounding_sec=0.3,
+        )
+
+        with (
+            patch("clindaws.execution.runner._prepare_run_context", return_value=ctx),
+            patch(
+                "clindaws.execution.runner._write_translation_summary",
+                return_value=(Path("/tmp/translation_summary.json"), {}),
+            ),
+            patch(
+                "clindaws.execution.runner._GROUNDER_DISPATCH",
+                {"single-shot": lambda *args, **kwargs: grounding_output},
+            ),
+        ):
+            result = run_ground_only(
+                "dummy-config.json",
+                mode="single-shot",
+                grounding_strategy="hybrid",
+                stage="full",
+            )
+
+        self.assertEqual(result.mode, "single-shot")
+        self.assertEqual(result.grounded_horizons, (4,))
 
     def test_run_once_timeout_returns_without_writing_run_artifacts(self) -> None:
         config = SimpleNamespace(

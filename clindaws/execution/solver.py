@@ -1032,6 +1032,86 @@ def solve_single_shot(
     )
 
 
+def ground_single_shot(
+    config: SnakeConfig,
+    facts: FactBundle,
+    *,
+    stage: str = "base",
+    progress_callback: ProgressCallback = None,
+    base_grounding_callback: BaseGroundingCallback = None,
+    horizon_record_callback: HorizonRecordCallback = None,
+) -> GroundingOutput:
+    """Ground the single-shot encoding without solving."""
+
+    control = _make_grounding_control()
+    for program_path in _single_shot_program_paths(optimized=facts.python_precompute_enabled):
+        control.load(str(program_path))
+    control.add("base", [], facts.facts)
+    if facts.python_precomputed_facts:
+        control.add("base", [], facts.python_precomputed_facts)
+
+    total_grounding = 0.0
+    base_grounding_peak_rss_mb = 0.0
+    base_grounding_sec = 0.0
+    grounded_horizons: list[int] = []
+    horizon_records: list[HorizonRecord] = []
+
+    try:
+        with _interrupt_guard(control) as is_interrupted:
+            _report(progress_callback, "Step 2: grounding started.")
+            _report(progress_callback, "Grounding: base program...")
+            start = perf_counter()
+            _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
+            elapsed = perf_counter() - start
+            total_grounding += elapsed
+            base_grounding_sec = elapsed
+            base_grounding_peak_rss_mb = current_peak_rss_mb()
+            if base_grounding_callback is not None:
+                base_grounding_callback(base_grounding_sec, base_grounding_peak_rss_mb)
+            _report(progress_callback, f"Grounding progress: base program finished after {elapsed:.3f}s.")
+
+            if stage == "full":
+                horizon = config.solution_length_max
+                control.add("base", [], f"time(1..{horizon}).\n")
+                control.add("base", [], _single_shot_overlay(config.solution_length_min, horizon))
+                _report(progress_callback, f"Grounding: single-shot (time 1..{horizon})...")
+                start = perf_counter()
+                _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
+                elapsed = perf_counter() - start
+                total_grounding += elapsed
+                grounded_horizons.append(horizon)
+                record = HorizonRecord(
+                    horizon=horizon,
+                    grounding_sec=elapsed,
+                    solving_sec=0.0,
+                    peak_rss_mb=current_peak_rss_mb(),
+                    satisfiable=False,
+                    models_seen=0,
+                    models_stored=0,
+                    unique_workflows_seen=0,
+                    unique_workflows_stored=0,
+                )
+                horizon_records.append(record)
+                if horizon_record_callback is not None:
+                    horizon_record_callback(record)
+                _report(
+                    progress_callback,
+                    f"Grounding progress: single-shot finished after {elapsed:.3f}s.",
+                )
+            elif stage != "base":
+                raise ValueError(f"Unsupported ground-only stage: {stage}")
+    finally:
+        control.cleanup()
+
+    return GroundingOutput(
+        base_grounding_peak_rss_mb=base_grounding_peak_rss_mb,
+        base_grounding_sec=base_grounding_sec,
+        grounding_sec=total_grounding,
+        grounded_horizons=tuple(grounded_horizons),
+        horizon_records=tuple(horizon_records),
+    )
+
+
 def _ground_multi_shot_control(
     control: clingo.Control,
     config: SnakeConfig,

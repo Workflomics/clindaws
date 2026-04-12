@@ -147,6 +147,45 @@ class PrecomputeTests(unittest.TestCase):
             },
         )
 
+    def test_plain_output_port_compression_distinguishes_goal_support_profiles(self) -> None:
+        compressed, stats = _compress_plain_output_port_candidates(
+            output_port_terminal_sets={
+                "port_1": {
+                    "cat_a": frozenset({"value_a", "value_b", "value_c"}),
+                },
+            },
+            port_requirements={},
+            goal_requirements={
+                "goal_1": {
+                    "cat_a": (frozenset({"value_a", "value_c"}),),
+                },
+                "goal_2": {
+                    "cat_a": (frozenset({"value_c"}),),
+                },
+            },
+        )
+
+        self.assertEqual(
+            compressed,
+            {
+                "port_1": {
+                    "cat_a": ("value_a", "value_b", "value_c"),
+                },
+            },
+        )
+        self.assertEqual(
+            stats,
+            {
+                "precompute_plain_output_port_candidate_categories_retained": 1,
+                "precompute_plain_output_port_candidate_categories_requiring_check": 1,
+                "precompute_plain_output_port_candidates_dense": 3,
+                "precompute_plain_output_port_candidates": 3,
+                "precompute_plain_output_port_candidates_dropped": 0,
+                "precompute_plain_output_port_candidate_categories_compressed": 0,
+                "precompute_plain_output_port_candidates_requiring_check": 3,
+            },
+        )
+
     def test_identical_support_profiles_do_not_require_check(self) -> None:
         writer = _FactWriter()
 

@@ -40,6 +40,7 @@ from clindaws.rendering.rendering import (
 )
 from clindaws.core.runtime_stats import current_peak_rss_mb
 from clindaws.execution.solver import (
+    ground_single_shot,
     ground_multi_shot,
     ground_multi_shot_compressed_candidate,
     program_paths_for_mode,
@@ -50,6 +51,7 @@ from clindaws.execution.solver import (
 from clindaws.core.tool_annotations import (
     load_candidate_tool_annotations,
     load_direct_tool_annotations,
+    load_multi_shot_tool_annotations,
 )
 from clindaws.translators.translator_direct import (
     build_fact_bundle,
@@ -102,7 +104,7 @@ _MODE_CONFIGS = {
         solver_approach="legacy",
         translation_pathway="normal",
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
-        supports_ground_only=False,
+        supports_ground_only=True,
     ),
     "multi-shot": _ModeConfig(
         solver_family="multi-shot",
@@ -127,6 +129,7 @@ _SOLVER_DISPATCH = {
 }
 
 _GROUNDER_DISPATCH = {
+    "single-shot": ground_single_shot,
     "multi-shot": ground_multi_shot,
     "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
@@ -165,6 +168,8 @@ def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
 def _load_tools_for_mode(config, translation_pathway: str):
     if translation_pathway == "compressed_candidate":
         return load_candidate_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
+    if translation_pathway == "ape_multi_shot":
+        return load_multi_shot_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     return load_direct_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
 
 
@@ -1769,7 +1774,7 @@ def run_ground_only(
 
     mode_config = _mode_config(mode)
     if not mode_config.supports_ground_only:
-        raise ValueError("Ground-only runs support only multi-shot mode.")
+        raise ValueError(f"Ground-only runs do not support mode {mode}.")
 
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
 

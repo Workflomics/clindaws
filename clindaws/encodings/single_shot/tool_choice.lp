@@ -1,0 +1,67 @@
+% TOOL CHOICE — run choice, input variant selection, and port binding
+% Docs: DOCS/encoding/tool_choice.md
+
+% --- Run choice ---
+{ occurs(T, run(Tool)) } :- time(T), tool(Tool), not tool_has_input(Tool).
+{ occurs(T, run(Tool)) } :- time(T), tool(Tool), tool_has_input(Tool).
+
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(T, run(Tool)). [100 - T, true]
+
+
+% --- Variant selection: exactly one input group per run ---
+1 { occurs(T, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
+    occurs(T, run(Tool)),
+    tool_has_input(Tool).
+
+occurs(T, run(Tool)) :- occurs(T, use_variant(Tool, _)).
+
+% --- Port binding: exactly one eligible item per port ---
+% Helper to project out concrete dimension 'V' from the main cross-product
+wf_provides_req(T, WF, ReqV, Cat) :-
+    holds(T, dim(WF, V, Cat)),
+    compatible(V, ReqV).
+
+% Item satisfies one category requirement of a port at time T
+port_cat_ok(T, Port, WF, Cat) :-
+    holds(T, avail(WF)),
+    port_requires(Port, ReqV, Cat),
+    wf_provides_req(T, WF, ReqV, Cat).
+
+
+% Item is eligible if ALL categories are satisfied
+eligible(T, Port, WF) :-
+    holds(T, avail(WF)),
+    input_port(_, Port),
+    port_cat_ok(T, Port, WF, Cat) : port_requires(Port, _, Cat).
+
+1 { occurs(T, bind(Tool, Port, WF)) : eligible(T-1, Port, WF) } 1 :-
+    occurs(T, use_variant(Tool, TI_ID)),
+    input_port(TI_ID, Port).
+
+:- occurs(T, use_variant(Tool, TI_ID)),
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(T, bind(Tool, PortLow, ArtifactLow)),
+   occurs(T, bind(Tool, PortHigh, ArtifactHigh)),
+   artifact_precedes(ArtifactHigh, ArtifactLow).
+
+:- occurs(T, use_variant(Tool, TI_ID)),
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(T, bind(Tool, PortLow, WF)),
+   occurs(T, bind(Tool, PortHigh, WF)),
+   workflow_input_slot(WF, Rep, _),
+   eligible(T-1, PortHigh, WFAlt),
+   workflow_input_slot(WFAlt, Rep, _),
+   WFAlt != WF.
+
+artifact_parent(out(T, Tool, PortOut), WF) :-
+    occurs(T, output(Tool, _, PortOut)),
+    occurs(T, bind(Tool, _, WF)).
+
+artifact_ancestor(Artifact, Ancestor) :-
+    artifact_parent(Artifact, Ancestor).
+
+artifact_ancestor(Artifact, Ancestor) :-
+    artifact_parent(Artifact, Mid),
+    artifact_ancestor(Mid, Ancestor).
+

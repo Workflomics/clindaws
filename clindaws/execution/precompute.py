@@ -327,6 +327,23 @@ def _compress_plain_output_port_candidates(
 ) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, int]]:
     """Compress legacy multi-shot output terminals by consumer/goal support."""
 
+    def _build_support_index(
+        requirements_by_id: Mapping[str, Mapping[str, tuple[frozenset[str], ...]]],
+    ) -> dict[str, dict[str, tuple[str, ...]]]:
+        support_index: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+        for item_id, category_requirements in sorted(requirements_by_id.items()):
+            for category, requirement_sets in sorted(category_requirements.items()):
+                supported_values = set().union(*requirement_sets) if requirement_sets else set()
+                for terminal_value in supported_values:
+                    support_index[category][terminal_value].add(item_id)
+        return {
+            category: {
+                terminal_value: tuple(sorted(item_ids))
+                for terminal_value, item_ids in sorted(value_index.items())
+            }
+            for category, value_index in sorted(support_index.items())
+        }
+
     compressed_candidates: dict[str, dict[str, tuple[str, ...]]] = {}
     dense_candidate_count = 0
     emitted_candidate_count = 0
@@ -335,6 +352,8 @@ def _compress_plain_output_port_candidates(
     retained_category_count = 0
     requiring_check_category_count = 0
     requiring_check_candidate_count = 0
+    ports_by_category_and_terminal_value = _build_support_index(port_requirements)
+    goals_by_category_and_terminal_value = _build_support_index(goal_requirements)
 
     for port_id, profile in sorted(output_port_terminal_sets.items()):
         category_candidates: dict[str, tuple[str, ...]] = {}
@@ -349,21 +368,13 @@ def _compress_plain_output_port_candidates(
 
             representatives: dict[tuple[tuple[str, ...], tuple[str, ...]], str] = {}
             for terminal_value in ordered_values:
-                supported_ports = tuple(
-                    consumer_port
-                    for consumer_port, requirements in sorted(port_requirements.items())
-                    if any(
-                        terminal_value in requirement_set
-                        for requirement_set in requirements.get(category, ())
-                    )
+                supported_ports = ports_by_category_and_terminal_value.get(category, {}).get(
+                    terminal_value,
+                    (),
                 )
-                supported_goals = tuple(
-                    goal_id
-                    for goal_id, requirements in sorted(goal_requirements.items())
-                    if any(
-                        terminal_value in requirement_set
-                        for requirement_set in requirements.get(category, ())
-                    )
+                supported_goals = goals_by_category_and_terminal_value.get(category, {}).get(
+                    terminal_value,
+                    (),
                 )
                 profile_key = (supported_ports, supported_goals)
                 current = representatives.get(profile_key)

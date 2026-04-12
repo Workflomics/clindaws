@@ -110,6 +110,21 @@ def load_direct_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...
     )
 
 
+def load_multi_shot_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
+    """Load tool annotations for plain multi-shot while preserving duplicate outputs.
+
+    Plain multi-shot uses legacy direct encodings, but duplicate output ports are
+    semantically relevant for `use_all_generated_data=ALL` and must remain
+    visible to the planner.
+    """
+
+    return load_tool_annotations(
+        path,
+        prefix,
+        dedupe_duplicate_outputs=False,
+    )
+
+
 def load_candidate_tool_annotations(path: Path, prefix: str) -> tuple[ToolMode, ...]:
     """Load tool annotations for compressed-candidate translation preserving duplicate outputs."""
 

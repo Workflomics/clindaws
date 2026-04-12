@@ -1,0 +1,2 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
+pizza_domain,single-shot,17,false,,false,7,3263,3026,1221.72,1000,1000,1000,true,false
