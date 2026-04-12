@@ -181,6 +181,10 @@ class HorizonRecord:
     eligible_workflow_inputs_at_step: int | None = None
     eligible_produced_outputs_at_step: int | None = None
     bind_choice_domain_size_at_step: int | None = None
+    model_callback_sec: float | None = None
+    shown_symbols_sec: float | None = None
+    workflow_signature_key_sec: float | None = None
+    canonicalization_sec: float | None = None
     grounding_parts: tuple[tuple[str, float], ...] = ()
 
 

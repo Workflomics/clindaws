@@ -907,6 +907,40 @@ def _workflow_input_compression_payload(
     return payload
 
 
+def _solve_callback_profile_payload(
+    records: tuple[HorizonRecord, ...],
+    *,
+    solving_sec: float,
+) -> dict[str, float] | None:
+    if not any(record.model_callback_sec is not None for record in records):
+        return None
+
+    model_callback_sec = sum(record.model_callback_sec or 0.0 for record in records)
+    shown_symbols_sec = sum(record.shown_symbols_sec or 0.0 for record in records)
+    workflow_signature_key_sec = sum(
+        record.workflow_signature_key_sec or 0.0
+        for record in records
+    )
+    canonicalization_sec = sum(record.canonicalization_sec or 0.0 for record in records)
+    other_callback_sec = max(
+        0.0,
+        model_callback_sec
+        - shown_symbols_sec
+        - workflow_signature_key_sec
+        - canonicalization_sec,
+    )
+    payload = {
+        "model_callback_sec": model_callback_sec,
+        "shown_symbols_sec": shown_symbols_sec,
+        "workflow_signature_key_sec": workflow_signature_key_sec,
+        "canonicalization_sec": canonicalization_sec,
+        "other_callback_sec": other_callback_sec,
+    }
+    if solving_sec > 0:
+        payload["model_callback_share_of_solving_sec"] = model_callback_sec / solving_sec
+    return payload
+
+
 def _translation_summary_payload(
     *,
     config: SnakeConfig,
@@ -1563,6 +1597,10 @@ def run_once(
                     mode=mode,
                     internal_solver_mode=internal_solver_mode,
                     compression_active=effective_project_models,
+                ),
+                "solve_callback_profile": _solve_callback_profile_payload(
+                    solve_output.horizon_records,
+                    solving_sec=solve_output.solving_sec,
                 ),
                 "effective_parallel_mode": effective_parallel_mode,
                 "translation_peak_rss_mb": translation_peak_rss_mb,

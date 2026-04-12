@@ -571,6 +571,10 @@ def _solve_multi_shot_with_programs(
                 models_stored = 0
                 unique_workflows_seen = 0
                 unique_workflows_stored = 0
+                model_callback_sec = 0.0
+                shown_symbols_sec = 0.0
+                workflow_signature_key_sec = 0.0
+                canonicalization_sec = 0.0
                 seen_unique_keys: set[tuple[object, ...]] = set()
                 try:
                     if not solving_started:
@@ -584,9 +588,16 @@ def _solve_multi_shot_with_programs(
                             with control.solve(yield_=True) as handle:
                                 for model in handle:
                                     nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
+                                    nonlocal model_callback_sec, shown_symbols_sec
+                                    nonlocal workflow_signature_key_sec, canonicalization_sec
+                                    callback_start = perf_counter()
                                     models_seen += 1
+                                    start = perf_counter()
                                     shown_symbols = tuple(model.symbols(shown=True))
+                                    shown_symbols_sec += perf_counter() - start
+                                    start = perf_counter()
                                     workflow_key = extract_workflow_signature_key(shown_symbols)
+                                    workflow_signature_key_sec += perf_counter() - start
                                     workflow_length = workflow_signature_length(workflow_key)
                                     in_length_window = (
                                         config.solution_length_min
@@ -610,10 +621,12 @@ def _solve_multi_shot_with_programs(
                                     )
                                     canonical_shown: tuple[clingo.Symbol, ...] | None = None
                                     if store_unique:
+                                        start = perf_counter()
                                         canonical_shown = canonicalize_shown_symbols(
                                             shown_symbols,
                                             tool_input_signatures,
                                         )
+                                        canonicalization_sec += perf_counter() - start
                                     if store_raw:
                                         raw_collected.append(shown_symbols)
                                         models_stored += 1
@@ -626,9 +639,12 @@ def _solve_multi_shot_with_programs(
                                         and (not capture_raw_models or len(raw_collected) >= config.solutions)
                                         and len(unique_collected) >= config.solutions
                                     ):
+                                        model_callback_sec += perf_counter() - callback_start
                                         break
                                     if not solve_all_horizons and len(unique_collected) >= config.solutions:
+                                        model_callback_sec += perf_counter() - callback_start
                                         break
+                                    model_callback_sec += perf_counter() - callback_start
                                 break
 
                     _run_interruptible(_solve, is_interrupted)
@@ -656,6 +672,10 @@ def _solve_multi_shot_with_programs(
                     eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
                     eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
                     bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                    model_callback_sec=model_callback_sec,
+                    shown_symbols_sec=shown_symbols_sec,
+                    workflow_signature_key_sec=workflow_signature_key_sec,
+                    canonicalization_sec=canonicalization_sec,
                     grounding_parts=grounding_parts,
                 )
                 horizon_records.append(record)
@@ -757,6 +777,10 @@ def _solve_single_shot_with_programs(
                 models_stored = 0
                 unique_workflows_seen = 0
                 unique_workflows_stored = 0
+                model_callback_sec = 0.0
+                shown_symbols_sec = 0.0
+                workflow_signature_key_sec = 0.0
+                canonicalization_sec = 0.0
                 seen_unique_keys: set[tuple[object, ...]] = set()
                 start = perf_counter()
 
@@ -764,9 +788,16 @@ def _solve_single_shot_with_programs(
                     with control.solve(yield_=True) as handle:
                         for model in handle:
                             nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
+                            nonlocal model_callback_sec, shown_symbols_sec
+                            nonlocal workflow_signature_key_sec, canonicalization_sec
+                            callback_start = perf_counter()
                             models_seen += 1
+                            sample_start = perf_counter()
                             shown_symbols = tuple(model.symbols(shown=True))
+                            shown_symbols_sec += perf_counter() - sample_start
+                            sample_start = perf_counter()
                             workflow_key = extract_workflow_signature_key(shown_symbols)
+                            workflow_signature_key_sec += perf_counter() - sample_start
                             workflow_length = workflow_signature_length(workflow_key)
                             in_length_window = (
                                 config.solution_length_min
@@ -790,10 +821,12 @@ def _solve_single_shot_with_programs(
                             )
                             canonical_shown: tuple[clingo.Symbol, ...] | None = None
                             if store_unique:
+                                sample_start = perf_counter()
                                 canonical_shown = canonicalize_shown_symbols(
                                     shown_symbols,
                                     tool_input_signatures,
                                 )
+                                canonicalization_sec += perf_counter() - sample_start
                             if store_raw:
                                 raw_solutions.append(shown_symbols)
                                 models_stored += 1
@@ -806,9 +839,12 @@ def _solve_single_shot_with_programs(
                                 and (not capture_raw_models or len(raw_solutions) >= config.solutions)
                                 and len(unique_solutions) >= config.solutions
                             ):
+                                model_callback_sec += perf_counter() - callback_start
                                 break
                             if not solve_all_horizons and len(unique_solutions) >= config.solutions:
+                                model_callback_sec += perf_counter() - callback_start
                                 break
+                            model_callback_sec += perf_counter() - callback_start
 
                 _run_interruptible(_solve, is_interrupted)
                 solve_elapsed = perf_counter() - start
@@ -823,6 +859,10 @@ def _solve_single_shot_with_programs(
                     models_stored=models_stored,
                     unique_workflows_seen=unique_workflows_seen,
                     unique_workflows_stored=unique_workflows_stored,
+                    model_callback_sec=model_callback_sec,
+                    shown_symbols_sec=shown_symbols_sec,
+                    workflow_signature_key_sec=workflow_signature_key_sec,
+                    canonicalization_sec=canonicalization_sec,
                 )
                 horizon_records.append(record)
                 if horizon_record_callback is not None:
@@ -899,6 +939,10 @@ def _solve_single_shot_once(
     models_stored = 0
     unique_workflows_seen = 0
     unique_workflows_stored = 0
+    model_callback_sec = 0.0
+    shown_symbols_sec = 0.0
+    workflow_signature_key_sec = 0.0
+    canonicalization_sec = 0.0
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -921,26 +965,36 @@ def _solve_single_shot_once(
 
             def _solve() -> None:
                 nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
+                nonlocal model_callback_sec, shown_symbols_sec
+                nonlocal workflow_signature_key_sec, canonicalization_sec
                 with control.solve(yield_=True) as handle:
                     for model in handle:
+                        callback_start = perf_counter()
                         models_seen += 1
+                        sample_start = perf_counter()
                         shown_symbols = tuple(model.symbols(shown=True))
+                        shown_symbols_sec += perf_counter() - sample_start
+                        sample_start = perf_counter()
                         workflow_key = extract_workflow_signature_key(shown_symbols)
+                        workflow_signature_key_sec += perf_counter() - sample_start
                         
                         if workflow_key not in stored_unique_keys:
                             unique_workflows_seen += 1
                             if len(unique_solutions) < config.solutions:
                                 unique_workflows_stored += 1
                                 stored_unique_keys.add(workflow_key)
+                                sample_start = perf_counter()
                                 unique_solutions.append(
                                     canonicalize_shown_symbols(shown_symbols, tool_input_signatures)
                                 )
+                                canonicalization_sec += perf_counter() - sample_start
                                 if capture_raw_models:
                                     raw_solutions.append(shown_symbols)
                                     models_stored += 1
                         else:
                             unique_workflows_seen += 1
 
+                        model_callback_sec += perf_counter() - callback_start
                         if len(unique_solutions) >= config.solutions:
                             break
 
@@ -969,6 +1023,10 @@ def _solve_single_shot_once(
         models_stored=models_stored,
         unique_workflows_seen=unique_workflows_seen,
         unique_workflows_stored=unique_workflows_stored,
+        model_callback_sec=model_callback_sec,
+        shown_symbols_sec=shown_symbols_sec,
+        workflow_signature_key_sec=workflow_signature_key_sec,
+        canonicalization_sec=canonicalization_sec,
     )
     if horizon_record_callback is not None:
         horizon_record_callback(record)
