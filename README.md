@@ -1,17 +1,17 @@
-# snakeAPE
+# clindaws
 
 ## Running
 
 Run from the workspace root (`/Volumes/ZGMF-X20A/GARYU`):
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws <path-to-config.json> [flags]
+./clindaws/clindaws-cli <path-to-config.json> [flags]
 ```
 
 Example:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/clindaws-run
 ```
 
 ## Modes
@@ -33,56 +33,56 @@ Backend note:
   `encodings/multi_shot_compressed_candidate`
 - `single-shot --optimized` is not implemented yet
 
-All runtime ASP encodings are vendored under `snakeAPE/encodings`.
+All runtime ASP encodings are vendored under `clindaws/encodings`.
 
 ## Common Commands
 
 Normal run:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/clindaws-run
 ```
 
 Single-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-single
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/clindaws-single
 ```
 
 Plain multi-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/clindaws-multi
 ```
 
 Grounding only:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --ground-only --ground-only-stage full --output-dir /tmp/snakeape-ground
+./clindaws/clindaws-cli ironAPE/APE_Example/biotools/config.json --mode multi-shot --ground-only --ground-only-stage full --output-dir /tmp/clindaws-ground
 ```
 
 Translation only:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/snakeape-translate
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/clindaws-translate
 ```
 
 Translation only with compressed-candidate optimization:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --optimized --translate-only --output-dir /tmp/snakeape-translate-opt
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --optimized --translate-only --output-dir /tmp/clindaws-translate-opt
 ```
 
 Optimized multi-shot:
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --output-dir /tmp/snakeape-multi-opt
+./clindaws/clindaws-cli ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --output-dir /tmp/clindaws-multi-opt
 ```
 
 Parallel translation expansion (8 workers):
 
 ```bash
-PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --translation-workers 8 --output-dir /tmp/snakeape-multi-opt-par
+./clindaws/clindaws-cli ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --translation-workers 8 --output-dir /tmp/clindaws-multi-opt-par
 ```
 
 ## Output Artifacts
@@ -94,7 +94,7 @@ Important files:
 - `translation.lp`
 - `translation_summary.json`
 - `grounding_summary.json` for `--ground-only`
-- `workflow_signatures.json` for normal solve runs
+- `workflow_signatures__<config>__<mode>__<opt|noopt>[__parallel_<mode>].json` for normal solve runs
 - `answer_sets__...txt` only when `--write-raw-answer-sets` is enabled
 - `asp_run_log.csv`
 - `asp_run_summary.csv`
@@ -128,7 +128,7 @@ Current count basis:
 
 - `workflows` in CLI summaries are canonical workflow candidates stored by the solver
 - `raw_models` are optional diagnostic counts over pre-canonical clingo answer sets
-- `workflow_signatures.json` is the primary machine-readable result artifact for
+- the `workflow_signatures__...json` artifact is the primary machine-readable result artifact for
   parity and benchmarking
 
 ## Useful Flags

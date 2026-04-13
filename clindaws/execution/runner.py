@@ -531,6 +531,24 @@ def _answer_sets_filename(
     return "__".join(parts) + ".txt"
 
 
+def _workflow_signatures_filename(
+    *,
+    config,
+    mode: str,
+    optimized_enabled: bool,
+    effective_parallel_mode: str | None,
+) -> str:
+    parts = [
+        "workflow_signatures",
+        _sanitize_filename_token(config.config_path.stem),
+        _sanitize_filename_token(mode),
+        "opt" if optimized_enabled else "noopt",
+    ]
+    if effective_parallel_mode:
+        parts.append(f"parallel_{_sanitize_filename_token(effective_parallel_mode)}")
+    return "__".join(parts) + ".json"
+
+
 def _horizon_record_payload(records: tuple[HorizonRecord, ...]) -> list[dict[str, object]]:
     return [asdict(record) for record in records]
 
@@ -1729,7 +1747,7 @@ def run_once(
         render_start = perf_counter()
         if write_raw_answer_sets:
             # Raw answer sets are a debug artifact. The default machine-readable
-            # result surface is ``workflow_signatures.json`` below.
+            # result surface is the config/mode-specific workflow-signature file below.
             answer_set_path = solution_dir / _answer_sets_filename(
                 config=config,
                 mode=mode,
@@ -1748,7 +1766,13 @@ def run_once(
                 _answer_set_content = "No answer sets found.\n"
                 answer_set_path.write_text(_answer_set_content, encoding="utf-8")
         workflow_signature_path = write_workflow_signatures(
-            solution_dir / "workflow_signatures.json",
+            solution_dir
+            / _workflow_signatures_filename(
+                config=config,
+                mode=mode,
+                optimized_enabled=optimized,
+                effective_parallel_mode=effective_parallel_mode,
+            ),
             solutions,
         )
         graph_path_list: list[Path] = []
