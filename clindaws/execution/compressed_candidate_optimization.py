@@ -1,4 +1,11 @@
-"""Compressed-candidate precomputation and optimization pipeline."""
+"""Compressed-candidate precomputation and optimization pipeline.
+
+This is the translation-time optimization layer behind ``multi-shot
+--optimized``. It expands tools into candidate records, prunes candidates that
+cannot contribute to any satisfiable workflow, compresses equivalent output
+choice values, and emits the indexed support surface consumed by the optimized
+ASP encodings.
+"""
 
 from __future__ import annotations
 from clindaws.translators.constraints import _collect_dynamic_forbidden_tool_ids, _collect_dynamic_backward_relevant_candidates, _collect_dynamic_selector_lower_bounds, _collect_dynamic_exact_prefix_lower_bound
@@ -177,7 +184,13 @@ def optimize_compressed_candidates(
     *,
     max_workers: int = 1,
 ) -> CompressedCandidateOptimizationResult:
-    """Precompute the compressed-candidate surface before fact emission."""
+    """Precompute the compressed-candidate surface before fact emission.
+
+    The resulting record is intentionally close to the optimized ASP schema:
+    candidate-step eligibility, signature support classes, goal distances, and
+    retained output choices are all materialized here so the encoding can stay
+    focused on workflow search rather than rediscovering that structure.
+    """
 
     roots = _build_roots(config, ontology)
     resolver = _ExpansionResolver(ontology, roots, "python")
@@ -189,7 +202,8 @@ def optimize_compressed_candidates(
         if tool.mode_id not in forbidden_tool_ids
     )
 
-    # Pre-assign candidate IDs to maintain deterministic ordering across workers.
+    # Pre-assign candidate IDs before optional parallel expansion so candidate
+    # order remains deterministic regardless of worker count.
     offset_tracker: dict[str, int] = defaultdict(int)
     work_items: list[tuple] = []
     for tool in candidate_source_tools:

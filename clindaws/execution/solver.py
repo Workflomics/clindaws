@@ -1,4 +1,17 @@
-"""Clingo solver orchestration."""
+"""Clingo solver orchestration.
+
+This module maps the public CLI modes onto concrete ASP program families and
+then drives grounding/solving in clingo.
+
+- ``multi-shot`` uses the direct incremental encoding family.
+- ``multi-shot --optimized`` uses the compressed-candidate incremental family.
+- ``single-shot`` currently reuses the direct ``multi_shot`` encoding files but
+  grounds them once over ``time(1..max_length)`` and solves on that single
+  control object.
+
+Canonical workflow candidates are the default stored result surface. Raw answer
+sets remain optional diagnostics for debugging multiplicity and callback cost.
+"""
 
 from __future__ import annotations
 
@@ -21,8 +34,8 @@ from clindaws.core.workflow import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ENCODINGS_ROOT = PROJECT_ROOT / "encodings"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+ENCODINGS_ROOT = PACKAGE_ROOT / "encodings"
 ProgressCallback = Callable[[str], None] | None
 BaseGroundingCallback = Callable[[float, float], None] | None
 HorizonRecordCallback = Callable[[HorizonRecord], None] | None
@@ -32,6 +45,12 @@ SINGLE_SHOT_OVERLAY_PREFIX = ""
 
 
 def _single_shot_overlay(min_length: int, horizon: int) -> str:
+    """Return one-shot constraints layered on top of the shared multi-shot core.
+
+    The overlay enforces that the final grounded horizon reaches the goal and
+    exposes external atoms used by Python to solve exact ``(goal_time,
+    run_count)`` slices in a deterministic shortest-first order.
+    """
     overlay = [
         SINGLE_SHOT_OVERLAY_PREFIX,
         f":- not holds({horizon}, goal).",
@@ -98,7 +117,12 @@ def _format_progress_counts(
     seen_tool_sequence_count: int,
     stored_tool_sequence_count: int,
 ) -> str:
-    """Format solve progress counts based on the active reporting mode."""
+    """Format solve progress counts based on the active reporting mode.
+
+    Normal runs only report stored canonical workflow candidates. Diagnostic
+    mode adds raw-answer-set and seen/stored counters so dense benchmarks can be
+    analyzed without changing the stored result artifact.
+    """
 
     if not diagnostic_counts_enabled:
         return (
@@ -144,12 +168,19 @@ class GroundingOutput:
 
 
 def _single_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
+    """Return the active program set for public single-shot mode.
+
+    The current single-shot runtime deliberately reuses the direct multi-shot
+    encoding family. Solver behavior differs by grounding/solving strategy, not
+    by a separate active ASP program family.
+    """
     if optimized:
         raise ValueError("--optimized is not yet supported for single-shot.")
     return _multi_shot_program_paths()
 
 
 def _multi_shot_program_paths() -> tuple[Path, ...]:
+    """Return the plain direct incremental multi-shot program set."""
     base = ENCODINGS_ROOT / "multi_shot"
     return (
         base / "base.lp",
@@ -168,6 +199,7 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
 
 
 def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
+    """Return the optimized compressed-candidate incremental program set."""
     base = ENCODINGS_ROOT / "multi_shot_compressed_candidate"
     return (
         base / "base.lp",
@@ -188,7 +220,7 @@ def program_paths_for_mode(
     *,
     optimized: bool = False,
 ) -> tuple[Path, ...]:
-    """Return encoding program paths for a solver mode."""
+    """Return the concrete ASP program family for one effective solver mode."""
 
     if mode == "single-shot":
         return _single_shot_program_paths(optimized=optimized)

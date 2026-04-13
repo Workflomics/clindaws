@@ -30,10 +30,10 @@ Backend note:
 
 - `--optimized` is currently supported only for `multi-shot`
 - `multi-shot --optimized` switches to the compressed-candidate backend under
-  `clindaws/encodings/multi_shot_compressed_candidate`
+  `encodings/multi_shot_compressed_candidate`
 - `single-shot --optimized` is not implemented yet
 
-All runtime ASP encodings are vendored under `clindaws/encodings`.
+All runtime ASP encodings are vendored under `snakeAPE/encodings`.
 
 ## Common Commands
 

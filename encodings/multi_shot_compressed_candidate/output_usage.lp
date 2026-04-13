@@ -1,6 +1,11 @@
 #program check_usage(t).
 #external query(t).
 
+% OUTPUT USAGE / USEFULNESS (optimized multi-shot)
+% The optimized backend keeps these checks separate from main goal validation so
+% usefulness pruning and output-consumption constraints can run against the
+% smaller compressed candidate/output surface.
+
 useful_check(t, T, Tool) :-
    query(t),
    occurs(T, run(Tool)),
@@ -29,7 +34,7 @@ useful_check(t, T, Tool) :-
 :- query(t),
    enable_all_outputs_consumed,
    occurs(T, output(Tool, Candidate, Port)),
-   lazy_candidate_output_multiplicity(Candidate, Port, RequiredUses),
+   dynamic_candidate_output_multiplicity(Candidate, Port, RequiredUses),
    RequiredUses > #count {
        goal(GoalID) : chosen_goal_output(t, GoalID, out(T, Tool, Port));
        bind(T2, Tool2, Port2) : output_used_by(T, Tool, Port, T2, Tool2, Port2)

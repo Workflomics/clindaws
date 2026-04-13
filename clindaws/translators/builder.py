@@ -1,3 +1,16 @@
+"""Fact-bundle builders for the direct translation families.
+
+This module turns normalized config/ontology/tool data into the ground facts
+consumed by the direct ASP encodings. It provides:
+
+- shared base facts used by all direct bundles,
+- the APE-style multi-shot/direct surface used by public multi-shot and the
+  current single-shot runtime,
+- helper metadata that the Python runner uses for reporting and reconstruction.
+
+Compressed-candidate optimized translation lives in its own translator module.
+"""
+
 from __future__ import annotations
 from collections import defaultdict, deque
 from itertools import product
@@ -20,6 +33,11 @@ def _bundle_metadata(
     config: SnakeConfig,
     tools: tuple[ToolMode, ...],
 ) -> tuple[dict[str, str], dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]], tuple[str, ...]]:
+    """Return Python-side metadata reused after solving.
+
+    These structures are not part of the ASP fact text itself, but the runner
+    needs them later to reconstruct workflow candidates and report tool labels.
+    """
     return (
         {tool.mode_id: tool.label for tool in tools},
         _tool_input_signatures(tools),
@@ -54,6 +72,7 @@ def _build_roots(
     config: SnakeConfig,
     ontology: Ontology,
 ) -> dict[str, frozenset[str]]:
+    """Build disjoint ontology subtrees for the configured data dimensions."""
     tool_taxonomy_nodes = ontology.descendants_of(config.tools_taxonomy_root)
     raw_roots = {
         root: frozenset(
@@ -124,6 +143,9 @@ def _build_common_facts(
             )
 
     for index, item in enumerate(config.inputs):
+        # Workflow inputs are emitted as timestep-0 available artifacts so both
+        # direct multi-shot and the current single-shot runtime can bootstrap
+        # artifact propagation from the same initial surface.
         wf_id = f"wf_input_{index}"
         writer.emit_fact("holds", "0", f"avail({_quote(wf_id)})")
         for dim, values in sorted(item.items()):
@@ -824,6 +846,9 @@ def build_fact_bundle_ape_multi_shot(
     - one `tool_output(..., "<tool>_out_<i>")` per declared output port
     - raw declared dimension values only
     """
+    # This builder is the direct baseline for public multi-shot and also feeds
+    # the current public single-shot runtime, which changes solver strategy but
+    # not the underlying fact surface.
 
     writer = _FactWriter()
     roots = _build_common_facts(writer, config, ontology, tools)

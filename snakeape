@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Run snakeAPE from any working directory.
-# Usage: /path/to/snakeAPE/snakeape <config.json> [options]
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PYTHON_BIN="/opt/homebrew/bin/python3"
-PYTHONPATH="$SCRIPT_DIR" exec "$PYTHON_BIN" -m snakeAPE "$@"

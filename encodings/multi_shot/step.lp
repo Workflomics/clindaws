@@ -73,34 +73,31 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Helper to project out concrete dimension 'V' from the main cross-product
-wf_provides_req(t, WF, ReqV, Cat) :-
-    holds(t, dim(WF, V, Cat)),
+eligible_initial_artifact(t, Port, Artifact) :-
+    holds(0, avail(Artifact)),
+    holds(t, avail(Artifact)),
+    initial_bindable(Port, Artifact).
+
+produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))),
+    bindable_output_port(Port, ProducerPort).
+
+produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
+    port_requires(Port, ReqV, Cat),
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), V, Cat),
     compatible(V, ReqV).
 
-% Port satisfaction per category
-port_cat_ok(t, Port, WF, Cat) :-
-    planner_workflow_input(WF),
-    holds(t, avail(WF)),
-    port_requires(Port, _, Cat),
-    not holds(t, dim(WF, _, Cat)).
+eligible_produced_output(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
+    produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :
+        port_category(Port, Cat).
 
-port_cat_ok(t, Port, WF, Cat) :-
-    planner_workflow_input(WF),
-    holds(t, avail(WF)),
-    port_requires(Port, ReqV, Cat),
-    wf_provides_req(t, WF, ReqV, Cat).
+eligible(t, Port, Artifact) :-
+    eligible_initial_artifact(t, Port, Artifact).
 
-port_cat_ok(t, Port, WF, Cat) :-
-    holds(t, avail(WF)),
-    not planner_workflow_input(WF),
-    port_requires(Port, ReqV, Cat),
-    wf_provides_req(t, WF, ReqV, Cat).
-
-eligible(t, Port, WF) :-
-    holds(t, avail(WF)),
-    input_port(_, Port),
-    port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
+eligible(t, Port, Artifact) :-
+    eligible_produced_output(t, Port, Artifact).
 
 % Port binding: exactly one eligible item per port
 1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Port, WF) } 1 :-
@@ -137,21 +134,15 @@ eligible(t, Port, WF) :-
    eligible(t-1, Port, SlotLow),
    not occurs(t, bind(_, _, SlotLow)).
 
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Carry forward workflow-input lineage only; input-usage checks do not need the
+% full produced-artifact transitive closure.
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
-
-% Carry forward ancestors from previous steps; the artifact graph is monotone.
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_ancestor(t-1, Artifact, Ancestor).
-
-% Only compute fresh ancestry for artifacts produced at THIS step.
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Ancestor).
-
-artifact_ancestor(t, out(t, Tool, PortOut), Ancestor) :-
-    artifact_parent(out(t, Tool, PortOut), Mid),
-    artifact_ancestor(t, Mid, Ancestor).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(t-1, Artifact, WF).
 
 
 % ----------------------------------------------------------------
@@ -173,23 +164,33 @@ available(out(t, Tool, Port)) :- holds(t, avail(out(t, Tool, Port))).
 artifact_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
 artifact_unit(out(t, Tool, Port), U)   :- holds(t, unit(out(t, Tool, Port), U)).
 
-% Output dimensions — Case A: terminal value
-
-holds(t, dim(out(t, Tool, Port), V, Cat)) :-
+% Output dimensions — each output category picks one retained terminal value.
+% When Python precompute emitted compressed representatives, branch only over
+% that reduced domain; otherwise fall back to the dense terminal expansion.
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    precomputed_output_port_candidate(Port, Value, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    is_terminal(V).
+    precomputed_output_port_has_category(Port, Cat),
+    not precomputed_output_port_singleton_terminal(Port, _, Cat).
 
-% Output dimensions — Case B: non-terminal, planner picks terminal descendant
-1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
-    compatible(Descendant, V),
-    is_terminal(Descendant) } 1 :-
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    output_port_terminal_candidate(Port, Value, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    not is_terminal(V).
+    not precomputed_output_port_has_category(Port, Cat),
+    output_port_has_category(Port, Cat),
+    not output_port_singleton_terminal(Port, _, Cat).
 
-holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
-    occurs(t, output_dim(Tool, Port, Descendant, Cat)).
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output(Tool, _, Port)),
+    precomputed_output_port_singleton_terminal(Port, Value, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output(Tool, _, Port)),
+    not precomputed_output_port_has_category(Port, Cat),
+    output_port_singleton_terminal(Port, Value, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output_dim(Tool, Port, Value, Cat)).
 
 % ----------------------------------------------------------------
 % From unit_reasoning.lp — unit production from tool outputs

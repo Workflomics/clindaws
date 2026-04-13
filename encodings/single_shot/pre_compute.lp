@@ -1,5 +1,9 @@
 % PRE-COMPUTE — static ground-time derivations from taxonomy and tool definitions
 % Docs: DOCS/encoding/pre_compute.md
+%
+% Note: the public single-shot runtime currently reuses the direct multi-shot
+% encoding family. This single-shot directory is therefore a secondary/reference
+% encoding set rather than the active public solver path.
 
 % --- Terminal detection ---
 % compatible(V, Ancestor) facts are pre-computed by the Python translator and

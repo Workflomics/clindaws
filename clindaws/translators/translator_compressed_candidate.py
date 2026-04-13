@@ -1,4 +1,10 @@
-"""Compressed-candidate translation entrypoints for optimized multi-shot runs."""
+"""Compressed-candidate translation entrypoints for optimized multi-shot runs.
+
+This translator builds the fact surface consumed by the optimized
+``multi_shot_compressed_candidate`` encodings. Most of the heavy work happens in
+the optimization layer first; this module mainly turns those precomputed
+records, support classes, and step windows into emitted facts.
+"""
 
 from __future__ import annotations
 from clindaws.translators.utils import _quote
@@ -23,7 +29,12 @@ def build_compressed_candidate_fact_bundle(
     *,
     max_workers: int = 1,
 ) -> FactBundle:
-    """Build compressed-candidate facts using a dedicated optimization layer."""
+    """Build compressed-candidate facts using a dedicated optimization layer.
+
+    The emitted facts are intentionally close to the optimized ASP schema so
+    step grounding can work from preindexed candidates, bindability classes, and
+    retained output-choice values instead of rediscovering them from scratch.
+    """
 
     optimization = optimize_compressed_candidates(config, ontology, tools, max_workers=max_workers)
 
@@ -52,6 +63,9 @@ def build_compressed_candidate_fact_bundle(
                 str(step_index),
             )
 
+    # Fact emission is kept separate from optimization timing so translation
+    # summaries can distinguish Python search/compression cost from plain output
+    # serialization cost.
     emit_start = perf_counter()
 
     for record in optimization.relevant_records:

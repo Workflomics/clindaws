@@ -1,4 +1,17 @@
-"""Optional Python-side precompute layer for legacy direct encodings."""
+"""Optional Python-side precompute layer for legacy direct encodings.
+
+This module emits helper facts that are static or monotone enough to compute in
+Python once instead of reconstructing them in ASP at every horizon. The main
+uses are:
+
+- workflow-input equivalence compression,
+- bindability facts for direct backends,
+- output-choice compression for dense output domains,
+- safe lower bounds on when a tool or workflow can first become feasible.
+
+The optimized compressed-candidate backend has its own dedicated optimization
+pipeline; this module focuses on augmenting the direct fact surface.
+"""
 
 from __future__ import annotations
 

@@ -32,7 +32,7 @@
 
 constraint_selected_tool(t, Sel, Tool) :-
     occurs(t, run(Tool)),
-    lazy_constraint_selector_matches_tool(Sel, Tool).
+    dynamic_constraint_selector_matches_tool(Sel, Tool).
 
 constraint_selected_time(t, Sel) :-
     constraint_selected_tool(t, Sel, _).

@@ -1,3 +1,0 @@
-test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,raw_models_seen,raw_solutions_found,solutions_found,constraints_used,timed_out
-GeoEvents,single-shot,4,false,,false,14,310,25,148.45,0,0,0,true,false
-GeoEvents,single-shot,4,false,,false,7,0,0,46.44,0,0,0,true,false

@@ -1,3 +1,11 @@
+"""Constraint parsing, selector resolution, and fact emission.
+
+This module bridges user constraint files and the internal facts consumed by
+the ASP encodings. It parses APE-style template objects and native atom
+strings, resolves whether selectors should match tools transitively or exactly,
+and emits both runtime constraint facts and translation-time pruning helpers.
+"""
+
 from __future__ import annotations
 import json
 import re
@@ -102,6 +110,9 @@ _SELECTOR_POLICY_LABELS = {
     "class_transitive": "abstract class selector",
     "tool_exact": "concrete tool selector",
 }
+
+# The helpers below normalize prefixed ontology/tool selectors from the config
+# into the compact ids used internally by the translator and encodings.
 def _strip_constraint_value(value: str, prefix: str) -> str:
     if prefix and value.startswith(prefix):
         return value[len(prefix):]
@@ -206,6 +217,7 @@ def _constraint_selector_mode(
     selector_kind: str,
     selector_policy: str = "auto",
 ) -> str:
+    """Resolve whether a selector should match by hierarchy or exact identity."""
     if selector_policy == "class_transitive":
         return "transitive"
     if selector_policy == "tool_exact":
@@ -762,6 +774,7 @@ def _emit_dynamic_native_constraints(
             index=index,
         )
 def _load_dynamic_constraints(config: SnakeConfig) -> tuple[object, list[Any], str] | None:
+    """Load the configured constraint file and classify its representation."""
     constraints_path = config.constraints_path
     if constraints_path is None or not constraints_path.exists():
         return None
@@ -819,6 +832,7 @@ def _collect_dynamic_forbidden_tool_ids(
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
 ) -> set[str]:
+    """Collect tools that can be removed before candidate expansion starts."""
     loaded_constraints = _load_dynamic_constraints(config)
     if loaded_constraints is None:
         return set()
@@ -1380,6 +1394,7 @@ def _emit_dynamic_constraints(
     ontology: Ontology,
     tools: tuple[ToolMode, ...],
 ) -> None:
+    """Emit runtime constraint facts plus selector-match metadata."""
     allowed_selectors = _dynamic_allowed_selectors(config, ontology, tools)
     allowed_data_selectors = _dynamic_allowed_data_selectors(config, ontology, tools)
     selector_ids: dict[tuple[str, str], str] = {}

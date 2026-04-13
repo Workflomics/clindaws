@@ -1,29 +1,40 @@
 #program check(t).
 #external query(t).
 
+% ================================================================
+% CHECK — volatile goal and output-choice validation at horizon t
+% ================================================================
+% Goal satisfaction still happens at the query horizon, but consumer/goal
+% support is now checked against precomputed profiles and retained output-choice
+% values instead of the larger direct terminal domain used by plain multi-shot.
+
+goal_output_candidate(t, GoalID, out(TProd, ToolProd, Port)) :-
+    query(t),
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    dynamic_candidate_output_goal_satisfies(ProducerCandidate, Port, GoalID).
+
 goal_dim_match(t, GoalID, WF, RequirementID) :-
     query(t),
+    goal_output_candidate(t, GoalID, WF),
     compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
-    available(WF),
     artifact_dim(WF, ActualV, Category),
-    lazy_profile_accepts(ProfileId, ActualV).
+    dynamic_profile_accepts(ProfileId, ActualV).
 
 goal_dim_missing(t, GoalID, WF, RequirementID) :-
     query(t),
+    goal_output_candidate(t, GoalID, WF),
     compressed_goal_requirement_profile(GoalID, RequirementID, _, _),
-    available(WF),
     not goal_dim_match(t, GoalID, WF, RequirementID).
 
 goal_satisfied_by(t, GoalID, WF) :-
     query(t),
-    available(WF),
+    goal_output_candidate(t, GoalID, WF),
     goal_id(GoalID),
     goal_dim_match(t, GoalID, WF, _),
     not goal_dim_missing(t, GoalID, WF, _).
 
 goal_satisfied_by_output(t, GoalID, WF) :-
-    goal_satisfied_by(t, GoalID, WF),
-    not holds(0, avail(WF)).
+    goal_satisfied_by(t, GoalID, WF).
 
 goal_satisfied(t, GoalID) :-
     query(t),
@@ -42,24 +53,24 @@ holds(t, goal) :-
 used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
     query(t),
     occurs(TUse, bind(ToolUse, PortUse, out(TProd, ToolProd, Port))),
-    occurs(TUse, use_lazy_candidate(ToolUse, ConsumerCandidate)),
+    occurs(TUse, use_dynamic_candidate(ToolUse, ConsumerCandidate)),
     compressed_candidate_input_profile(ConsumerCandidate, PortUse, Category, ProfileId).
 
 query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     query_output_filter_active(t),
     TProd = t,
     occurs(TProd, output(_, ProducerCandidate, Port)),
-    lazy_query_output_value(ProducerCandidate, Port, V, Category).
+    dynamic_query_output_value(ProducerCandidate, Port, V, Category).
 
 query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     occurs(TProd, output(_, ProducerCandidate, Port)),
     TProd != t,
-    lazy_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
+    dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
 query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     occurs(TProd, output(_, ProducerCandidate, Port)),
     not query_output_filter_active(t),
-    lazy_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
+    dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
 % Identify non-terminal outputs and their candidates
 candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
@@ -71,7 +82,7 @@ candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category)
 output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
     used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
-    not lazy_profile_accepts(ProfileId, V).
+    not dynamic_profile_accepts(ProfileId, V).
 
 output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category) :-
     output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, _).
@@ -79,7 +90,7 @@ output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category) :-
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId),
-    not lazy_profile_accepts(ProfileId, V).
+    not dynamic_profile_accepts(ProfileId, V).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
@@ -96,4 +107,3 @@ output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category) :-
    occurs(TProd, output_dim(ToolProd, Port, V, Category)),
    output_dim_supported(t, TProd, ToolProd, Port, V, Category),
    output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category).
-

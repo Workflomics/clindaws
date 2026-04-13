@@ -1,4 +1,16 @@
-"""High-level execution entrypoints."""
+"""High-level execution entrypoints.
+
+The runner owns the end-to-end lifecycle around the lower-level clingo solver:
+
+- load and normalize configuration,
+- choose the effective translation/backend family,
+- build the fact bundle and translation summaries,
+- execute grounding/solving in a worker process with timeout control,
+- reconstruct canonical workflow candidates and write run artifacts.
+
+Public modes stay small (`single-shot`, `multi-shot`), while this module maps
+them onto the internal backends used by translation and solving.
+"""
 
 from __future__ import annotations
 
@@ -99,6 +111,8 @@ class _ModeConfig:
 
 
 _MODE_CONFIGS = {
+    # Public single-shot currently shares the APE-style multi-shot translation
+    # surface, then changes only the grounding/solving strategy downstream.
     "single-shot": _ModeConfig(
         solver_family="single-shot",
         solver_approach="one-shot",
@@ -113,6 +127,8 @@ _MODE_CONFIGS = {
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
+    # Optimized multi-shot is an explicit compressed-candidate backend rather
+    # than a small variation of the direct multi-shot encoding family.
     "multi-shot-compressed-candidate": _ModeConfig(
         solver_family="multi-shot",
         solver_approach="compressed_candidate",
@@ -1252,6 +1268,10 @@ def _select_fact_bundle(
     resolved_translation_builder = mode_config.translation_builder
 
     if mode_config.translation_pathway == "ape_multi_shot":
+        # Plain multi-shot and the public single-shot mode both start from the
+        # APE-style direct fact surface. Optional precompute augments that
+        # bundle, while optimized multi-shot swaps to the compressed-candidate
+        # internal bundle entirely.
         fact_bundle = _ape_multi_shot_direct_bundle(
             config,
             ontology,
@@ -1289,6 +1309,8 @@ def _select_fact_bundle(
             )
 
     elif mode_config.translation_pathway == "normal":
+        # Reserved for the legacy direct translation family where optimized mode
+        # means "add Python-emitted helper facts" rather than "switch backend".
         fact_bundle = replace(
             build_fact_bundle(config, ontology, tools, effective_translation_strategy),
             internal_schema="legacy_direct",
@@ -1329,7 +1351,13 @@ def _prepare_run_context(
     optimized: bool = False,
     max_workers: int = 1,
 ) -> RunContext:
-    """Load config and build the fact bundle for a run."""
+    """Load config and build the translation-phase context for one run.
+
+    The returned context is the hand-off point between translation and the later
+    solve/render phases. It packages the resolved config, output directory,
+    backend-specific fact bundle, and translation diagnostics in one named
+    object so callers do not need to thread anonymous tuples around.
+    """
 
     mode_config = _mode_config(mode)
     if optimized and mode == "single-shot":
@@ -1546,6 +1574,8 @@ def run_once(
             completed_stage="translation_timeout",
         )
     else:
+        # Solving happens in a worker process so the parent can enforce the
+        # configured timeout even while clingo is grounding or enumerating.
         try:
             solve_output, _timed_out = _run_solve_in_worker(
                 mode=internal_solver_mode,
@@ -1647,6 +1677,9 @@ def run_once(
         )
         for index, symbols in enumerate(solve_output.solutions)
     )
+    # ``solutions`` is the canonical stored result surface. ``candidate_solutions``
+    # mirrors raw callback order and is only useful when raw diagnostics are
+    # requested.
 
     answer_set_path: Path | None = None
     
@@ -1695,6 +1728,8 @@ def run_once(
         _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
         render_start = perf_counter()
         if write_raw_answer_sets:
+            # Raw answer sets are a debug artifact. The default machine-readable
+            # result surface is ``workflow_signatures.json`` below.
             answer_set_path = solution_dir / _answer_sets_filename(
                 config=config,
                 mode=mode,
