@@ -63,6 +63,9 @@ holds(t, state(Artifact, NewState)) :-
 { occurs(t, run(Tool)) } :- tool(Tool), not tool_has_input(Tool).
 { occurs(t, run(Tool)) } :- tool(Tool), tool_has_input(Tool).
 
+% Heuristic: Branch on earlier time steps first to solidify the pipeline prefix
+#heuristic occurs(t, run(Tool)). [100 - t, true]
+
 % Variant selection: exactly one input group per run
 1 { occurs(t, use_variant(Tool, TI_ID)) : tool_input_variant(Tool, TI_ID) } 1 :-
     occurs(t, run(Tool)),
@@ -70,64 +73,77 @@ holds(t, state(Artifact, NewState)) :-
 
 occurs(t, run(Tool)) :- occurs(t, use_variant(Tool, _)).
 
-% Port satisfaction per category
-port_cat_ok(t, Port, WF, Cat) :-
-    holds(t, avail(WF)),
+eligible_initial_artifact(t, Port, Artifact) :-
+    holds(0, avail(Artifact)),
+    holds(t, avail(Artifact)),
+    initial_bindable(Port, Artifact).
+
+produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    holds(t, avail(out(TPrev, ToolPrev, ProducerPort))),
+    bindable_output_port(Port, ProducerPort).
+
+produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
     port_requires(Port, ReqV, Cat),
-    holds(t, dim(WF, V, Cat)),
+    artifact_dim(out(TPrev, ToolPrev, ProducerPort), V, Cat),
     compatible(V, ReqV).
 
-% Eligible item: all categories satisfied
-eligible(t, Port, WF) :-
-    holds(t, avail(WF)),
-    input_port(_, Port),
-    port_cat_ok(t, Port, WF, Cat) : port_requires(Port, _, Cat).
+eligible_produced_output(t, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    produced_output_candidate(t, Port, out(TPrev, ToolPrev, ProducerPort)),
+    produced_output_cat_ok(t, Port, out(TPrev, ToolPrev, ProducerPort), Cat) :
+        port_category(Port, Cat).
+
+eligible(t, Port, Artifact) :-
+    eligible_initial_artifact(t, Port, Artifact).
+
+eligible(t, Port, Artifact) :-
+    eligible_produced_output(t, Port, Artifact).
 
 % Port binding: exactly one eligible item per port
 1 { occurs(t, bind(Tool, Port, WF)) : eligible(t-1, Port, WF) } 1 :-
     occurs(t, use_variant(Tool, TI_ID)),
     input_port(TI_ID, Port).
 
-% Artifact ancestry over committed runs.
-artifact_parent(out(t, Tool, PortOut), WF) :-
+% Symmetry breaking for same-signature ports using direct term order.
+:- occurs(t, use_variant(Tool, TI_ID)),
+   not full_workflow_input_witnesses,
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(t, bind(Tool, PortLow, ArtifactLow)),
+   occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
+   ArtifactHigh < ArtifactLow.
+
+% If symmetric same-signature ports both consume the same workflow input, use a
+% different equivalent workflow input when one is available.
+:- occurs(t, use_variant(Tool, TI_ID)),
+   not full_workflow_input_witnesses,
+   variant_sym_ports(TI_ID, PortHigh, PortLow),
+   occurs(t, bind(Tool, PortLow, WF)),
+   occurs(t, bind(Tool, PortHigh, WF)),
+   workflow_input_slot(WF, Rep, _),
+   eligible(t-1, PortHigh, WFAlt),
+   workflow_input_slot(WFAlt, Rep, _),
+   WFAlt != WF.
+
+% Within one step, interchangeable slots of the same workflow-input class are
+% used in increasing Rank order.
+:- occurs(t, bind(Tool, Port, SlotHigh)),
+   not full_workflow_input_witnesses,
+   workflow_input_slot(SlotHigh, Rep, RankHigh),
+   workflow_input_slot(SlotLow, Rep, RankLow),
+   RankLow < RankHigh,
+   eligible(t-1, Port, SlotLow),
+   not occurs(t, bind(_, _, SlotLow)).
+
+% Carry forward workflow-input lineage only; input-usage checks do not need the
+% full produced-artifact transitive closure.
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
-    occurs(t, bind(Tool, _, WF)).
+    occurs(t, bind(Tool, _, Artifact)),
+    workflow_input_lineage(t-1, Artifact, WF).
 
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Ancestor).
-
-artifact_ancestor(t, Artifact, Ancestor) :-
-    artifact_parent(Artifact, Mid),
-    artifact_ancestor(t, Mid, Ancestor).
-
-% Symmetry breaking for duplicate input signatures on the same join tool.
-:- occurs(t, bind(Tool, Port1, out(T1, Tool1, _))),
-   occurs(t, bind(Tool, Port2, out(T2, Tool2, _))),
-   Port1 < Port2,
-   same_input_signature(Port1, Port2),
-   T1 < T2.
-
-% When two single-input producer runs with the same input signature later feed a
-% symmetric join, keep the earlier producer on the more-derived source and the
-% later producer on the older source. This removes the extra branch-swapped
-% variants while preserving the SAT-aligned one.
-paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2) :-
-    T1 < T2,
-    tool_single_input(Tool1),
-    tool_single_input(Tool2),
-    occurs(T1, bind(Tool1, Port1, WF1)),
-    occurs(T2, bind(Tool2, Port2, WF2)),
-    same_input_signature(Port1, Port2),
-    occurs(TJ, bind(JoinTool, JoinPort1, out(T1, Tool1, _))),
-    occurs(TJ, bind(JoinTool, JoinPort2, out(T2, Tool2, _))),
-    TJ > T2,
-    JoinPort2 < JoinPort1,
-    same_input_signature(JoinPort1, JoinPort2).
-
-:- paired_symmetric_producers(t, T1, Tool1, Port1, WF, T2, Tool2, Port2, WF).
-
-:- paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2),
-   artifact_ancestor(t, WF1, WF2).
 
 % ----------------------------------------------------------------
 % From output_production.lp — output port selection and dimensions
@@ -143,22 +159,38 @@ paired_symmetric_producers(t, T1, Tool1, Port1, WF1, T2, Tool2, Port2, WF2) :-
 holds(t, avail(out(t, Tool, Port))) :-
     occurs(t, output(Tool, _, Port)).
 
-% Output dimensions — Case A: terminal value
-holds(t, dim(out(t, Tool, Port), V, Cat)) :-
-    occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    is_terminal(V).
+% Monotonic bridge for symmetry breakers
+available(out(t, Tool, Port)) :- holds(t, avail(out(t, Tool, Port))).
+artifact_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
+artifact_unit(out(t, Tool, Port), U)   :- holds(t, unit(out(t, Tool, Port), U)).
 
-% Output dimensions — Case B: non-terminal, planner picks terminal descendant
-1 { occurs(t, output_dim(Tool, Port, Descendant, Cat)) :
-    compatible(Descendant, V),
-    is_terminal(Descendant) } 1 :-
+% Output dimensions — each output category picks one retained terminal value.
+% When Python precompute emitted compressed representatives, branch only over
+% that reduced domain; otherwise fall back to the dense terminal expansion.
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    precomputed_output_port_candidate(Port, Value, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
-    dimension(Port, (V, Cat)),
-    not is_terminal(V).
+    precomputed_output_port_has_category(Port, Cat),
+    not precomputed_output_port_singleton_terminal(Port, _, Cat).
 
-holds(t, dim(out(t, Tool, Port), Descendant, Cat)) :-
-    occurs(t, output_dim(Tool, Port, Descendant, Cat)).
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    output_port_terminal_candidate(Port, Value, Cat) } 1 :-
+    occurs(t, output(Tool, _, Port)),
+    not precomputed_output_port_has_category(Port, Cat),
+    output_port_has_category(Port, Cat),
+    not output_port_singleton_terminal(Port, _, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output(Tool, _, Port)),
+    precomputed_output_port_singleton_terminal(Port, Value, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output(Tool, _, Port)),
+    not precomputed_output_port_has_category(Port, Cat),
+    output_port_singleton_terminal(Port, Value, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output_dim(Tool, Port, Value, Cat)).
 
 % ----------------------------------------------------------------
 % From unit_reasoning.lp — unit production from tool outputs
@@ -178,7 +210,7 @@ holds(t, unit(out(t, Tool, Port), none)) :-
 % Case 3: agnostic mode — inherit from homogeneous inputs
 input_root(t, Tool, Root) :-
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none,
     unit_root(U, Root).
 
@@ -192,20 +224,20 @@ holds(t, unit(out(t, Tool, Port), U)) :-
     not port_unit(Port, _),
     single_input_root(t, Tool),
     occurs(t, bind(Tool, _, WF)),
-    holds(t, unit(WF, U)),
+    artifact_unit(WF, U),
     U != none.
 
 % Unit binding compatibility constraints
 :- occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, UPort),
-   holds(t, unit(WF, UData)),
+   artifact_unit(WF, UData),
    UData != none,
    not units_compatible(UPort, UData).
 
 :- unit_mode(strict),
    occurs(t, bind(Tool, Port, WF)),
    port_unit(Port, _),
-   not holds(t, unit(WF, _)).
+   not artifact_unit(WF, _).
 
 % ----------------------------------------------------------------
 % From reachability.lp
@@ -213,6 +245,10 @@ holds(t, unit(out(t, Tool, Port), U)) :-
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
+
+output_used_by(TPrev, ToolPrev, Port, t, Tool, ConsumerPort) :-
+    occurs(t, bind(Tool, ConsumerPort, out(TPrev, ToolPrev, Port))),
+    TPrev < t.
 
 % Root: no-input tools
 is_root(t, Tool) :-
@@ -229,9 +265,8 @@ reachable(t, Tool) :- is_root(t, Tool).
 
 reachable(t, Tool2) :-
     reachable(T1, Tool1),
-    occurs(T1, output(Tool1, _, Port)),
-    occurs(t, bind(Tool2, _, out(T1, Tool1, Port))),
-    t > T1.
+    output_used_by(T1, Tool1, Port, t, Tool2, ConsumerPort),
+    T1 < t.
 
 :- occurs(t, run(Tool)), not reachable(t, Tool).
 
@@ -243,8 +278,8 @@ reachable(t, Tool2) :-
 goal_dim_match(t, GoalID, WF, GoalV, Cat) :-
     goal_output(GoalID, GoalV, Cat),
     holds(t, avail(WF)),
-    holds(t, dim(WF, ActualV, Cat)),
-    compatible(ActualV, GoalV).
+    artifact_dim(WF, ActualV, Cat),
+    goal_requirement_accepts(goalreq(GoalID, GoalV, Cat), ActualV, Cat).
 
 goal_dim_missing(t, GoalID, WF) :-
     goal_output(GoalID, GoalV, Cat),
@@ -257,9 +292,13 @@ goal_satisfied_by(t, GoalID, WF) :-
     goal_dim_match(t, GoalID, WF, _, _),
     not goal_dim_missing(t, GoalID, WF).
 
+goal_satisfied_by_output(t, GoalID, WF) :-
+    goal_satisfied_by(t, GoalID, WF),
+    not holds(0, avail(WF)).
+
 goal_satisfied(t, GoalID) :-
     goal_output(GoalID, _, _),
-    goal_satisfied_by(t, GoalID, WF).
+    goal_satisfied_by_output(t, GoalID, WF).
 
 holds(t, goal) :-
     goal_satisfied(t, GoalID) : goal_output(GoalID, _, _).
@@ -279,11 +318,10 @@ pipeline_has_at(t, Prop) :-
     occurs(t, run(Tool)).
 
 pipeline_has_at(t, Prop) :-
-    port_property(Tool, Port, ReqV, Cat, Prop),
+    port_property(Tool, Port, _, Cat, Prop),
     occurs(t, bind(Tool, Port, WF)),
-    holds(t, dim(WF, ActualV, Cat)),
-    compatible(ActualV, ReqV).
-
+    artifact_dim(WF, ActualV, Cat),
+    port_property_accepts(Tool, Port, ActualV, Cat, Prop).
 
 % ----------------------------------------------------------------
 % From requirements.lp — constraints only (static derivations in base.lp)
@@ -293,22 +331,13 @@ pipeline_has_at(t, Prop) :-
 :- requirement_filtering_active, occurs(t, bind(Tool, Port, _)), not port_env_compatible(Tool, Port).
 
 % ----------------------------------------------------------------
-% From constraints.lp
-% ----------------------------------------------------------------
-
-% Contiguous execution: no gaps in the plan
-:- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).
-
-% No runs after goal is reached
-:- occurs(t, run(_)), holds(t-1, goal).
-
-% SAT mode does not forbid repeated tool occurrences during synthesis. The
-% config-level tool_seq_repeat flag is handled later as a solution-distinction
-% policy, so repeated runs remain legal here.
-
-% ----------------------------------------------------------------
 % Sequential workflow: at most one tool runs per timestep
 % (mirrors the SAT automaton which allocates exactly one tool slot per step)
 % ----------------------------------------------------------------
 
 :- 2 { occurs(t, run(_)) }.
+
+% Contiguous execution: no gaps in the plan — prevents shorter pipelines from
+% reappearing at later horizons with empty intermediate steps, which would produce
+% C(H,k) step-assignment duplicates per unique k-step sequence.
+:- t > 1, occurs(t, run(_)), not occurs(t-1, run(_)).

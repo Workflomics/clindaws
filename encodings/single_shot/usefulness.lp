@@ -5,7 +5,7 @@
 useful(T, Tool) :-
     occurs(T, run(Tool)),
     occurs(T, output(Tool, _, Port)),
-    goal_satisfied_by(_, out(T, Tool, Port)).
+    chosen_goal_output(_, _, out(T, Tool, Port)).
 
 % --- Indirect usefulness: backward propagation from goal ---
 useful(T1, Tool1) :-
@@ -21,7 +21,9 @@ useful(T, Tool) :-
     not tool_has_output(Tool).
 
 % --- Constraint: every tool that runs must be useful ---
-:- occurs(T, run(Tool)), not useful(T, Tool).
+:- enable_usefulness_pruning,
+   occurs(T, run(Tool)),
+   not useful(T, Tool).
 
-% --- Self-loop prevention ---
-:- occurs(T2, bind(Tool, _, out(T1, Tool, _))), T2 > T1.
+% SAT-aligned behavior permits reusing outputs from earlier runs of the same
+% tool when the resulting workflow remains useful.

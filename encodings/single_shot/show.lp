@@ -14,5 +14,6 @@
 % #show stateholds/2.(T, state(A,S)) : holds(T, state(A,S)).
 % #show useful/2.
 tool_at_time(T, Tool) :- occurs(T, run(Tool)).
+#project tool_at_time/2.
 #show tool_at_time/2.
 % #show rdf_triple/3.

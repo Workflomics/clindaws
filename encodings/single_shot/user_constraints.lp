@@ -100,7 +100,7 @@
 %
 % Uncomment to enable:
 %   % enable_all_inputs_used.   % every input must be bound somewhere
-%   % enable_inputs_used_once.  % each input bound to at most one port
+%   % enable_some_input_used.   % at least one workflow input must be bound
 %   % enable_inputs_consumed.   % binding consumes the item (destructive)
 
 
@@ -125,4 +125,3 @@
 % Minimize the amount of workflow candidates and find the optimal ones
 
 % #minimize { T, Tool : occurs(T, run(Tool)) }.
-
