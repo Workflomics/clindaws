@@ -83,3 +83,15 @@ Example2,multi-shot,2,true,,true,10,19,7,51.89,0,0,0,true,false
 Example2,multi-shot,3,true,,true,10,45,23,74.83,0,0,0,true,false
 Example2,multi-shot,4,true,,true,10,80,54,114.94,0,0,3,true,false
 Example2,single-shot,10,false,,false,10,979,680,44.14,0,0,3,true,false
+Example2,multi-shot,1,false,,false,9,20,1,49.50,0,0,0,true,false
+Example2,multi-shot,2,false,,false,9,26,9,58.42,0,0,0,true,false
+Example2,multi-shot,3,false,,false,9,51,26,84.06,0,0,0,true,false
+Example2,multi-shot,4,false,,false,9,90,100,130.64,0,0,54,true,false
+Example2,multi-shot,1,true,,true,9,9,1,43.61,0,0,0,true,false
+Example2,multi-shot,2,true,,true,9,20,7,52.56,0,0,0,true,false
+Example2,multi-shot,3,true,,true,9,45,23,75.36,0,0,0,true,false
+Example2,multi-shot,4,true,,true,9,80,102,116.97,0,0,54,true,false
+Example2,single-shot,10,false,,false,10,1073,937,44.48,0,0,54,true,false
+Example2,single-shot,10,false,,false,8,895,649,44.06,0,0,0,true,false
+Example2,single-shot,10,false,,false,10,893,1004,44.22,0,0,34,true,false
+Example2,single-shot,10,false,,false,8,885,3752,44.41,0,0,1000,true,false

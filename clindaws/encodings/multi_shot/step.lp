@@ -164,17 +164,29 @@ available(out(t, Tool, Port)) :- holds(t, avail(out(t, Tool, Port))).
 artifact_dim(out(t, Tool, Port), V, Cat) :- holds(t, dim(out(t, Tool, Port), V, Cat)).
 artifact_unit(out(t, Tool, Port), U)   :- holds(t, unit(out(t, Tool, Port), U)).
 
-% Output dimensions — each output category picks one terminal value.
-% This avoids accumulating every declared terminal on one artifact when a port
-% lists multiple alternatives within the same dimension.
+% Output dimensions — each output category picks one retained terminal value.
+% When Python precompute emitted compressed representatives, branch only over
+% that reduced domain; otherwise fall back to the dense terminal expansion.
+1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
+    precomputed_output_port_candidate(Port, Value, Cat) } 1 :-
+    occurs(t, output(Tool, _, Port)),
+    precomputed_output_port_has_category(Port, Cat),
+    not precomputed_output_port_singleton_terminal(Port, _, Cat).
+
 1 { occurs(t, output_dim(Tool, Port, Value, Cat)) :
     output_port_terminal_candidate(Port, Value, Cat) } 1 :-
     occurs(t, output(Tool, _, Port)),
+    not precomputed_output_port_has_category(Port, Cat),
     output_port_has_category(Port, Cat),
     not output_port_singleton_terminal(Port, _, Cat).
 
 holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
     occurs(t, output(Tool, _, Port)),
+    precomputed_output_port_singleton_terminal(Port, Value, Cat).
+
+holds(t, dim(out(t, Tool, Port), Value, Cat)) :-
+    occurs(t, output(Tool, _, Port)),
+    not precomputed_output_port_has_category(Port, Cat),
     output_port_singleton_terminal(Port, Value, Cat).
 
 holds(t, dim(out(t, Tool, Port), Value, Cat)) :-

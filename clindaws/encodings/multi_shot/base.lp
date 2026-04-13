@@ -57,6 +57,19 @@ output_port_singleton_terminal(ProducerPort, OutputValue, Category) :-
             output_port_terminal_candidate(ProducerPort, CandidateValue, Category)
     }.
 
+% Translation-time compressed output representatives for direct multi-shot.
+% When present, these facts should define the full output-dimension choice
+% domain instead of the dense terminal expansion above.
+precomputed_output_port_has_category(ProducerPort, Category) :-
+    precomputed_output_port_candidate(ProducerPort, _, Category).
+
+precomputed_output_port_singleton_terminal(ProducerPort, OutputValue, Category) :-
+    precomputed_output_port_candidate(ProducerPort, OutputValue, Category),
+    1 = #count {
+        CandidateValue :
+            precomputed_output_port_candidate(ProducerPort, CandidateValue, Category)
+    }.
+
 declared_output_value_supports_requirement(OutputValue, ReqV) :-
     is_terminal(Terminal),
     compatible(Terminal, OutputValue),

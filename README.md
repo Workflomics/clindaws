@@ -23,8 +23,15 @@ The CLI supports 2 runtime modes:
 
 Meaning:
 
-- `single-shot`: legacy single-shot runtime schema
-- `multi-shot`: APE-style incremental runtime schema
+- `single-shot`: one-shot solve over a full grounding for `time(1..max_length)`
+- `multi-shot`: APE-style incremental grounding and solving
+
+Backend note:
+
+- `--optimized` is currently supported only for `multi-shot`
+- `multi-shot --optimized` switches to the compressed-candidate backend under
+  `clindaws/encodings/multi_shot_compressed_candidate`
+- `single-shot --optimized` is not implemented yet
 
 All runtime ASP encodings are vendored under `clindaws/encodings`.
 
@@ -36,13 +43,13 @@ Normal run:
 PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/snakeape-run
 ```
 
-Legacy single-shot:
+Single-shot:
 
 ```bash
 PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-single
 ```
 
-Legacy multi-shot:
+Plain multi-shot:
 
 ```bash
 PYTHONPATH=snakeAPE python -m clindaws ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --solutions 1 --no-graphs --output-dir /tmp/snakeape-multi
@@ -87,7 +94,8 @@ Important files:
 - `translation.lp`
 - `translation_summary.json`
 - `grounding_summary.json` for `--ground-only`
-- descriptive `answer_sets__...txt` files and `workflow_signatures.json` for normal runs
+- `workflow_signatures.json` for normal solve runs
+- `answer_sets__...txt` only when `--write-raw-answer-sets` is enabled
 - `asp_run_log.csv`
 - `asp_run_summary.csv`
 
@@ -116,6 +124,13 @@ The CSV logs are written to the output directory for each run (same as `--output
 
 If a run is interrupted, `asp_run_log.csv` still contains all stages that were completed before the interruption.
 
+Current count basis:
+
+- `workflows` in CLI summaries are canonical workflow candidates stored by the solver
+- `raw_models` are optional diagnostic counts over pre-canonical clingo answer sets
+- `workflow_signatures.json` is the primary machine-readable result artifact for
+  parity and benchmarking
+
 ## Useful Flags
 
 - `--mode single-shot|multi-shot`
@@ -128,11 +143,12 @@ If a run is interrupted, `asp_run_log.csv` still contains all stages that were c
 - `--project` / `--no-project` — enable/disable clingo model projection during solving
 - `--no-graphs`
 - `--graph-format png|dot|svg`
-- `--optimized` — precompute static helper relations and bindability facts in Python before grounding
-- `--translation-workers N` — parallel worker processes for candidate expansion (default 1, sequential)
+- `--optimized` — enable the optimized backend; for `multi-shot` this selects the compressed-candidate translation/encoding path
+- `--translation-workers N` — worker processes for optimized compressed-candidate translation (default 1, sequential)
 - `--ground-only`
 - `--ground-only-stage base|full`
 - `--translate-only`
-- `--write-raw-answer-sets`
+- `--write-raw-answer-sets` — emit raw witness-level answer sets for debugging
+- `--debug` — print diagnostic raw-model and workflow-candidate counters during solving
 - `--benchmark-repetitions N` — repeat the grounding benchmark N times
 - `--summary-top-tools N` — include top N expanded tools in translation/grounding summaries

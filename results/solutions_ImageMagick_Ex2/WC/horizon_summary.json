@@ -19,43 +19,43 @@
   "backend_stats": {},
   "workflow_input_compression": null,
   "solve_callback_profile": {
-    "model_callback_sec": 0.0028912920970469713,
-    "shown_symbols_sec": 0.0012560001341626048,
-    "workflow_signature_key_sec": 0.0007869170513004065,
-    "canonicalization_sec": 0.0008361248765140772,
-    "other_callback_sec": 1.225003506988287e-05,
-    "model_callback_share_of_solving_sec": 0.004249894467527564
+    "model_callback_sec": 0.5682308464311063,
+    "shown_symbols_sec": 0.30593277944717556,
+    "workflow_signature_key_sec": 0.12196640006732196,
+    "canonicalization_sec": 0.1390000133542344,
+    "other_callback_sec": 0.001331653562374413,
+    "model_callback_share_of_solving_sec": 0.15145834114052
   },
   "effective_parallel_mode": null,
-  "translation_peak_rss_mb": 38.609375,
-  "base_grounding_peak_rss_mb": 44.140625,
-  "base_grounding_sec": 0.008328209049068391,
+  "translation_peak_rss_mb": 41.609375,
+  "base_grounding_peak_rss_mb": 44.40625,
+  "base_grounding_sec": 0.007972708088345826,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 10,
-      "grounding_sec": 0.9794422091217712,
-      "solving_sec": 0.680320915998891,
-      "peak_rss_mb": 44.140625,
+      "grounding_sec": 0.8849396251607686,
+      "solving_sec": 3.7517302919877693,
+      "peak_rss_mb": 44.40625,
       "satisfiable": true,
       "models_seen": 0,
       "models_stored": 0,
       "unique_workflows_seen": 0,
-      "unique_workflows_stored": 3,
+      "unique_workflows_stored": 1000,
       "diagnostic_counts_enabled": false,
       "available_artifacts_at_step": null,
       "eligible_artifacts_at_step": null,
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.0028912920970469713,
-      "shown_symbols_sec": 0.0012560001341626048,
-      "workflow_signature_key_sec": 0.0007869170513004065,
-      "canonicalization_sec": 0.0008361248765140772,
+      "model_callback_sec": 0.5682308464311063,
+      "shown_symbols_sec": 0.30593277944717556,
+      "workflow_signature_key_sec": 0.12196640006732196,
+      "canonicalization_sec": 0.1390000133542344,
       "grounding_parts": [
         [
           "single_shot_full",
-          0.9711140000727028
+          0.8769669170724228
         ]
       ]
     }

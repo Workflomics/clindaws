@@ -38,3 +38,14 @@ No2,multi-shot,2,false,"10,compete",false,309,833,264,610.23,0,0,0,true,false
 No2,multi-shot,3,false,"10,compete",false,309,1774,634,1279.72,0,0,0,true,false
 No2,multi-shot,4,false,"10,compete",false,309,2978,1952,2773.92,0,0,0,true,false
 No2,multi-shot,5,false,"10,compete",false,309,3932,151842,4901.98,127057,425,425,true,false
+No2,multi-shot,1,false,,false,313,2201,71,357.52,0,0,0,true,false
+No2,multi-shot,2,false,,false,313,322,92,446.67,0,0,0,true,false
+No2,multi-shot,3,false,,false,313,579,287,522.00,0,0,0,true,false
+No2,multi-shot,4,false,,false,313,1096,969,834.69,0,0,0,true,false
+No2,multi-shot,5,false,,false,313,1646,31162,1255.88,0,0,152,true,false
+No2,multi-shot,1,false,,false,309,2247,74,359.30,0,0,0,true,false
+No2,multi-shot,2,false,,false,309,339,81,444.55,0,0,0,true,false
+No2,multi-shot,3,false,,false,309,565,281,501.69,0,0,0,true,false
+No2,multi-shot,4,false,,false,309,1095,949,832.55,0,0,0,true,false
+No2,multi-shot,5,false,,false,309,1692,32948,1242.80,5130,0,152,true,false
+No2,single-shot,10,false,,false,313,21706,51279,306.38,0,0,152,true,false

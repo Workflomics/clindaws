@@ -1,8 +1,8 @@
 {
-  "mode": "multi-shot",
+  "mode": "single-shot",
   "grounding_strategy": "hybrid",
   "internal_schema": "legacy_direct_check_precompute",
-  "internal_solver_mode": "multi-shot",
+  "internal_solver_mode": "single-shot",
   "earliest_solution_step": 1,
   "effective_solve_start_horizon": 1,
   "python_precompute_enabled": false,
@@ -17,202 +17,45 @@
     "precompute_plain_output_port_candidates_requiring_check": 4434
   },
   "backend_stats": {},
-  "workflow_input_compression": {
-    "workflow_input_collapsed_members": 0,
-    "workflow_input_equivalence_classes": 1,
-    "workflow_input_planner_visible_count_compressed": 1,
-    "workflow_input_planner_visible_count_uncompressed": 1,
-    "workflow_input_planner_visible_reduction_if_compressed": 0,
-    "workflow_input_repeated_equivalence_classes": 0,
-    "workflow_input_slots": 0,
-    "workflow_input_compression_active": false,
-    "workflow_input_planner_visible_count_effective": 1
-  },
+  "workflow_input_compression": null,
   "solve_callback_profile": {
-    "model_callback_sec": 92.53552603267599,
-    "shown_symbols_sec": 71.02768439310603,
-    "workflow_signature_key_sec": 20.9305398670258,
-    "canonicalization_sec": 0.07097090920433402,
-    "other_callback_sec": 0.5063308633398265,
-    "model_callback_share_of_solving_sec": 0.5974231093483724
+    "model_callback_sec": 5.482425596215762,
+    "shown_symbols_sec": 5.118838210357353,
+    "workflow_signature_key_sec": 0.31904356577433646,
+    "canonicalization_sec": 0.03967112640384585,
+    "other_callback_sec": 0.004872693680226803,
+    "model_callback_share_of_solving_sec": 0.10691464311371493
   },
-  "effective_parallel_mode": "10,compete",
-  "translation_peak_rss_mb": 68.65625,
-  "base_grounding_peak_rss_mb": 307.234375,
-  "base_grounding_sec": 1.9550823329482228,
+  "effective_parallel_mode": null,
+  "translation_peak_rss_mb": 68.671875,
+  "base_grounding_peak_rss_mb": 306.375,
+  "base_grounding_sec": 2.104245957918465,
   "timed_out": false,
   "horizons": [
     {
-      "horizon": 1,
-      "grounding_sec": 0.9525510419625789,
-      "solving_sec": 0.19999062502756715,
-      "peak_rss_mb": 493.390625,
-      "satisfiable": false,
-      "models_seen": 0,
-      "models_stored": 0,
-      "unique_workflows_seen": 0,
-      "unique_workflows_stored": 0,
-      "available_artifacts_at_step": 361,
-      "eligible_artifacts_at_step": 8702,
-      "eligible_workflow_inputs_at_step": 42,
-      "eligible_produced_outputs_at_step": 8660,
-      "bind_choice_domain_size_at_step": 42,
-      "model_callback_sec": 0.0,
-      "shown_symbols_sec": 0.0,
-      "workflow_signature_key_sec": 0.0,
-      "canonicalization_sec": 0.0,
-      "grounding_parts": [
-        [
-          "init",
-          0.0015793329803273082
-        ],
-        [
-          "step",
-          0.8069478339748457
-        ],
-        [
-          "constraint_step",
-          0.002933582989498973
-        ],
-        [
-          "check",
-          0.1410902920179069
-        ]
-      ]
-    },
-    {
-      "horizon": 2,
-      "grounding_sec": 0.8333543750923127,
-      "solving_sec": 0.26438741700258106,
-      "peak_rss_mb": 610.234375,
-      "satisfiable": false,
-      "models_seen": 0,
-      "models_stored": 0,
-      "unique_workflows_seen": 0,
-      "unique_workflows_stored": 0,
-      "available_artifacts_at_step": 402,
-      "eligible_artifacts_at_step": 10023,
-      "eligible_workflow_inputs_at_step": 42,
-      "eligible_produced_outputs_at_step": 9981,
-      "bind_choice_domain_size_at_step": 1363,
-      "model_callback_sec": 0.0,
-      "shown_symbols_sec": 0.0,
-      "workflow_signature_key_sec": 0.0,
-      "canonicalization_sec": 0.0,
-      "grounding_parts": [
-        [
-          "step",
-          0.6713365420000628
-        ],
-        [
-          "constraint_step",
-          0.00661550008226186
-        ],
-        [
-          "check",
-          0.15540233300998807
-        ]
-      ]
-    },
-    {
-      "horizon": 3,
-      "grounding_sec": 1.7741292079444975,
-      "solving_sec": 0.6336042919429019,
-      "peak_rss_mb": 1279.71875,
-      "satisfiable": false,
-      "models_seen": 0,
-      "models_stored": 0,
-      "unique_workflows_seen": 0,
-      "unique_workflows_stored": 0,
-      "available_artifacts_at_step": 598,
-      "eligible_artifacts_at_step": 16158,
-      "eligible_workflow_inputs_at_step": 42,
-      "eligible_produced_outputs_at_step": 16116,
-      "bind_choice_domain_size_at_step": 7498,
-      "model_callback_sec": 0.0,
-      "shown_symbols_sec": 0.0,
-      "workflow_signature_key_sec": 0.0,
-      "canonicalization_sec": 0.0,
-      "grounding_parts": [
-        [
-          "step",
-          1.330967374960892
-        ],
-        [
-          "constraint_step",
-          0.02866120799444616
-        ],
-        [
-          "check",
-          0.4145006249891594
-        ]
-      ]
-    },
-    {
-      "horizon": 4,
-      "grounding_sec": 2.978451082133688,
-      "solving_sec": 1.9516129579860717,
-      "peak_rss_mb": 2773.921875,
-      "satisfiable": false,
-      "models_seen": 0,
-      "models_stored": 0,
-      "unique_workflows_seen": 0,
-      "unique_workflows_stored": 0,
-      "available_artifacts_at_step": 922,
-      "eligible_artifacts_at_step": 24204,
-      "eligible_workflow_inputs_at_step": 42,
-      "eligible_produced_outputs_at_step": 24162,
-      "bind_choice_domain_size_at_step": 15544,
-      "model_callback_sec": 0.0,
-      "shown_symbols_sec": 0.0,
-      "workflow_signature_key_sec": 0.0,
-      "canonicalization_sec": 0.0,
-      "grounding_parts": [
-        [
-          "step",
-          1.9804149160627276
-        ],
-        [
-          "constraint_step",
-          0.08805583301000297
-        ],
-        [
-          "check",
-          0.9099803330609575
-        ]
-      ]
-    },
-    {
-      "horizon": 5,
-      "grounding_sec": 3.9319078339030966,
-      "solving_sec": 151.8415105000604,
-      "peak_rss_mb": 4901.984375,
+      "horizon": 10,
+      "grounding_sec": 21.705881457892247,
+      "solving_sec": 51.278528708033264,
+      "peak_rss_mb": 306.375,
       "satisfiable": true,
-      "models_seen": 127057,
-      "models_stored": 425,
-      "unique_workflows_seen": 425,
-      "unique_workflows_stored": 425,
-      "available_artifacts_at_step": 1261,
-      "eligible_artifacts_at_step": 32707,
-      "eligible_workflow_inputs_at_step": 42,
-      "eligible_produced_outputs_at_step": 32665,
-      "bind_choice_domain_size_at_step": 24047,
-      "model_callback_sec": 92.53552603267599,
-      "shown_symbols_sec": 71.02768439310603,
-      "workflow_signature_key_sec": 20.9305398670258,
-      "canonicalization_sec": 0.07097090920433402,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 152,
+      "diagnostic_counts_enabled": false,
+      "available_artifacts_at_step": null,
+      "eligible_artifacts_at_step": null,
+      "eligible_workflow_inputs_at_step": null,
+      "eligible_produced_outputs_at_step": null,
+      "bind_choice_domain_size_at_step": null,
+      "model_callback_sec": 5.482425596215762,
+      "shown_symbols_sec": 5.118838210357353,
+      "workflow_signature_key_sec": 0.31904356577433646,
+      "canonicalization_sec": 0.03967112640384585,
       "grounding_parts": [
         [
-          "step",
-          2.708320749923587
-        ],
-        [
-          "constraint_step",
-          0.13029691693373024
-        ],
-        [
-          "check",
-          1.0932901670457795
+          "single_shot_full",
+          19.60163549997378
         ]
       ]
     }

@@ -37,6 +37,19 @@ def _single_shot_overlay(min_length: int, horizon: int) -> str:
         f":- not holds({horizon}, goal).",
         ":- occurs(T, run(_)), not occurs(T-1, run(_)), T > 1.",
         ":- occurs(T, run(ToolA)), occurs(T, run(ToolB)), ToolA < ToolB.",
+        "",
+        "% One-shot ordering layer: solve exact (goal_time, run_count) slices on one",
+        "% grounded control object, lexicographically by earlier goal then shorter",
+        "% active prefix.",
+        "single_shot_goal_time(1) :- holds(1, goal).",
+        "single_shot_goal_time(T) :- T > 1, holds(T, goal), not holds(T-1, goal).",
+        "single_shot_run_count(N) :- N = #count { T : occurs(T, run(_)) }.",
+        "#external single_shot_target_goal_time(T) : time(T).",
+        "#external single_shot_target_run_count(N) : time(N).",
+        ":- single_shot_target_goal_time(T), not single_shot_goal_time(T).",
+        ":- single_shot_target_goal_time(Target), single_shot_goal_time(Actual), Actual != Target.",
+        ":- single_shot_target_run_count(N), not single_shot_run_count(N).",
+        ":- single_shot_target_run_count(Target), single_shot_run_count(Actual), Actual != Target.",
     ]
     if min_length > 1:
         overlay.append(f":- holds({min_length - 1}, goal).")
@@ -758,7 +771,6 @@ def _solve_single_shot_with_programs(
     horizon_records: list[HorizonRecord] = []
     solving_started = False
     tool_input_signatures = dict(facts.tool_input_signatures)
-
     horizon = config.solution_length_min
     while horizon <= config.solution_length_max:
         if not solve_all_horizons and len(unique_solutions) >= config.solutions:
@@ -1037,8 +1049,16 @@ def _solve_single_shot_once(
             start = perf_counter()
             query_symbol = clingo.Function("query", [clingo.Number(horizon)])
             control.assign_external(query_symbol, True)
+            goal_time_symbols = {
+                goal_time: clingo.Function("single_shot_target_goal_time", [clingo.Number(goal_time)])
+                for goal_time in range(config.solution_length_min, horizon + 1)
+            }
+            run_count_symbols = {
+                run_count: clingo.Function("single_shot_target_run_count", [clingo.Number(run_count)])
+                for run_count in range(config.solution_length_min, horizon + 1)
+            }
 
-            def _solve() -> None:
+            def _solve_layer() -> None:
                 nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                 nonlocal model_callback_sec, shown_symbols_sec
                 nonlocal workflow_signature_key_sec, canonicalization_sec
@@ -1101,7 +1121,23 @@ def _solve_single_shot_once(
                             break
 
             try:
-                _run_interruptible(_solve, is_interrupted)
+                for goal_time in range(config.solution_length_min, horizon + 1):
+                    if len(unique_solutions) >= config.solutions:
+                        break
+                    goal_time_symbol = goal_time_symbols[goal_time]
+                    control.assign_external(goal_time_symbol, True)
+                    try:
+                        for run_count in range(goal_time, horizon + 1):
+                            if len(unique_solutions) >= config.solutions:
+                                break
+                            run_count_symbol = run_count_symbols[run_count]
+                            control.assign_external(run_count_symbol, True)
+                            try:
+                                _run_interruptible(_solve_layer, is_interrupted)
+                            finally:
+                                control.assign_external(run_count_symbol, False)
+                    finally:
+                        control.assign_external(goal_time_symbol, False)
                 solve_elapsed = perf_counter() - start
             finally:
                 control.release_external(query_symbol)

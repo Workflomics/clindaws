@@ -45,12 +45,23 @@ goal_satisfied_by(T, GoalID, WF) :-
 % Keep the smallest terminal value that still satisfies all actual downstream
 % consumers and any goal the produced output satisfies at horizon T.
 
-output_dim_violates_consumer(TProd, ToolProd, Port, V, Cat) :-
+has_precomputed_output_port_candidates :-
+    precomputed_output_port_candidate(_, _, _).
+
+output_dim_check_candidate(TProd, ToolProd, Port, V, Cat) :-
+    occurs(TProd, output(ToolProd, _, Port)),
+    precomputed_output_port_candidate_requires_check(Port, V, Cat).
+
+output_dim_check_candidate(TProd, ToolProd, Port, V, Cat) :-
     occurs(TProd, output(ToolProd, _, Port)),
     dimension(Port, (BaseV, Cat)),
     not is_terminal(BaseV),
     compatible(V, BaseV),
     is_terminal(V),
+    not has_precomputed_output_port_candidates.
+
+output_dim_violates_consumer(TProd, ToolProd, Port, V, Cat) :-
+    output_dim_check_candidate(TProd, ToolProd, Port, V, Cat),
     occurs(TUse, bind(ToolUse, PortIn, out(TProd, ToolProd, Port))),
     port_requires(PortIn, ReqV, Cat),
     not compatible(V, ReqV).
@@ -61,20 +72,12 @@ chosen_output_goal_requirement(TGoal, TProd, ToolProd, Port, GoalID, GoalV, Cat)
     goal_output(GoalID, GoalV, Cat).
 
 output_dim_violates_goal(TProd, ToolProd, Port, V, Cat) :-
-    occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
+    output_dim_check_candidate(TProd, ToolProd, Port, V, Cat),
     chosen_output_goal_requirement(_, TProd, ToolProd, Port, _, GoalV, Cat),
     not compatible(V, GoalV).
 
 output_dim_supported(TProd, ToolProd, Port, V, Cat) :-
-    occurs(TProd, output(ToolProd, _, Port)),
-    dimension(Port, (BaseV, Cat)),
-    not is_terminal(BaseV),
-    compatible(V, BaseV),
-    is_terminal(V),
+    output_dim_check_candidate(TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_consumer(TProd, ToolProd, Port, V, Cat),
     not output_dim_violates_goal(TProd, ToolProd, Port, V, Cat).
 

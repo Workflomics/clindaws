@@ -29,24 +29,24 @@
     "workflow_input_planner_visible_count_effective": 2
   },
   "solve_callback_profile": {
-    "model_callback_sec": 0.09880749916192144,
-    "shown_symbols_sec": 0.010944877518340945,
-    "workflow_signature_key_sec": 0.0608040492516011,
-    "canonicalization_sec": 0.026654961751773953,
-    "other_callback_sec": 0.0004036106402054429,
-    "model_callback_share_of_solving_sec": 0.38678745389415836
+    "model_callback_sec": 0.10798470152076334,
+    "shown_symbols_sec": 0.012471114750951529,
+    "workflow_signature_key_sec": 0.0664430761244148,
+    "canonicalization_sec": 0.028566586319357157,
+    "other_callback_sec": 0.0005039243260398507,
+    "model_callback_share_of_solving_sec": 0.3833559773482442
   },
   "effective_parallel_mode": null,
-  "translation_peak_rss_mb": 41.734375,
-  "base_grounding_peak_rss_mb": 43.796875,
-  "base_grounding_sec": 0.0069913329789415,
+  "translation_peak_rss_mb": 39.03125,
+  "base_grounding_peak_rss_mb": 43.953125,
+  "base_grounding_sec": 0.007937749964185059,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 1,
-      "grounding_sec": 0.006260459893383086,
-      "solving_sec": 0.0005561249563470483,
-      "peak_rss_mb": 45.84375,
+      "grounding_sec": 0.006394042051397264,
+      "solving_sec": 0.0005810420261695981,
+      "peak_rss_mb": 45.671875,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -65,27 +65,27 @@
       "grounding_parts": [
         [
           "init",
-          0.000489958911202848
+          0.0005613339599221945
         ],
         [
           "step",
-          0.0026145840529352427
+          0.0026803750079125166
         ],
         [
           "constraint_step",
-          0.00042683398351073265
+          0.00037408305797725916
         ],
         [
           "check",
-          0.0027290829457342625
+          0.0027782500255852938
         ]
       ]
     },
     {
       "horizon": 2,
-      "grounding_sec": 0.0057311669224873185,
-      "solving_sec": 0.0005159169668331742,
-      "peak_rss_mb": 46.3125,
+      "grounding_sec": 0.006107957917265594,
+      "solving_sec": 0.00043987506069242954,
+      "peak_rss_mb": 46.109375,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -104,23 +104,23 @@
       "grounding_parts": [
         [
           "step",
-          0.002650999929755926
+          0.0028888749657198787
         ],
         [
           "constraint_step",
-          0.0003491670358926058
+          0.0003917909925803542
         ],
         [
           "check",
-          0.0027309999568387866
+          0.002827291958965361
         ]
       ]
     },
     {
       "horizon": 3,
-      "grounding_sec": 0.006903458037413657,
-      "solving_sec": 0.00103854201734066,
-      "peak_rss_mb": 46.90625,
+      "grounding_sec": 0.006268374039791524,
+      "solving_sec": 0.0010831659892573953,
+      "peak_rss_mb": 46.953125,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -139,23 +139,23 @@
       "grounding_parts": [
         [
           "step",
-          0.003358875052072108
+          0.003279582946561277
         ],
         [
           "constraint_step",
-          0.0005448330193758011
+          0.0004278330598026514
         ],
         [
           "check",
-          0.002999749965965748
+          0.002560958033427596
         ]
       ]
     },
     {
       "horizon": 4,
-      "grounding_sec": 0.010081751039251685,
-      "solving_sec": 0.002241416950710118,
-      "peak_rss_mb": 49.65625,
+      "grounding_sec": 0.010376540943980217,
+      "solving_sec": 0.0022698750253766775,
+      "peak_rss_mb": 49.5625,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -174,23 +174,23 @@
       "grounding_parts": [
         [
           "step",
-          0.005432834033854306
+          0.005827290937304497
         ],
         [
           "constraint_step",
-          0.0006998749449849129
+          0.0007369579980149865
         ],
         [
           "check",
-          0.0039490420604124665
+          0.0038122920086607337
         ]
       ]
     },
     {
       "horizon": 5,
-      "grounding_sec": 0.012868707999587059,
-      "solving_sec": 0.0038146249717101455,
-      "peak_rss_mb": 53.171875,
+      "grounding_sec": 0.01288975088391453,
+      "solving_sec": 0.004406249965541065,
+      "peak_rss_mb": 53.28125,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -209,23 +209,23 @@
       "grounding_parts": [
         [
           "step",
-          0.0064916659612208605
+          0.007032874971628189
         ],
         [
           "constraint_step",
-          0.0010903750080615282
+          0.0011980419512838125
         ],
         [
           "check",
-          0.00528666703030467
+          0.004658833961002529
         ]
       ]
     },
     {
       "horizon": 6,
-      "grounding_sec": 0.017407543025910854,
-      "solving_sec": 0.0071917090099304914,
-      "peak_rss_mb": 59.609375,
+      "grounding_sec": 0.01842491701245308,
+      "solving_sec": 0.007083707954734564,
+      "peak_rss_mb": 59.1875,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -244,23 +244,23 @@
       "grounding_parts": [
         [
           "step",
-          0.008549417019821703
+          0.009911792003549635
         ],
         [
           "constraint_step",
-          0.0014250419335439801
+          0.0015962079633027315
         ],
         [
           "check",
-          0.007433084072545171
+          0.006916917045600712
         ]
       ]
     },
     {
       "horizon": 7,
-      "grounding_sec": 0.02480429201386869,
-      "solving_sec": 0.009926792001351714,
-      "peak_rss_mb": 70.015625,
+      "grounding_sec": 0.025841958122327924,
+      "solving_sec": 0.010952332988381386,
+      "peak_rss_mb": 70.125,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -279,23 +279,23 @@
       "grounding_parts": [
         [
           "step",
-          0.012426292058080435
+          0.013440332957543433
         ],
         [
           "constraint_step",
-          0.001979209017008543
+          0.0018842500867322087
         ],
         [
           "check",
-          0.010398790938779712
+          0.010517375078052282
         ]
       ]
     },
     {
       "horizon": 8,
-      "grounding_sec": 0.029582500108517706,
-      "solving_sec": 0.01622891705483198,
-      "peak_rss_mb": 81.234375,
+      "grounding_sec": 0.03244541701860726,
+      "solving_sec": 0.01841570797841996,
+      "peak_rss_mb": 81.375,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -314,23 +314,23 @@
       "grounding_parts": [
         [
           "step",
-          0.014614416984841228
+          0.015853874967433512
         ],
         [
           "constraint_step",
-          0.00215000007301569
+          0.0026095419889315963
         ],
         [
           "check",
-          0.012818083050660789
+          0.01398200006224215
         ]
       ]
     },
     {
       "horizon": 9,
-      "grounding_sec": 0.036673833965323865,
-      "solving_sec": 0.21394279203377664,
-      "peak_rss_mb": 98.015625,
+      "grounding_sec": 0.04080558393616229,
+      "solving_sec": 0.23645062500145286,
+      "peak_rss_mb": 97.296875,
       "satisfiable": true,
       "models_seen": 0,
       "models_stored": 0,
@@ -342,22 +342,22 @@
       "eligible_workflow_inputs_at_step": 8,
       "eligible_produced_outputs_at_step": 1007,
       "bind_choice_domain_size_at_step": 874,
-      "model_callback_sec": 0.09880749916192144,
-      "shown_symbols_sec": 0.010944877518340945,
-      "workflow_signature_key_sec": 0.0608040492516011,
-      "canonicalization_sec": 0.026654961751773953,
+      "model_callback_sec": 0.10798470152076334,
+      "shown_symbols_sec": 0.012471114750951529,
+      "workflow_signature_key_sec": 0.0664430761244148,
+      "canonicalization_sec": 0.028566586319357157,
       "grounding_parts": [
         [
           "step",
-          0.018007750040851533
+          0.019231416983529925
         ],
         [
           "constraint_step",
-          0.0028727089520543814
+          0.0031892090337350965
         ],
         [
           "check",
-          0.01579337497241795
+          0.01838495791889727
         ]
       ]
     }

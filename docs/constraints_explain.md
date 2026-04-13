@@ -4,10 +4,14 @@
 
 - `constraints_path`
 
-`constraints_path` is currently wired for the benchmark-targeted modes:
+`constraints_path` is currently wired for the active public modes:
 
 - `single-shot`
 - `multi-shot`
+
+This includes optimized multi-shot runs as well. `multi-shot --optimized` uses a
+different internal ASP backend, but it still consumes the same lowered
+constraint facts.
 
 The file behind `constraints_path` can be one of two shapes:
 
@@ -30,7 +34,7 @@ Constraint selectors refer to tools or tool classes from the ontology and tool a
 Selectors are matched against `constraint_selected_tool/3` through an explicit
 selector-mode layer.
 
-Today the default mode is still taxonomy-aware `transitive` matching, so a
+Today the default is still taxonomy-aware `transitive` matching, so a
 class selector can match any concrete tool implementation below it. The
 translator now also emits selector metadata (`constraint_selector_mode/2`,
 `constraint_selector_kind/2`) and the ASP layer exposes an exact/direct tool
@@ -87,6 +91,7 @@ Supported native atoms:
 - `unique_inputs(A)`: matching tool runs cannot reuse one workflow artifact on two input ports
 - `connected_op(A, B)`: some later matching `B` must bind an artifact produced by some earlier matching `A`
 - `operation_input(A, X)`: some matching `A` run must bind an artifact carrying data selector `X`
+- `operationInput(A, X)`: accepted as an alias of `operation_input(A, X)`
 - `used_iff_used(A, B)`: `A` appears iff `B` appears
 - `max_uses(A, N)`: selector `A` may appear at most `N` times
 - `mutex_tools(A, B)`: `A` and `B` may not both appear in the same workflow
@@ -100,7 +105,7 @@ Notes:
 
 ## What Is Implemented Today
 
-Implemented in the current benchmark-targeted paths:
+Implemented in the current public paths:
 
 - APE-style templates listed above
 - Native atoms listed above
@@ -114,7 +119,8 @@ Not implemented:
 
 - General `SLTLx` parsing
 - Arbitrary raw ASP snippets inside JSON
-- Additional removed legacy/experimental modes beyond `single-shot` and `multi-shot`
+- Additional removed legacy/experimental mode families beyond the current
+  `single-shot` and `multi-shot` surface
 
 ## Defect Concentration Example
 
@@ -130,4 +136,6 @@ The important native entries are:
 - `used_iff_used(CreateAntisite, CalcChemicalPotentialB)`
 - `mutex_tools(RunVasp, RunSphinx)`
 
-This setup matches the APE SAT baseline for `defect_concentration` in `multi-shot` on the benchmarked horizons.
+This setup remains representative for the current `multi-shot` constraint
+surface. The same translated constraints are also consumed by optimized
+multi-shot runs, although parity should still be checked benchmark by benchmark.
