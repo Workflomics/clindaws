@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=(
             "single-shot",
+            "single-shot-sliding-window",
             "multi-shot",
         ),
         default="multi-shot",
@@ -52,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--solutions",
         type=int,
-        help="Override the solution limit used both for canonical workflow storage and the native clingo model cap.",
+        help="Override the maximum number of canonical workflows stored for the run.",
     )
     parser.add_argument(
         "--min-length",
@@ -155,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--ground-only cannot be combined with --translate-only.")
         if args.ground_only_stage != "base" and not args.ground_only:
             parser.error("--ground-only-stage requires --ground-only.")
+        if args.ground_only and args.mode == "single-shot-sliding-window":
+            parser.error("--ground-only does not support mode single-shot-sliding-window.")
 
         if args.ground_only:
             grounding_result = run_ground_only(

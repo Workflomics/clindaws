@@ -16,14 +16,17 @@ Example:
 
 ## Modes
 
-The CLI supports 2 runtime modes:
+The CLI supports 3 runtime modes:
 
 - `single-shot`
+- `single-shot-sliding-window`
 - `multi-shot`
 
 Meaning:
 
 - `single-shot`: one-shot solve over a full grounding for `time(1..max_length)`
+- `single-shot-sliding-window`: single-shot horizon traversal from `solution_length.min`
+  to `solution_length.max`, stopping once the configured workflow limit is met
 - `multi-shot`: APE-style incremental grounding and solving
 
 Backend note:
@@ -32,6 +35,8 @@ Backend note:
 - `multi-shot --optimized` switches to the compressed-candidate backend under
   `encodings/multi_shot_compressed_candidate`
 - `single-shot --optimized` is not implemented yet
+- `single-shot-sliding-window --optimized` is not implemented yet
+- `--ground-only` does not support `single-shot-sliding-window`
 
 All runtime ASP encodings are vendored under `clindaws/encodings`.
 
@@ -47,6 +52,12 @@ Single-shot:
 
 ```bash
 ./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/clindaws-single
+```
+
+Sliding-window single-shot:
+
+```bash
+./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-sliding-window --solutions 1 --no-graphs --output-dir /tmp/clindaws-single-window
 ```
 
 Plain multi-shot:
@@ -110,7 +121,8 @@ The CSV logs are written to the output directory for each run (same as `--output
 - `translation_schema`
 - timing columns
 - peak RSS memory columns
-- satisfiability / stored-solution counts
+- `workflow_candidates_found`
+- satisfiability / stored-workflow counts
 
 `asp_run_summary.csv` is append-only and contains one row per completed invocation with total:
 
@@ -128,12 +140,13 @@ Current count basis:
 
 - `workflows` in CLI summaries are canonical workflow candidates stored by the solver
 - `raw_models` are optional diagnostic counts over pre-canonical clingo answer sets
+- `solutions` caps stored canonical workflows; for `single-shot` this cap is enforced after workflow canonicalization rather than as a raw clingo answer-set limit
 - the `workflow_signatures__...json` artifact is the primary machine-readable result artifact for
   parity and benchmarking
 
 ## Useful Flags
 
-- `--mode single-shot|multi-shot`
+- `--mode single-shot|single-shot-sliding-window|multi-shot`
 - `--grounding python|hybrid|clingo` — grounding strategy (default `hybrid`)
 - `--output-dir ...`
 - `--solutions N`

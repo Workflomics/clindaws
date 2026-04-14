@@ -81,7 +81,13 @@ def _make_solve_control(
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> clingo.Control:
-    """Create a clingo control for full model enumeration during solving."""
+    """Create a clingo control for solve-time model enumeration.
+
+    The public runtime keeps clingo's native model bound open and enforces the
+    stored workflow quota in Python after canonicalization. That preserves the
+    meaning of ``solutions`` as a cap on unique stored workflows rather than a
+    cap on raw pre-canonical answer sets.
+    """
 
     args = ["0", "--warn=none"]
     if project_models:
@@ -222,7 +228,7 @@ def program_paths_for_mode(
 ) -> tuple[Path, ...]:
     """Return the concrete ASP program family for one effective solver mode."""
 
-    if mode == "single-shot":
+    if mode in {"single-shot", "single-shot-sliding-window"}:
         return _single_shot_program_paths(optimized=optimized)
     if mode == "multi-shot":
         if optimized:
@@ -805,7 +811,10 @@ def _solve_single_shot_with_programs(
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_min
     while horizon <= config.solution_length_max:
-        if not solve_all_horizons and len(unique_solutions) >= config.solutions:
+        if not solve_all_horizons and _stored_solution_quota_reached(
+            unique_count=len(unique_solutions),
+            solution_limit=config.solutions,
+        ):
             break
 
         control = _make_solve_control(
@@ -815,8 +824,12 @@ def _solve_single_shot_with_programs(
         for program_path in program_paths:
             control.load(str(program_path))
         control.add("base", [], facts.facts)
-        control.add("base", [], f"time(1..{horizon}).\n")
-        control.add("base", [], _single_shot_overlay(horizon))
+        runtime_facts = _projection_runtime_facts(mode="single-shot", project_models=project_models)
+        if runtime_facts:
+            control.add("base", [], runtime_facts)
+        if facts.python_precomputed_facts:
+            control.add("base", [], facts.python_precomputed_facts)
+        control.add("single_shot", [], _single_shot_overlay(config.solution_length_min, horizon))
 
         _horizon_interrupted = False
         try:
@@ -824,15 +837,30 @@ def _solve_single_shot_with_programs(
                 if horizon == config.solution_length_min:
                     _report(progress_callback, "Step 2: grounding started.")
                 _report(progress_callback, f"Grounding: single-shot horizon {horizon}...")
+                grounding_parts: list[tuple[str, float]] = []
                 start = perf_counter()
                 _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
-                ground_elapsed = perf_counter() - start
-                total_grounding += ground_elapsed
+                base_elapsed = perf_counter() - start
+                ground_elapsed = base_elapsed
+                grounding_parts.append(("base", base_elapsed))
+                total_grounding += base_elapsed
                 if horizon == config.solution_length_min:
-                    base_grounding_sec += ground_elapsed
+                    base_grounding_sec += base_elapsed
                     base_grounding_peak_rss_mb = current_peak_rss_mb()
                     if base_grounding_callback is not None:
                         base_grounding_callback(base_grounding_sec, base_grounding_peak_rss_mb)
+                full_ground_parts = _single_shot_full_ground_parts(horizon)
+                start = perf_counter()
+                _run_interruptible(
+                    lambda: control.ground(
+                        [(name, list(args)) for name, args in full_ground_parts]
+                    ),
+                    is_interrupted,
+                )
+                full_ground_elapsed = perf_counter() - start
+                ground_elapsed += full_ground_elapsed
+                grounding_parts.append(("single_shot_full", full_ground_elapsed))
+                total_grounding += full_ground_elapsed
                 _report(
                     progress_callback,
                     f"Grounding progress: single-shot horizon {horizon} finished after {ground_elapsed:.3f}s.",
@@ -855,6 +883,8 @@ def _solve_single_shot_with_programs(
                 seen_tool_sequence_keys: set[tuple[object, ...]] = set()
                 stored_tool_sequence_keys: set[tuple[object, ...]] = set()
                 start = perf_counter()
+                query_symbol = clingo.Function("query", [clingo.Number(horizon)])
+                control.assign_external(query_symbol, True)
 
                 def _solve() -> None:
                     with control.solve(yield_=True) as handle:
@@ -916,52 +946,62 @@ def _solve_single_shot_with_programs(
                                 unique_workflows_stored += 1
                             elif (
                                 solve_all_horizons
-                                and len(unique_solutions) >= config.solutions
+                                and _stored_solution_quota_reached(
+                                    unique_count=len(unique_solutions),
+                                    solution_limit=config.solutions,
+                                )
                             ):
                                 model_callback_sec += perf_counter() - callback_start
                                 break
-                            if not solve_all_horizons and len(unique_solutions) >= config.solutions:
+                            if not solve_all_horizons and _stored_solution_quota_reached(
+                                unique_count=len(unique_solutions),
+                                solution_limit=config.solutions,
+                            ):
                                 model_callback_sec += perf_counter() - callback_start
                                 break
                             model_callback_sec += perf_counter() - callback_start
 
-                _run_interruptible(_solve, is_interrupted)
-                solve_elapsed = perf_counter() - start
-                total_solving += solve_elapsed
-                record = HorizonRecord(
-                    horizon=horizon,
-                    grounding_sec=ground_elapsed,
-                    solving_sec=solve_elapsed,
-                    peak_rss_mb=current_peak_rss_mb(),
-                    satisfiable=any_model_seen,
-                    models_seen=models_seen,
-                    models_stored=models_stored,
-                    unique_workflows_seen=unique_workflows_seen,
-                    unique_workflows_stored=unique_workflows_stored,
-                    diagnostic_counts_enabled=diagnostic_counts_enabled,
-                    model_callback_sec=model_callback_sec,
-                    shown_symbols_sec=shown_symbols_sec,
-                    workflow_signature_key_sec=workflow_signature_key_sec,
-                    canonicalization_sec=canonicalization_sec,
-                )
-                horizon_records.append(record)
-                if horizon_record_callback is not None:
-                    horizon_record_callback(record)
-                _report(
-                    progress_callback,
-                    f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
-                    f"{_format_progress_counts(
-                        diagnostic_counts_enabled=diagnostic_counts_enabled,
-                        capture_raw_models=capture_raw_models,
+                try:
+                    _run_interruptible(_solve, is_interrupted)
+                    solve_elapsed = perf_counter() - start
+                    total_solving += solve_elapsed
+                    record = HorizonRecord(
+                        horizon=horizon,
+                        grounding_sec=ground_elapsed,
+                        solving_sec=solve_elapsed,
+                        peak_rss_mb=current_peak_rss_mb(),
+                        satisfiable=any_model_seen,
                         models_seen=models_seen,
                         models_stored=models_stored,
                         unique_workflows_seen=unique_workflows_seen,
                         unique_workflows_stored=unique_workflows_stored,
-                        seen_tool_sequence_count=len(seen_tool_sequence_keys),
-                        stored_tool_sequence_count=len(stored_tool_sequence_keys),
-                    )}, "
-                    f"satisfiable={'yes' if any_model_seen else 'no'}.",
-                )
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        model_callback_sec=model_callback_sec,
+                        shown_symbols_sec=shown_symbols_sec,
+                        workflow_signature_key_sec=workflow_signature_key_sec,
+                        canonicalization_sec=canonicalization_sec,
+                        grounding_parts=tuple(grounding_parts),
+                    )
+                    horizon_records.append(record)
+                    if horizon_record_callback is not None:
+                        horizon_record_callback(record)
+                    _report(
+                        progress_callback,
+                        f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
+                        f"{_format_progress_counts(
+                            diagnostic_counts_enabled=diagnostic_counts_enabled,
+                            capture_raw_models=capture_raw_models,
+                            models_seen=models_seen,
+                            models_stored=models_stored,
+                            unique_workflows_seen=unique_workflows_seen,
+                            unique_workflows_stored=unique_workflows_stored,
+                            seen_tool_sequence_count=len(seen_tool_sequence_keys),
+                            stored_tool_sequence_count=len(stored_tool_sequence_keys),
+                        )}, "
+                        f"satisfiable={'yes' if any_model_seen else 'no'}.",
+                    )
+                finally:
+                    control.release_external(query_symbol)
         except KeyboardInterrupt:
             _report(progress_callback, "Interrupted/timeout: returning partial results.")
             _horizon_interrupted = True
@@ -970,7 +1010,10 @@ def _solve_single_shot_with_programs(
 
         if _horizon_interrupted:
             break
-        if unique_solutions and not solve_all_horizons:
+        if not solve_all_horizons and _stored_solution_quota_reached(
+            unique_count=len(unique_solutions),
+            solution_limit=config.solutions,
+        ):
             break
         horizon += 1
 
@@ -998,7 +1041,11 @@ def _solve_single_shot_once(
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
-    """Ground the plain multi-shot programs once and solve at max horizon."""
+    """Ground the plain multi-shot programs once and solve at max horizon.
+
+    Stored results stop at ``config.solutions`` unique canonical workflows.
+    Raw answer sets remain optional diagnostics and do not control termination.
+    """
 
     raw_solutions: list[tuple[clingo.Symbol, ...]] = []
     unique_solutions: list[tuple[clingo.Symbol, ...]] = []
@@ -1149,18 +1196,27 @@ def _solve_single_shot_once(
                             unique_solutions.append(canonical_shown)
 
                         model_callback_sec += perf_counter() - callback_start
-                        if len(unique_solutions) >= config.solutions:
+                        if _stored_solution_quota_reached(
+                            unique_count=len(unique_solutions),
+                            solution_limit=config.solutions,
+                        ):
                             break
 
             try:
                 for goal_time in range(config.solution_length_min, horizon + 1):
-                    if len(unique_solutions) >= config.solutions:
+                    if _stored_solution_quota_reached(
+                        unique_count=len(unique_solutions),
+                        solution_limit=config.solutions,
+                    ):
                         break
                     goal_time_symbol = goal_time_symbols[goal_time]
                     control.assign_external(goal_time_symbol, True)
                     try:
                         for run_count in range(goal_time, horizon + 1):
-                            if len(unique_solutions) >= config.solutions:
+                            if _stored_solution_quota_reached(
+                                unique_count=len(unique_solutions),
+                                solution_limit=config.solutions,
+                            ):
                                 break
                             run_count_symbol = run_count_symbols[run_count]
                             control.assign_external(run_count_symbol, True)
@@ -1247,6 +1303,35 @@ def solve_single_shot(
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
+        capture_raw_models=capture_raw_models,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
+        parallel_mode=parallel_mode,
+        project_models=project_models,
+    )
+
+
+def solve_single_shot_sliding_window(
+    config: SnakeConfig,
+    facts: FactBundle,
+    *,
+    progress_callback: ProgressCallback = None,
+    base_grounding_callback: BaseGroundingCallback = None,
+    horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
+) -> SolveOutput:
+    """Solve single-shot mode by traversing the configured horizon range."""
+
+    return _solve_single_shot_with_programs(
+        config,
+        facts,
+        _single_shot_program_paths(optimized=facts.python_precompute_enabled),
+        progress_callback=progress_callback,
+        base_grounding_callback=base_grounding_callback,
+        horizon_record_callback=horizon_record_callback,
+        solve_all_horizons=False,
         capture_raw_models=capture_raw_models,
         diagnostic_counts_enabled=diagnostic_counts_enabled,
         parallel_mode=parallel_mode,

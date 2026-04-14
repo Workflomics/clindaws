@@ -8,7 +8,7 @@ The runner owns the end-to-end lifecycle around the lower-level clingo solver:
 - execute grounding/solving in a worker process with timeout control,
 - reconstruct canonical workflow candidates and write run artifacts.
 
-Public modes stay small (`single-shot`, `multi-shot`), while this module maps
+Public modes stay small (`single-shot`, `single-shot-sliding-window`, `multi-shot`), while this module maps
 them onto the internal backends used by translation and solving.
 """
 
@@ -59,6 +59,7 @@ from clindaws.execution.solver import (
     solve_multi_shot,
     solve_multi_shot_compressed_candidate,
     solve_single_shot,
+    solve_single_shot_sliding_window,
 )
 from clindaws.core.tool_annotations import (
     load_candidate_tool_annotations,
@@ -120,6 +121,13 @@ _MODE_CONFIGS = {
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
+    "single-shot-sliding-window": _ModeConfig(
+        solver_family="single-shot",
+        solver_approach="sliding_window",
+        translation_pathway="ape_multi_shot",
+        translation_builder=RUNTIME_TRANSLATION_BUILDER,
+        supports_ground_only=False,
+    ),
     "multi-shot": _ModeConfig(
         solver_family="multi-shot",
         solver_approach="legacy",
@@ -140,6 +148,7 @@ _MODE_CONFIGS = {
 
 _SOLVER_DISPATCH = {
     "single-shot": solve_single_shot,
+    "single-shot-sliding-window": solve_single_shot_sliding_window,
     "multi-shot": solve_multi_shot,
     "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
@@ -570,7 +579,13 @@ def _ensure_csv_header(csv_path: Path, fieldnames: list[str]) -> None:
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         dict_reader = csv.DictReader(handle)
         for row in dict_reader:
-            rows.append({name: row.get(name, "") for name in fieldnames})
+            migrated_row: dict[str, str] = {}
+            for name in fieldnames:
+                value = row.get(name, "")
+                if not value and name == "workflow_candidates_found":
+                    value = row.get("solutions_found", "")
+                migrated_row[name] = value
+            rows.append(migrated_row)
 
     temp_path = csv_path.with_suffix(csv_path.suffix + ".tmp")
     with temp_path.open("w", encoding="utf-8", newline="") as handle:
@@ -594,9 +609,7 @@ class _RunLogWriter:
         "setup_grounding_ms",
         "solving_ms",
         "memory_used_mb",
-        "raw_models_seen",
-        "raw_solutions_found",
-        "solutions_found",
+        "workflow_candidates_found",
         "constraints_used",
         "timed_out",
     ]
@@ -618,8 +631,6 @@ class _RunLogWriter:
         compressed_candidate_engaged: bool,
     ) -> None:
         self.csv_path = csv_path
-        self.cumulative_raw_models_seen = 0
-        self.cumulative_raw_solutions = 0
         self.cumulative_unique_solutions = 0
         self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
         self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
@@ -645,8 +656,6 @@ class _RunLogWriter:
         self.base_grounding_peak_rss_mb = base_grounding_peak_rss_mb
 
     def log_horizon(self, record: HorizonRecord) -> None:
-        self.cumulative_raw_models_seen += record.models_seen
-        self.cumulative_raw_solutions += record.models_stored
         self.cumulative_unique_solutions += record.unique_workflows_stored
         setup_grounding_ms = round(record.grounding_sec * 1000)
         memory_used_mb = record.peak_rss_mb or 0.0
@@ -665,9 +674,7 @@ class _RunLogWriter:
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
                 "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
-                "raw_models_seen": self.cumulative_raw_models_seen,
-                "raw_solutions_found": self.cumulative_raw_solutions,
-                "solutions_found": self.cumulative_unique_solutions,
+                "workflow_candidates_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
                 "timed_out": "false",
             }
@@ -687,9 +694,7 @@ class _RunLogWriter:
                 "setup_grounding_ms": elapsed_ms,
                 "solving_ms": "",
                 "memory_used_mb": "",
-                "raw_models_seen": self.cumulative_raw_models_seen,
-                "raw_solutions_found": self.cumulative_raw_solutions,
-                "solutions_found": self.cumulative_unique_solutions,
+                "workflow_candidates_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
                 "timed_out": "true",
             }
@@ -1286,7 +1291,7 @@ def _select_fact_bundle(
     resolved_translation_builder = mode_config.translation_builder
 
     if mode_config.translation_pathway == "ape_multi_shot":
-        # Plain multi-shot and the public single-shot mode both start from the
+        # Plain multi-shot and the public single-shot modes both start from the
         # APE-style direct fact surface. Optional precompute augments that
         # bundle, while optimized multi-shot swaps to the compressed-candidate
         # internal bundle entirely.
@@ -1294,11 +1299,17 @@ def _select_fact_bundle(
             config,
             ontology,
             tools,
-            internal_solver_mode="single-shot" if mode == "single-shot" else "multi-shot",
+            internal_solver_mode=(
+                "single-shot"
+                if mode == "single-shot"
+                else "single-shot-sliding-window"
+                if mode == "single-shot-sliding-window"
+                else "multi-shot"
+            ),
         )
         if optimized:
-            if mode == "single-shot":
-                raise ValueError("--optimized is not yet supported for single-shot.")
+            if mode_config.solver_family == "single-shot":
+                raise ValueError("--optimized is not yet supported for single-shot modes.")
             compressed_candidate_tools = load_candidate_tool_annotations(
                 config.tool_annotations_path,
                 config.ontology_prefix,
@@ -1378,8 +1389,8 @@ def _prepare_run_context(
     """
 
     mode_config = _mode_config(mode)
-    if optimized and mode == "single-shot":
-        raise ValueError("--optimized is not yet supported for single-shot.")
+    if optimized and mode_config.solver_family == "single-shot":
+        raise ValueError("--optimized is not yet supported for single-shot modes.")
     if optimized and mode != "multi-shot":
         raise ValueError("--optimized supports only multi-shot.")
     config = load_config(config_path)
