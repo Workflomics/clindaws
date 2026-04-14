@@ -299,6 +299,8 @@ def _timed_out_run_result(
     translation_peak_rss_mb: float,
     solve_start: float,
     completed_stage: str,
+    run_log_path: Path | None = None,
+    run_summary_path: Path | None = None,
 ) -> RunResult:
     solving_sec = max(0.0, perf_counter() - solve_start) if completed_stage == "run_timeout" else 0.0
     return RunResult(
@@ -328,8 +330,8 @@ def _timed_out_run_result(
         diagnostic_counts_enabled=False,
         timed_out=True,
         completed_stage=completed_stage,
-        run_log_path=None,
-        run_summary_path=None,
+        run_log_path=run_log_path,
+        run_summary_path=run_summary_path,
     )
 
 
@@ -1577,6 +1579,22 @@ def run_once(
     _translation_builder = ctx.resolved_translation_builder
     effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
     internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
+    csv_writers = _RunCsvWriters(
+        csv_dir=config.solutions_dir_path,
+        mode=mode,
+        grounding_strategy=grounding_strategy,
+        fact_count=fact_bundle.fact_count,
+        run_metadata=run_metadata,
+        translation_builder=_translation_builder,
+        translation_schema=_translation_schema(fact_bundle),
+        optimized_enabled=optimized,
+        effective_parallel_mode=effective_parallel_mode,
+        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
+    )
+    csv_writers.step_writer.log_translation(
+        translation_sec=translation_sec,
+        translation_peak_rss_mb=translation_peak_rss_mb,
+    )
 
     effective_project_models = _effective_project_models(mode, project_models)
     diagnostic_counts_enabled = bool(debug or write_raw_answer_sets)
@@ -1592,6 +1610,24 @@ def run_once(
             progress_callback,
             f"Translation already exceeded timeout ({config.timeout_sec}s); skipping solve.",
         )
+        csv_writers.step_writer.log_timeout(elapsed_ms=0)
+        csv_writers.summary_writer.log_summary(
+            completed_stage="translation_timeout",
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=0.0,
+                solving_sec=0.0,
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            base_grounding_sec=0.0,
+            base_grounding_peak_rss_mb=0.0,
+            horizon_records=(),
+            raw_solutions_found=0,
+            raw_models_seen=0,
+            solutions_found=0,
+            effective_parallel_mode=effective_parallel_mode,
+        )
         return _timed_out_run_result(
             config=config,
             mode=mode,
@@ -1601,6 +1637,8 @@ def run_once(
             translation_peak_rss_mb=translation_peak_rss_mb,
             solve_start=_solve_start,
             completed_stage="translation_timeout",
+            run_log_path=csv_writers.run_log_path,
+            run_summary_path=csv_writers.run_summary_path,
         )
     else:
         # Solving happens in a worker process so the parent can enforce the
@@ -1650,6 +1688,26 @@ def run_once(
 
     if _timed_out:
         _report(progress_callback, "Configured timeout reached; stopping run immediately.")
+        csv_writers.step_writer.log_timeout(
+            elapsed_ms=round(max(0.0, perf_counter() - _solve_start) * 1000),
+        )
+        csv_writers.summary_writer.log_summary(
+            completed_stage="run_timeout",
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=0.0,
+                solving_sec=max(0.0, perf_counter() - _solve_start),
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            base_grounding_sec=0.0,
+            base_grounding_peak_rss_mb=0.0,
+            horizon_records=(),
+            raw_solutions_found=0,
+            raw_models_seen=0,
+            solutions_found=0,
+            effective_parallel_mode=effective_parallel_mode,
+        )
         return _timed_out_run_result(
             config=config,
             mode=mode,
@@ -1659,24 +1717,9 @@ def run_once(
             translation_peak_rss_mb=translation_peak_rss_mb,
             solve_start=_solve_start,
             completed_stage="run_timeout",
+            run_log_path=csv_writers.run_log_path,
+            run_summary_path=csv_writers.run_summary_path,
         )
-
-    csv_writers = _RunCsvWriters(
-        csv_dir=config.solutions_dir_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_count=fact_bundle.fact_count,
-        run_metadata=run_metadata,
-        translation_builder=_translation_builder,
-        translation_schema=_translation_schema(fact_bundle),
-        optimized_enabled=optimized,
-        effective_parallel_mode=effective_parallel_mode,
-        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
-    )
-    csv_writers.step_writer.log_translation(
-        translation_sec=translation_sec,
-        translation_peak_rss_mb=translation_peak_rss_mb,
-    )
 
     if solve_output.base_grounding_sec or solve_output.base_grounding_peak_rss_mb:
         csv_writers.step_writer.log_base_grounding(
