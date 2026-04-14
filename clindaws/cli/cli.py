@@ -17,10 +17,10 @@ def _progress(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def _format_count_summary(*, workflows: int, raw_models: int, diagnostic_counts_enabled: bool) -> str:
+def _format_count_summary(*, workflows: int, raw_models: int, show_raw_models: bool) -> str:
     """Format canonical workflow and optional raw model counts consistently."""
 
-    if diagnostic_counts_enabled:
+    if show_raw_models:
         return f"workflows={workflows} raw_models={raw_models}"
     return f"workflows={workflows}"
 
@@ -260,15 +260,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Solutions written to: {run_result.solution_summary_path}")
         if run_result.workflow_signature_path is not None:
             print(f"Workflow signatures written to: {run_result.workflow_signature_path}")
+        show_raw_models = run_result.diagnostic_counts_enabled and (
+            args.debug or args.mode not in {"single-shot", "single-shot-sliding-window"}
+        )
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "
-            f"{_format_count_summary(workflows=run_result.unique_solutions_found, raw_models=run_result.raw_models_seen, diagnostic_counts_enabled=run_result.diagnostic_counts_enabled)} "
+            f"{_format_count_summary(workflows=run_result.unique_solutions_found, raw_models=run_result.raw_models_seen, show_raw_models=show_raw_models)} "
             f"translation={run_result.timings.translation_sec:.3f}s "
             f"grounding={run_result.timings.grounding_sec:.3f}s "
             f"solving={run_result.timings.solving_sec:.3f}s "
             f"total={run_result.timings.total_sec:.3f}s"
         )
-        if run_result.diagnostic_counts_enabled and run_result.raw_models_seen != run_result.unique_solutions_found:
+        if show_raw_models and run_result.raw_models_seen != run_result.unique_solutions_found:
             print(
                 "Count basis: workflows are canonical workflow candidates; "
                 "raw_models are pre-canonical answer sets seen by clingo."

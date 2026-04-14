@@ -201,6 +201,7 @@ class RunResult:
     solutions: tuple[WorkflowSolution, ...]
     timings: TimingBreakdown
     translation_peak_rss_mb: float
+    combined_peak_rss_mb: float
     base_grounding_peak_rss_mb: float
     base_grounding_sec: float
     horizon_records: tuple[HorizonRecord, ...]
@@ -230,6 +231,7 @@ class GroundingRunResult:
     fact_bundle: FactBundle
     timings: TimingBreakdown
     translation_peak_rss_mb: float
+    combined_peak_rss_mb: float
     base_grounding_peak_rss_mb: float
     base_grounding_sec: float
     horizon_records: tuple[HorizonRecord, ...]
@@ -253,6 +255,7 @@ class TranslationRunResult:
     fact_bundle: FactBundle
     timings: TimingBreakdown
     translation_peak_rss_mb: float
+    combined_peak_rss_mb: float
     translation_path: Path | None
     translation_summary_path: Path
     run_log_path: Path | None = None

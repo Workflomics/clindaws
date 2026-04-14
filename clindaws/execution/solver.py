@@ -20,7 +20,7 @@ import signal
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from time import perf_counter
+from time import perf_counter, perf_counter_ns
 from typing import Callable, Iterator
 
 import clingo
@@ -36,7 +36,7 @@ from clindaws.core.workflow import (
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 ENCODINGS_ROOT = PACKAGE_ROOT / "encodings"
-ProgressCallback = Callable[[str], None] | None
+ProgressCallback = Callable[[object], None] | None
 BaseGroundingCallback = Callable[[float, float], None] | None
 HorizonRecordCallback = Callable[[HorizonRecord], None] | None
 
@@ -744,6 +744,14 @@ def _solve_multi_shot_with_programs(
                 horizon_records.append(record)
                 if horizon_record_callback is not None:
                     horizon_record_callback(record)
+                if progress_callback is not None:
+                    progress_callback(
+                        {
+                            "event": "horizon_complete",
+                            "horizon": horizon,
+                            "timestamp_ns": perf_counter_ns(),
+                        }
+                    )
                 _report(
                     progress_callback,
                     f"Solving progress: horizon {horizon} finished after {solve_elapsed:.3f}s, "
@@ -985,6 +993,14 @@ def _solve_single_shot_with_programs(
                     horizon_records.append(record)
                     if horizon_record_callback is not None:
                         horizon_record_callback(record)
+                    if progress_callback is not None:
+                        progress_callback(
+                            {
+                                "event": "horizon_complete",
+                                "horizon": horizon,
+                                "timestamp_ns": perf_counter_ns(),
+                            }
+                        )
                     _report(
                         progress_callback,
                         f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
@@ -1250,11 +1266,13 @@ def _solve_single_shot_once(
     finally:
         control.cleanup()
 
+    peak_rss_mb = max(base_grounding_peak_rss_mb, current_peak_rss_mb())
+
     record = HorizonRecord(
         horizon=horizon,
         grounding_sec=ground_elapsed,
         solving_sec=solve_elapsed,
-        peak_rss_mb=base_grounding_peak_rss_mb,
+        peak_rss_mb=peak_rss_mb,
         satisfiable=any_model_seen,
         models_seen=models_seen,
         models_stored=models_stored,
@@ -1269,6 +1287,14 @@ def _solve_single_shot_once(
     )
     if horizon_record_callback is not None:
         horizon_record_callback(record)
+    if progress_callback is not None:
+        progress_callback(
+            {
+                "event": "horizon_complete",
+                "horizon": horizon,
+                "timestamp_ns": perf_counter_ns(),
+            }
+        )
 
     return SolveOutput(
         raw_solutions=tuple(raw_solutions),

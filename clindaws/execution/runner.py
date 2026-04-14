@@ -50,7 +50,10 @@ from clindaws.rendering.rendering import (
     render_solution_graphs,
     write_workflow_signatures,
 )
-from clindaws.core.runtime_stats import current_peak_rss_mb
+from clindaws.core.runtime_stats import (
+    ProcessTreePeakMonitor,
+    current_peak_rss_mb,
+)
 from clindaws.execution.solver import (
     ground_single_shot,
     ground_multi_shot,
@@ -99,7 +102,7 @@ SCHEMA_PREDICATES = (
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 COMPRESSED_CANDIDATE_TRANSLATION_BUILDER = "candidate_compressed"
-ProgressCallback = Callable[[str], None] | None
+ProgressCallback = Callable[[object], None] | None
 
 
 @dataclass(frozen=True)
@@ -171,6 +174,7 @@ class RunContext:
     tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]]
     translation_sec: float
     translation_peak_rss_mb: float
+    translation_peak_combined_rss_mb: float
     effective_translation_strategy: str
     resolved_translation_builder: str
     run_metadata: dict[str, object]
@@ -297,6 +301,7 @@ def _timed_out_run_result(
     fact_bundle,
     translation_sec: float,
     translation_peak_rss_mb: float,
+    combined_peak_rss_mb: float,
     solve_start: float,
     completed_stage: str,
     run_log_path: Path | None = None,
@@ -316,6 +321,7 @@ def _timed_out_run_result(
             rendering_sec=0.0,
         ),
         translation_peak_rss_mb=translation_peak_rss_mb,
+        combined_peak_rss_mb=combined_peak_rss_mb,
         base_grounding_peak_rss_mb=0.0,
         base_grounding_sec=0.0,
         horizon_records=(),
@@ -338,6 +344,7 @@ def _timed_out_run_result(
 def _drain_progress_queue(
     progress_queue: multiprocessing.queues.Queue | None,
     progress_callback: ProgressCallback,
+    event_callback: Callable[[dict[str, object]], None] | None = None,
 ) -> None:
     if progress_queue is None:
         return
@@ -348,7 +355,42 @@ def _drain_progress_queue(
             return
         if message is None:
             return
+        if isinstance(message, dict):
+            if event_callback is not None:
+                event_callback(message)
+            continue
         _report(progress_callback, str(message))
+
+
+def _combined_peak_mb(memory_monitor: ProcessTreePeakMonitor | None) -> float:
+    """Return the latest sampled combined-process peak, sampling once first."""
+
+    if memory_monitor is None:
+        return 0.0
+    memory_monitor.sample_now()
+    return memory_monitor.current_peak_mb()
+
+
+def _records_with_combined_peak_rss(
+    records: tuple[HorizonRecord, ...],
+    *,
+    memory_monitor: ProcessTreePeakMonitor | None,
+    peaks_by_horizon: dict[int, float] | None = None,
+) -> tuple[HorizonRecord, ...]:
+    """Replace per-process RSS fields with cumulative combined-process peaks."""
+
+    updated_records: list[HorizonRecord] = []
+    cumulative_peak_mb = 0.0
+    horizon_peaks = peaks_by_horizon or {}
+    for record in records:
+        combined_peak_mb = horizon_peaks.get(record.horizon, 0.0)
+        if combined_peak_mb <= 0.0 and memory_monitor is not None:
+            combined_peak_mb = _combined_peak_mb(memory_monitor)
+        if combined_peak_mb <= 0.0:
+            combined_peak_mb = record.peak_rss_mb
+        cumulative_peak_mb = max(cumulative_peak_mb, combined_peak_mb)
+        updated_records.append(replace(record, peak_rss_mb=cumulative_peak_mb))
+    return tuple(updated_records)
 
 
 def _solve_worker_entrypoint(
@@ -363,7 +405,7 @@ def _solve_worker_entrypoint(
     result_queue: multiprocessing.queues.Queue,
     progress_queue: multiprocessing.queues.Queue,
 ) -> None:
-    def _worker_progress(message: str) -> None:
+    def _worker_progress(message: object) -> None:
         progress_queue.put(message)
 
     try:
@@ -415,7 +457,8 @@ def _run_solve_in_worker(
     project_models: bool,
     remaining_timeout: float,
     progress_callback: ProgressCallback,
-) -> tuple[object, bool]:
+    memory_monitor: ProcessTreePeakMonitor | None = None,
+) -> tuple[object, bool, dict[int, float]]:
     ctx = multiprocessing.get_context("spawn")
     result_queue = ctx.Queue()
     progress_queue = ctx.Queue()
@@ -437,9 +480,26 @@ def _run_solve_in_worker(
     deadline = perf_counter() + remaining_timeout
     timed_out = False
     payload: dict[str, object] | None = None
+    horizon_peak_rss_by_horizon: dict[int, float] = {}
+
+    def _handle_progress_event(message: dict[str, object]) -> None:
+        if message.get("event") != "horizon_complete":
+            return
+        horizon = message.get("horizon")
+        timestamp_ns = message.get("timestamp_ns")
+        if not isinstance(horizon, int):
+            return
+        if memory_monitor is None or not isinstance(timestamp_ns, int):
+            horizon_peak_rss_by_horizon[horizon] = 0.0
+            return
+        horizon_peak_rss_by_horizon[horizon] = memory_monitor.peak_at(timestamp_ns)
 
     while True:
-        _drain_progress_queue(progress_queue, progress_callback)
+        _drain_progress_queue(
+            progress_queue,
+            progress_callback,
+            event_callback=_handle_progress_event,
+        )
         if payload is None:
             try:
                 payload = result_queue.get_nowait()
@@ -468,11 +528,19 @@ def _run_solve_in_worker(
             _report(progress_callback, "Solver worker did not exit after terminate; forcing kill.")
             process.kill()
             process.join()
-        _drain_progress_queue(progress_queue, progress_callback)
-        return _empty_solve_output(), True
+        _drain_progress_queue(
+            progress_queue,
+            progress_callback,
+            event_callback=_handle_progress_event,
+        )
+        return _empty_solve_output(), True, horizon_peak_rss_by_horizon
 
     process.join()
-    _drain_progress_queue(progress_queue, progress_callback)
+    _drain_progress_queue(
+        progress_queue,
+        progress_callback,
+        event_callback=_handle_progress_event,
+    )
 
     if payload is None:
         try:
@@ -487,7 +555,7 @@ def _run_solve_in_worker(
             f"{payload.get('traceback', '')}".rstrip()
         )
 
-    return _deserialize_solve_output(payload["solve_output"]), False
+    return _deserialize_solve_output(payload["solve_output"]), False, horizon_peak_rss_by_horizon
 
 
 def _constraint_metadata(config) -> tuple[str | None, int]:
@@ -663,7 +731,6 @@ class _RunLogWriter:
         memory_used_mb = record.peak_rss_mb or 0.0
         if record.horizon == 1:
             setup_grounding_ms += self.base_grounding_ms
-            memory_used_mb = max(memory_used_mb, self.base_grounding_peak_rss_mb)
         self._write_row(
             {
                 "test": self.test_name,
@@ -682,7 +749,7 @@ class _RunLogWriter:
             }
         )
 
-    def log_timeout(self, *, elapsed_ms: int) -> None:
+    def log_timeout(self, *, elapsed_ms: int, memory_used_mb: float | None = None) -> None:
         """Write a sentinel row marking the step that was interrupted by timeout."""
         self._write_row(
             {
@@ -695,7 +762,7 @@ class _RunLogWriter:
                 "translation_ms": self._translation_ms,
                 "setup_grounding_ms": elapsed_ms,
                 "solving_ms": "",
-                "memory_used_mb": "",
+                "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
                 "workflow_candidates_found": self.cumulative_unique_solutions,
                 "constraints_used": self.constraints_used,
                 "timed_out": "true",
@@ -726,6 +793,7 @@ class _RunSummaryWriter:
         "fact_count",
         "translation_sec",
         "translation_peak_rss_mb",
+        "combined_peak_rss_mb",
         "base_grounding_sec",
         "base_grounding_peak_rss_mb",
         "grounding_sec_total",
@@ -786,6 +854,7 @@ class _RunSummaryWriter:
         completed_stage: str,
         timings: TimingBreakdown,
         translation_peak_rss_mb: float,
+        combined_peak_rss_mb: float,
         base_grounding_sec: float,
         base_grounding_peak_rss_mb: float,
         horizon_records: tuple[HorizonRecord, ...],
@@ -802,6 +871,7 @@ class _RunSummaryWriter:
             "completed_stage": completed_stage,
             "translation_sec": f"{timings.translation_sec:.6f}",
             "translation_peak_rss_mb": f"{translation_peak_rss_mb:.3f}" if translation_peak_rss_mb else "",
+            "combined_peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
             "base_grounding_sec": f"{base_grounding_sec:.6f}" if base_grounding_sec else "",
             "base_grounding_peak_rss_mb": f"{base_grounding_peak_rss_mb:.3f}" if base_grounding_peak_rss_mb else "",
             "grounding_sec_total": f"{timings.grounding_sec:.6f}",
@@ -1381,6 +1451,7 @@ def _prepare_run_context(
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
     max_workers: int = 1,
+    memory_monitor: ProcessTreePeakMonitor | None = None,
 ) -> RunContext:
     """Load config and build the translation-phase context for one run.
 
@@ -1425,6 +1496,11 @@ def _prepare_run_context(
     )
     translation_sec = perf_counter() - start
     translation_peak_rss_mb = current_peak_rss_mb()
+    if memory_monitor is not None:
+        memory_monitor.sample_now()
+        translation_peak_combined_rss_mb = memory_monitor.current_peak_mb()
+    else:
+        translation_peak_combined_rss_mb = translation_peak_rss_mb
     _report(progress_callback, f"Step 1 complete: translation finished after {translation_sec:.3f}s.")
 
     return RunContext(
@@ -1435,6 +1511,7 @@ def _prepare_run_context(
         tool_output_dims=_tool_output_dims_lookup(tools),
         translation_sec=translation_sec,
         translation_peak_rss_mb=translation_peak_rss_mb,
+        translation_peak_combined_rss_mb=translation_peak_combined_rss_mb,
         effective_translation_strategy=effective_translation_strategy,
         resolved_translation_builder=resolved_translation_builder,
         run_metadata=run_metadata,
@@ -1456,85 +1533,90 @@ def run_translate_only(
 ) -> TranslationRunResult:
     """Run translation only and write translation diagnostics."""
 
-    ctx = _prepare_run_context(
-        config_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        output_dir=output_dir,
-        solutions=solutions,
-        min_length=min_length,
-        max_length=max_length,
-        progress_callback=progress_callback,
-        optimized=optimized,
-        max_workers=max_workers,
-    )
-    csv_writers = _RunCsvWriters(
-        csv_dir=ctx.config.solutions_dir_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_count=ctx.fact_bundle.fact_count,
-        run_metadata=ctx.run_metadata,
-        translation_builder=ctx.resolved_translation_builder,
-        translation_schema=_translation_schema(ctx.fact_bundle),
-        optimized_enabled=optimized,
-        effective_parallel_mode=None,
-        compressed_candidate_engaged=_compressed_candidate_engaged(ctx.fact_bundle),
-    )
-    csv_writers.step_writer.log_translation(
-        translation_sec=ctx.translation_sec,
-        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
-    )
-
-    translation_summary_path, _ = _write_translation_summary(
-        config=ctx.config,
-        solution_dir=ctx.solution_dir,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        translation_builder=ctx.resolved_translation_builder,
-        effective_translation_strategy=ctx.effective_translation_strategy,
-        fact_bundle=ctx.fact_bundle,
-        translation_path=None,
-        translation_sec=ctx.translation_sec,
-    )
-    csv_writers.summary_writer.log_summary(
-        completed_stage="translate_only",
-        timings=TimingBreakdown(
+    with ProcessTreePeakMonitor() as memory_monitor:
+        ctx = _prepare_run_context(
+            config_path,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            output_dir=output_dir,
+            solutions=solutions,
+            min_length=min_length,
+            max_length=max_length,
+            progress_callback=progress_callback,
+            optimized=optimized,
+            max_workers=max_workers,
+            memory_monitor=memory_monitor,
+        )
+        csv_writers = _RunCsvWriters(
+            csv_dir=ctx.config.solutions_dir_path,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_count=ctx.fact_bundle.fact_count,
+            run_metadata=ctx.run_metadata,
+            translation_builder=ctx.resolved_translation_builder,
+            translation_schema=_translation_schema(ctx.fact_bundle),
+            optimized_enabled=optimized,
+            effective_parallel_mode=None,
+            compressed_candidate_engaged=_compressed_candidate_engaged(ctx.fact_bundle),
+        )
+        csv_writers.step_writer.log_translation(
             translation_sec=ctx.translation_sec,
-            grounding_sec=0.0,
-            solving_sec=0.0,
-            rendering_sec=0.0,
-        ),
-        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
-        base_grounding_sec=0.0,
-        base_grounding_peak_rss_mb=0.0,
-        horizon_records=(),
-        raw_solutions_found=0,
-        raw_models_seen=0,
-        solutions_found=0,
-        effective_parallel_mode=None,
-    )
-    run_log_path = csv_writers.run_log_path
-    run_summary_path = csv_writers.run_summary_path
+            translation_peak_rss_mb=ctx.translation_peak_rss_mb,
+        )
 
-    return TranslationRunResult(
-        config=ctx.config,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        translation_builder=ctx.resolved_translation_builder,
-        effective_translation_strategy=ctx.effective_translation_strategy,
-        fact_bundle=ctx.fact_bundle,
-        timings=TimingBreakdown(
+        translation_summary_path, _ = _write_translation_summary(
+            config=ctx.config,
+            solution_dir=ctx.solution_dir,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            translation_builder=ctx.resolved_translation_builder,
+            effective_translation_strategy=ctx.effective_translation_strategy,
+            fact_bundle=ctx.fact_bundle,
+            translation_path=None,
             translation_sec=ctx.translation_sec,
-            grounding_sec=0.0,
-            solving_sec=0.0,
-            rendering_sec=0.0,
-        ),
-        translation_peak_rss_mb=ctx.translation_peak_rss_mb,
-        translation_path=None,
-        translation_summary_path=translation_summary_path,
-        run_log_path=run_log_path,
-        run_summary_path=run_summary_path,
-    )
+        )
+        combined_peak_rss_mb = _combined_peak_mb(memory_monitor)
+        csv_writers.summary_writer.log_summary(
+            completed_stage="translate_only",
+            timings=TimingBreakdown(
+                translation_sec=ctx.translation_sec,
+                grounding_sec=0.0,
+                solving_sec=0.0,
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=ctx.translation_peak_combined_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            base_grounding_sec=0.0,
+            base_grounding_peak_rss_mb=0.0,
+            horizon_records=(),
+            raw_solutions_found=0,
+            raw_models_seen=0,
+            solutions_found=0,
+            effective_parallel_mode=None,
+        )
+        run_log_path = csv_writers.run_log_path
+        run_summary_path = csv_writers.run_summary_path
+
+        return TranslationRunResult(
+            config=ctx.config,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            translation_builder=ctx.resolved_translation_builder,
+            effective_translation_strategy=ctx.effective_translation_strategy,
+            fact_bundle=ctx.fact_bundle,
+            timings=TimingBreakdown(
+                translation_sec=ctx.translation_sec,
+                grounding_sec=0.0,
+                solving_sec=0.0,
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=ctx.translation_peak_combined_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            translation_path=None,
+            translation_summary_path=translation_summary_path,
+            run_log_path=run_log_path,
+            run_summary_path=run_summary_path,
+        )
 
 
 def run_once(
@@ -1558,93 +1640,96 @@ def run_once(
 ) -> RunResult:
     """Run one snakeAPE execution."""
 
-    ctx = _prepare_run_context(
-        config_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        output_dir=output_dir,
-        solutions=solutions,
-        min_length=min_length,
-        max_length=max_length,
-        progress_callback=progress_callback,
-        optimized=optimized,
-        max_workers=max_workers,
-    )
-    config = ctx.config
-    solution_dir = ctx.solution_dir
-    fact_bundle = ctx.fact_bundle
-    translation_sec = ctx.translation_sec
-    translation_peak_rss_mb = ctx.translation_peak_rss_mb
-    run_metadata = ctx.run_metadata
-    _translation_builder = ctx.resolved_translation_builder
-    effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
-    internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
-    csv_writers = _RunCsvWriters(
-        csv_dir=config.solutions_dir_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_count=fact_bundle.fact_count,
-        run_metadata=run_metadata,
-        translation_builder=_translation_builder,
-        translation_schema=_translation_schema(fact_bundle),
-        optimized_enabled=optimized,
-        effective_parallel_mode=effective_parallel_mode,
-        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
-    )
-    csv_writers.step_writer.log_translation(
-        translation_sec=translation_sec,
-        translation_peak_rss_mb=translation_peak_rss_mb,
-    )
-
-    effective_project_models = _effective_project_models(mode, project_models)
-    diagnostic_counts_enabled = bool(debug or write_raw_answer_sets)
-    capture_raw_models = bool(write_raw_answer_sets)
-    if effective_parallel_mode:
-        _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
-    remaining_timeout = config.timeout_sec - translation_sec
-    _timed_out = False
-    _solve_start = perf_counter()
-    if remaining_timeout <= 0:
-        _timed_out = True
-        _report(
-            progress_callback,
-            f"Translation already exceeded timeout ({config.timeout_sec}s); skipping solve.",
-        )
-        csv_writers.step_writer.log_timeout(elapsed_ms=0)
-        csv_writers.summary_writer.log_summary(
-            completed_stage="translation_timeout",
-            timings=TimingBreakdown(
-                translation_sec=translation_sec,
-                grounding_sec=0.0,
-                solving_sec=0.0,
-                rendering_sec=0.0,
-            ),
-            translation_peak_rss_mb=translation_peak_rss_mb,
-            base_grounding_sec=0.0,
-            base_grounding_peak_rss_mb=0.0,
-            horizon_records=(),
-            raw_solutions_found=0,
-            raw_models_seen=0,
-            solutions_found=0,
-            effective_parallel_mode=effective_parallel_mode,
-        )
-        return _timed_out_run_result(
-            config=config,
+    with ProcessTreePeakMonitor() as memory_monitor:
+        ctx = _prepare_run_context(
+            config_path,
             mode=mode,
             grounding_strategy=grounding_strategy,
-            fact_bundle=fact_bundle,
+            output_dir=output_dir,
+            solutions=solutions,
+            min_length=min_length,
+            max_length=max_length,
+            progress_callback=progress_callback,
+            optimized=optimized,
+            max_workers=max_workers,
+            memory_monitor=memory_monitor,
+        )
+        config = ctx.config
+        solution_dir = ctx.solution_dir
+        fact_bundle = ctx.fact_bundle
+        translation_sec = ctx.translation_sec
+        translation_peak_rss_mb = ctx.translation_peak_combined_rss_mb
+        run_metadata = ctx.run_metadata
+        _translation_builder = ctx.resolved_translation_builder
+        effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
+        internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
+        csv_writers = _RunCsvWriters(
+            csv_dir=config.solutions_dir_path,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_count=fact_bundle.fact_count,
+            run_metadata=run_metadata,
+            translation_builder=_translation_builder,
+            translation_schema=_translation_schema(fact_bundle),
+            optimized_enabled=optimized,
+            effective_parallel_mode=effective_parallel_mode,
+            compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
+        )
+        csv_writers.step_writer.log_translation(
             translation_sec=translation_sec,
             translation_peak_rss_mb=translation_peak_rss_mb,
-            solve_start=_solve_start,
-            completed_stage="translation_timeout",
-            run_log_path=csv_writers.run_log_path,
-            run_summary_path=csv_writers.run_summary_path,
         )
-    else:
-        # Solving happens in a worker process so the parent can enforce the
-        # configured timeout even while clingo is grounding or enumerating.
+
+        effective_project_models = _effective_project_models(mode, project_models)
+        diagnostic_counts_enabled = bool(debug or write_raw_answer_sets)
+        capture_raw_models = bool(write_raw_answer_sets)
+        if effective_parallel_mode:
+            _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
+        remaining_timeout = config.timeout_sec - translation_sec
+        _timed_out = False
+        _solve_start = perf_counter()
+        if remaining_timeout <= 0:
+            _timed_out = True
+            _report(
+                progress_callback,
+                f"Translation already exceeded timeout ({config.timeout_sec}s); skipping solve.",
+            )
+            combined_peak_rss_mb = _combined_peak_mb(memory_monitor)
+            csv_writers.step_writer.log_timeout(elapsed_ms=0, memory_used_mb=combined_peak_rss_mb)
+            csv_writers.summary_writer.log_summary(
+                completed_stage="translation_timeout",
+                timings=TimingBreakdown(
+                    translation_sec=translation_sec,
+                    grounding_sec=0.0,
+                    solving_sec=0.0,
+                    rendering_sec=0.0,
+                ),
+                translation_peak_rss_mb=translation_peak_rss_mb,
+                combined_peak_rss_mb=combined_peak_rss_mb,
+                base_grounding_sec=0.0,
+                base_grounding_peak_rss_mb=0.0,
+                horizon_records=(),
+                raw_solutions_found=0,
+                raw_models_seen=0,
+                solutions_found=0,
+                effective_parallel_mode=effective_parallel_mode,
+            )
+            return _timed_out_run_result(
+                config=config,
+                mode=mode,
+                grounding_strategy=grounding_strategy,
+                fact_bundle=fact_bundle,
+                translation_sec=translation_sec,
+                translation_peak_rss_mb=translation_peak_rss_mb,
+                combined_peak_rss_mb=combined_peak_rss_mb,
+                solve_start=_solve_start,
+                completed_stage="translation_timeout",
+                run_log_path=csv_writers.run_log_path,
+                run_summary_path=csv_writers.run_summary_path,
+            )
+
         try:
-            solve_output, _timed_out = _run_solve_in_worker(
+            solve_output, _timed_out, horizon_peak_rss_by_horizon = _run_solve_in_worker(
                 mode=internal_solver_mode,
                 config=config,
                 fact_bundle=fact_bundle,
@@ -1654,6 +1739,7 @@ def run_once(
                 project_models=effective_project_models,
                 remaining_timeout=remaining_timeout,
                 progress_callback=progress_callback,
+                memory_monitor=memory_monitor,
             )
         except RuntimeError as exc:
             if (
@@ -1686,117 +1772,87 @@ def run_once(
                 )
             raise
 
-    if _timed_out:
-        _report(progress_callback, "Configured timeout reached; stopping run immediately.")
-        csv_writers.step_writer.log_timeout(
-            elapsed_ms=round(max(0.0, perf_counter() - _solve_start) * 1000),
-        )
-        csv_writers.summary_writer.log_summary(
-            completed_stage="run_timeout",
-            timings=TimingBreakdown(
+        if _timed_out:
+            _report(progress_callback, "Configured timeout reached; stopping run immediately.")
+            combined_peak_rss_mb = _combined_peak_mb(memory_monitor)
+            csv_writers.step_writer.log_timeout(
+                elapsed_ms=round(max(0.0, perf_counter() - _solve_start) * 1000),
+                memory_used_mb=combined_peak_rss_mb,
+            )
+            csv_writers.summary_writer.log_summary(
+                completed_stage="run_timeout",
+                timings=TimingBreakdown(
+                    translation_sec=translation_sec,
+                    grounding_sec=0.0,
+                    solving_sec=max(0.0, perf_counter() - _solve_start),
+                    rendering_sec=0.0,
+                ),
+                translation_peak_rss_mb=translation_peak_rss_mb,
+                combined_peak_rss_mb=combined_peak_rss_mb,
+                base_grounding_sec=0.0,
+                base_grounding_peak_rss_mb=0.0,
+                horizon_records=(),
+                raw_solutions_found=0,
+                raw_models_seen=0,
+                solutions_found=0,
+                effective_parallel_mode=effective_parallel_mode,
+            )
+            return _timed_out_run_result(
+                config=config,
+                mode=mode,
+                grounding_strategy=grounding_strategy,
+                fact_bundle=fact_bundle,
                 translation_sec=translation_sec,
-                grounding_sec=0.0,
-                solving_sec=max(0.0, perf_counter() - _solve_start),
-                rendering_sec=0.0,
-            ),
-            translation_peak_rss_mb=translation_peak_rss_mb,
-            base_grounding_sec=0.0,
-            base_grounding_peak_rss_mb=0.0,
-            horizon_records=(),
-            raw_solutions_found=0,
-            raw_models_seen=0,
-            solutions_found=0,
-            effective_parallel_mode=effective_parallel_mode,
-        )
-        return _timed_out_run_result(
-            config=config,
-            mode=mode,
-            grounding_strategy=grounding_strategy,
-            fact_bundle=fact_bundle,
-            translation_sec=translation_sec,
-            translation_peak_rss_mb=translation_peak_rss_mb,
-            solve_start=_solve_start,
-            completed_stage="run_timeout",
-            run_log_path=csv_writers.run_log_path,
-            run_summary_path=csv_writers.run_summary_path,
-        )
+                translation_peak_rss_mb=translation_peak_rss_mb,
+                combined_peak_rss_mb=combined_peak_rss_mb,
+                solve_start=_solve_start,
+                completed_stage="run_timeout",
+                run_log_path=csv_writers.run_log_path,
+                run_summary_path=csv_writers.run_summary_path,
+            )
 
-    if solve_output.base_grounding_sec or solve_output.base_grounding_peak_rss_mb:
-        csv_writers.step_writer.log_base_grounding(
-            base_grounding_sec=solve_output.base_grounding_sec,
-            base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
+        horizon_records = _records_with_combined_peak_rss(
+            solve_output.horizon_records,
+            memory_monitor=memory_monitor,
+            peaks_by_horizon=horizon_peak_rss_by_horizon,
         )
-    for record in solve_output.horizon_records:
-        csv_writers.step_writer.log_horizon(record)
+        if solve_output.base_grounding_sec or solve_output.base_grounding_peak_rss_mb:
+            csv_writers.step_writer.log_base_grounding(
+                base_grounding_sec=solve_output.base_grounding_sec,
+                base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
+            )
+        for record in horizon_records:
+            csv_writers.step_writer.log_horizon(record)
 
-    candidate_solutions = tuple(
-        reconstruct_solution(
-            index + 1,
-            symbols,
-            dict(fact_bundle.tool_labels),
-            workflow_input_dims=ctx.workflow_input_dims,
-            tool_output_dims=ctx.tool_output_dims,
+        candidate_solutions = tuple(
+            reconstruct_solution(
+                index + 1,
+                symbols,
+                dict(fact_bundle.tool_labels),
+                workflow_input_dims=ctx.workflow_input_dims,
+                tool_output_dims=ctx.tool_output_dims,
+            )
+            for index, symbols in enumerate(solve_output.raw_solutions)
         )
-        for index, symbols in enumerate(solve_output.raw_solutions)
-    )
-    solutions = tuple(
-        reconstruct_solution(
-            index + 1,
-            symbols,
-            dict(fact_bundle.tool_labels),
-            workflow_input_dims=ctx.workflow_input_dims,
-            tool_output_dims=ctx.tool_output_dims,
+        solutions = tuple(
+            reconstruct_solution(
+                index + 1,
+                symbols,
+                dict(fact_bundle.tool_labels),
+                workflow_input_dims=ctx.workflow_input_dims,
+                tool_output_dims=ctx.tool_output_dims,
+            )
+            for index, symbols in enumerate(solve_output.solutions)
         )
-        for index, symbols in enumerate(solve_output.solutions)
-    )
-    # ``solutions`` is the canonical stored result surface. ``candidate_solutions``
-    # mirrors raw callback order and is only useful when raw diagnostics are
-    # requested.
+        # ``solutions`` is the canonical stored result surface. ``candidate_solutions``
+        # mirrors raw callback order and is only useful when raw diagnostics are
+        # requested.
 
-    answer_set_path: Path | None = None
-    
-    workflow_signature_path: Path | None = None
-    graph_paths: tuple[Path, ...] = ()
-    rendering_sec = 0.0
+        answer_set_path: Path | None = None
+        workflow_signature_path: Path | None = None
+        graph_paths: tuple[Path, ...] = ()
+        rendering_sec = 0.0
 
-    horizon_summary_path = solution_dir / "horizon_summary.json"
-    horizon_summary_path.write_text(
-        json.dumps(
-            {
-                "mode": mode,
-                "grounding_strategy": grounding_strategy,
-                "internal_schema": fact_bundle.internal_schema,
-                "internal_solver_mode": internal_solver_mode,
-                "earliest_solution_step": fact_bundle.earliest_solution_step,
-                "effective_solve_start_horizon": config.solution_length_min,
-                "python_precompute_enabled": fact_bundle.python_precompute_enabled,
-                "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
-                "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
-                "backend_stats": fact_bundle.backend_stats,
-                "workflow_input_compression": _workflow_input_compression_payload(
-                    config=config,
-                    mode=mode,
-                    internal_solver_mode=internal_solver_mode,
-                    compression_active=effective_project_models,
-                ),
-                "solve_callback_profile": _solve_callback_profile_payload(
-                    solve_output.horizon_records,
-                    solving_sec=solve_output.solving_sec,
-                ),
-                "effective_parallel_mode": effective_parallel_mode,
-                "translation_peak_rss_mb": translation_peak_rss_mb,
-                "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
-                "base_grounding_sec": solve_output.base_grounding_sec,
-                "timed_out": _timed_out,
-                "horizons": _horizon_record_payload(solve_output.horizon_records),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    if not _timed_out:
         _report(progress_callback, "Step 4: writing outputs and rendering artifacts...")
         render_start = perf_counter()
         if write_raw_answer_sets:
@@ -1839,65 +1895,106 @@ def run_once(
         rendering_sec = perf_counter() - render_start
         _report(progress_callback, f"Step 4 complete: output writing/rendering finished after {rendering_sec:.3f}s.")
 
-    csv_writers.summary_writer.log_summary(
-        completed_stage="run",
-        timings=TimingBreakdown(
-            translation_sec=translation_sec,
-            grounding_sec=solve_output.grounding_sec,
-            solving_sec=solve_output.solving_sec,
-            rendering_sec=rendering_sec,
-        ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
-        base_grounding_sec=solve_output.base_grounding_sec,
-        base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
-        horizon_records=solve_output.horizon_records,
-        raw_solutions_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
-        raw_models_seen=(
-            sum(record.models_seen for record in solve_output.horizon_records)
-            if diagnostic_counts_enabled
-            else 0
-        ),
-        solutions_found=len(solutions),
-        grounded_horizons=tuple(record.horizon for record in solve_output.horizon_records),
-        effective_parallel_mode=effective_parallel_mode,
-    )
-    run_log_path = csv_writers.run_log_path
-    run_summary_path = csv_writers.run_summary_path
+        combined_peak_rss_mb = _combined_peak_mb(memory_monitor)
+        horizon_summary_path = solution_dir / "horizon_summary.json"
+        horizon_summary_path.write_text(
+            json.dumps(
+                {
+                    "mode": mode,
+                    "grounding_strategy": grounding_strategy,
+                    "internal_schema": fact_bundle.internal_schema,
+                    "internal_solver_mode": internal_solver_mode,
+                    "earliest_solution_step": fact_bundle.earliest_solution_step,
+                    "effective_solve_start_horizon": config.solution_length_min,
+                    "python_precompute_enabled": fact_bundle.python_precompute_enabled,
+                    "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
+                    "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                    "backend_stats": fact_bundle.backend_stats,
+                    "workflow_input_compression": _workflow_input_compression_payload(
+                        config=config,
+                        mode=mode,
+                        internal_solver_mode=internal_solver_mode,
+                        compression_active=effective_project_models,
+                    ),
+                    "solve_callback_profile": _solve_callback_profile_payload(
+                        horizon_records,
+                        solving_sec=solve_output.solving_sec,
+                    ),
+                    "effective_parallel_mode": effective_parallel_mode,
+                    "translation_peak_rss_mb": translation_peak_rss_mb,
+                    "combined_peak_rss_mb": combined_peak_rss_mb,
+                    "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
+                    "base_grounding_sec": solve_output.base_grounding_sec,
+                    "timed_out": _timed_out,
+                    "horizons": _horizon_record_payload(horizon_records),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
-    return RunResult(
-        config=config,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_bundle=fact_bundle,
-        solutions=solutions,
-        timings=TimingBreakdown(
-            translation_sec=translation_sec,
-            grounding_sec=solve_output.grounding_sec,
-            solving_sec=solve_output.solving_sec,
-            rendering_sec=rendering_sec,
-        ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
-        base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
-        base_grounding_sec=solve_output.base_grounding_sec,
-        horizon_records=solve_output.horizon_records,
-        translation_path=None,
-        answer_set_path=answer_set_path,
-        solution_summary_path=None,
-        workflow_signature_path=workflow_signature_path,
-        graph_paths=graph_paths,
-        raw_models_seen=(
-            sum(record.models_seen for record in solve_output.horizon_records)
-            if diagnostic_counts_enabled
-            else 0
-        ),
-        raw_answer_sets_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
-        unique_solutions_found=len(solutions),
-        diagnostic_counts_enabled=diagnostic_counts_enabled,
-        timed_out=False,
-        completed_stage="run",
-        run_log_path=run_log_path,
-        run_summary_path=run_summary_path,
-    )
+        csv_writers.summary_writer.log_summary(
+            completed_stage="run",
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=solve_output.grounding_sec,
+                solving_sec=solve_output.solving_sec,
+                rendering_sec=rendering_sec,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            base_grounding_sec=solve_output.base_grounding_sec,
+            base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
+            horizon_records=horizon_records,
+            raw_solutions_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
+            raw_models_seen=(
+                sum(record.models_seen for record in horizon_records)
+                if diagnostic_counts_enabled
+                else 0
+            ),
+            solutions_found=len(solutions),
+            grounded_horizons=tuple(record.horizon for record in horizon_records),
+            effective_parallel_mode=effective_parallel_mode,
+        )
+        run_log_path = csv_writers.run_log_path
+        run_summary_path = csv_writers.run_summary_path
+
+        return RunResult(
+            config=config,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_bundle=fact_bundle,
+            solutions=solutions,
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=solve_output.grounding_sec,
+                solving_sec=solve_output.solving_sec,
+                rendering_sec=rendering_sec,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            base_grounding_peak_rss_mb=solve_output.base_grounding_peak_rss_mb,
+            base_grounding_sec=solve_output.base_grounding_sec,
+            horizon_records=horizon_records,
+            translation_path=None,
+            answer_set_path=answer_set_path,
+            solution_summary_path=None,
+            workflow_signature_path=workflow_signature_path,
+            graph_paths=graph_paths,
+            raw_models_seen=(
+                sum(record.models_seen for record in horizon_records)
+                if diagnostic_counts_enabled
+                else 0
+            ),
+            raw_answer_sets_found=len(solve_output.raw_solutions) if diagnostic_counts_enabled else 0,
+            unique_solutions_found=len(solutions),
+            diagnostic_counts_enabled=diagnostic_counts_enabled,
+            timed_out=False,
+            completed_stage="run",
+            run_log_path=run_log_path,
+            run_summary_path=run_summary_path,
+        )
 
 
 def run_ground_only(
@@ -1916,156 +2013,173 @@ def run_ground_only(
 ) -> GroundingRunResult:
     """Run translation plus grounding without solving."""
 
-    ctx = _prepare_run_context(
-        config_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        output_dir=output_dir,
-        solutions=solutions,
-        min_length=min_length,
-        max_length=max_length,
-        progress_callback=progress_callback,
-        optimized=optimized,
-        max_workers=max_workers,
-    )
-    config = ctx.config
-    solution_dir = ctx.solution_dir
-    fact_bundle = ctx.fact_bundle
-    translation_sec = ctx.translation_sec
-    translation_peak_rss_mb = ctx.translation_peak_rss_mb
-    translation_builder = ctx.resolved_translation_builder
-    effective_translation_strategy = ctx.effective_translation_strategy
-    run_metadata = ctx.run_metadata
-    csv_writers = _RunCsvWriters(
-        csv_dir=config.solutions_dir_path,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        fact_count=fact_bundle.fact_count,
-        run_metadata=run_metadata,
-        translation_builder=translation_builder,
-        translation_schema=_translation_schema(fact_bundle),
-        optimized_enabled=optimized,
-        effective_parallel_mode=None,
-        compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
-    )
-    csv_writers.step_writer.log_translation(
-        translation_sec=translation_sec,
-        translation_peak_rss_mb=translation_peak_rss_mb,
-    )
-
-    translation_summary_path, translation_summary = _write_translation_summary(
-        config=config,
-        solution_dir=solution_dir,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        translation_builder=translation_builder,
-        effective_translation_strategy=effective_translation_strategy,
-        fact_bundle=fact_bundle,
-        translation_path=None,
-        translation_sec=translation_sec,
-    )
-
-    mode_config = _mode_config(mode)
-    if not mode_config.supports_ground_only:
-        raise ValueError(f"Ground-only runs do not support mode {mode}.")
-
-    internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
-
-    grounding_output = _GROUNDER_DISPATCH[internal_solver_mode](
-        config,
-        fact_bundle,
-        stage=stage,
-        progress_callback=progress_callback,
-        base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
-            base_grounding_sec=sec,
-            base_grounding_peak_rss_mb=peak,
-        ),
-        horizon_record_callback=csv_writers.step_writer.log_horizon,
-    )
-
-    _report(
-        progress_callback,
-        f"Step 2 complete: grounding finished after {grounding_output.grounding_sec:.3f}s.",
-    )
-
-    grounding_summary_path = solution_dir / "grounding_summary.json"
-    grounding_summary_path.write_text(
-        json.dumps(
-            {
-                "mode": mode,
-                "grounding_strategy": grounding_strategy,
-                "stage": stage,
-                "internal_schema": fact_bundle.internal_schema,
-                "internal_solver_mode": internal_solver_mode,
-                "fact_count": fact_bundle.fact_count,
-                "translation_path": None,
-                "translation_summary_path": str(translation_summary_path),
-                "earliest_solution_step": fact_bundle.earliest_solution_step,
-                "python_precompute_enabled": fact_bundle.python_precompute_enabled,
-                "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
-                "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
-                "backend_stats": fact_bundle.backend_stats,
-                "workflow_input_compression": _workflow_input_compression_payload(
-                    config=config,
-                    mode=mode,
-                    internal_solver_mode=internal_solver_mode,
-                ),
-                "grounded_horizons": list(grounding_output.grounded_horizons),
-                "translation_peak_rss_mb": translation_peak_rss_mb,
-                "base_grounding_peak_rss_mb": grounding_output.base_grounding_peak_rss_mb,
-                "base_grounding_sec": grounding_output.base_grounding_sec,
-                "horizon_records": _horizon_record_payload(grounding_output.horizon_records),
-                "translation_sec": translation_sec,
-                "grounding_sec": grounding_output.grounding_sec,
-                "total_sec": translation_sec + grounding_output.grounding_sec,
-                "translation_summary": translation_summary,
-            },
-            indent=2,
+    with ProcessTreePeakMonitor() as memory_monitor:
+        ctx = _prepare_run_context(
+            config_path,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            output_dir=output_dir,
+            solutions=solutions,
+            min_length=min_length,
+            max_length=max_length,
+            progress_callback=progress_callback,
+            optimized=optimized,
+            max_workers=max_workers,
+            memory_monitor=memory_monitor,
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    csv_writers.summary_writer.log_summary(
-        completed_stage="ground_only_full" if stage == "full" else "ground_only_base",
-        timings=TimingBreakdown(
+        config = ctx.config
+        solution_dir = ctx.solution_dir
+        fact_bundle = ctx.fact_bundle
+        translation_sec = ctx.translation_sec
+        translation_peak_rss_mb = ctx.translation_peak_combined_rss_mb
+        translation_builder = ctx.resolved_translation_builder
+        effective_translation_strategy = ctx.effective_translation_strategy
+        run_metadata = ctx.run_metadata
+        csv_writers = _RunCsvWriters(
+            csv_dir=config.solutions_dir_path,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            fact_count=fact_bundle.fact_count,
+            run_metadata=run_metadata,
+            translation_builder=translation_builder,
+            translation_schema=_translation_schema(fact_bundle),
+            optimized_enabled=optimized,
+            effective_parallel_mode=None,
+            compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
+        )
+        csv_writers.step_writer.log_translation(
             translation_sec=translation_sec,
-            grounding_sec=grounding_output.grounding_sec,
-            solving_sec=0.0,
-            rendering_sec=0.0,
-        ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
-        base_grounding_sec=grounding_output.base_grounding_sec,
-        base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
-        horizon_records=grounding_output.horizon_records,
-        raw_models_seen=0,
-        raw_solutions_found=0,
-        solutions_found=0,
-        grounded_horizons=grounding_output.grounded_horizons,
-        effective_parallel_mode=None,
-    )
-    run_log_path = csv_writers.run_log_path
-    run_summary_path = csv_writers.run_summary_path
+            translation_peak_rss_mb=translation_peak_rss_mb,
+        )
 
-    return GroundingRunResult(
-        config=config,
-        mode=mode,
-        grounding_strategy=grounding_strategy,
-        stage=stage,
-        fact_bundle=fact_bundle,
-        timings=TimingBreakdown(
+        translation_summary_path, translation_summary = _write_translation_summary(
+            config=config,
+            solution_dir=solution_dir,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            translation_builder=translation_builder,
+            effective_translation_strategy=effective_translation_strategy,
+            fact_bundle=fact_bundle,
+            translation_path=None,
             translation_sec=translation_sec,
-            grounding_sec=grounding_output.grounding_sec,
-            solving_sec=0.0,
-            rendering_sec=0.0,
-        ),
-        translation_peak_rss_mb=translation_peak_rss_mb,
-        base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
-        base_grounding_sec=grounding_output.base_grounding_sec,
-        horizon_records=grounding_output.horizon_records,
-        translation_path=None,
-        translation_summary_path=translation_summary_path,
-        grounding_summary_path=grounding_summary_path,
-        grounded_horizons=grounding_output.grounded_horizons,
-        run_log_path=run_log_path,
-        run_summary_path=run_summary_path,
-    )
+        )
+
+        mode_config = _mode_config(mode)
+        if not mode_config.supports_ground_only:
+            raise ValueError(f"Ground-only runs do not support mode {mode}.")
+
+        internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
+        grounded_horizon_peaks: dict[int, float] = {}
+
+        def _log_ground_horizon(record: HorizonRecord) -> None:
+            combined_peak_mb = _combined_peak_mb(memory_monitor)
+            grounded_horizon_peaks[record.horizon] = combined_peak_mb
+            csv_writers.step_writer.log_horizon(replace(record, peak_rss_mb=combined_peak_mb))
+
+        grounding_output = _GROUNDER_DISPATCH[internal_solver_mode](
+            config,
+            fact_bundle,
+            stage=stage,
+            progress_callback=progress_callback,
+            base_grounding_callback=lambda sec, peak: csv_writers.step_writer.log_base_grounding(
+                base_grounding_sec=sec,
+                base_grounding_peak_rss_mb=peak,
+            ),
+            horizon_record_callback=_log_ground_horizon,
+        )
+
+        _report(
+            progress_callback,
+            f"Step 2 complete: grounding finished after {grounding_output.grounding_sec:.3f}s.",
+        )
+
+        horizon_records = _records_with_combined_peak_rss(
+            grounding_output.horizon_records,
+            memory_monitor=memory_monitor,
+            peaks_by_horizon=grounded_horizon_peaks,
+        )
+        combined_peak_rss_mb = _combined_peak_mb(memory_monitor)
+        grounding_summary_path = solution_dir / "grounding_summary.json"
+        grounding_summary_path.write_text(
+            json.dumps(
+                {
+                    "mode": mode,
+                    "grounding_strategy": grounding_strategy,
+                    "stage": stage,
+                    "internal_schema": fact_bundle.internal_schema,
+                    "internal_solver_mode": internal_solver_mode,
+                    "fact_count": fact_bundle.fact_count,
+                    "translation_path": None,
+                    "translation_summary_path": str(translation_summary_path),
+                    "earliest_solution_step": fact_bundle.earliest_solution_step,
+                    "python_precompute_enabled": fact_bundle.python_precompute_enabled,
+                    "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
+                    "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),
+                    "backend_stats": fact_bundle.backend_stats,
+                    "workflow_input_compression": _workflow_input_compression_payload(
+                        config=config,
+                        mode=mode,
+                        internal_solver_mode=internal_solver_mode,
+                    ),
+                    "grounded_horizons": list(grounding_output.grounded_horizons),
+                    "translation_peak_rss_mb": translation_peak_rss_mb,
+                    "combined_peak_rss_mb": combined_peak_rss_mb,
+                    "base_grounding_peak_rss_mb": grounding_output.base_grounding_peak_rss_mb,
+                    "base_grounding_sec": grounding_output.base_grounding_sec,
+                    "horizon_records": _horizon_record_payload(horizon_records),
+                    "translation_sec": translation_sec,
+                    "grounding_sec": grounding_output.grounding_sec,
+                    "total_sec": translation_sec + grounding_output.grounding_sec,
+                    "translation_summary": translation_summary,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        csv_writers.summary_writer.log_summary(
+            completed_stage="ground_only_full" if stage == "full" else "ground_only_base",
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=grounding_output.grounding_sec,
+                solving_sec=0.0,
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            base_grounding_sec=grounding_output.base_grounding_sec,
+            base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
+            horizon_records=horizon_records,
+            raw_models_seen=0,
+            raw_solutions_found=0,
+            solutions_found=0,
+            grounded_horizons=grounding_output.grounded_horizons,
+            effective_parallel_mode=None,
+        )
+        run_log_path = csv_writers.run_log_path
+        run_summary_path = csv_writers.run_summary_path
+
+        return GroundingRunResult(
+            config=config,
+            mode=mode,
+            grounding_strategy=grounding_strategy,
+            stage=stage,
+            fact_bundle=fact_bundle,
+            timings=TimingBreakdown(
+                translation_sec=translation_sec,
+                grounding_sec=grounding_output.grounding_sec,
+                solving_sec=0.0,
+                rendering_sec=0.0,
+            ),
+            translation_peak_rss_mb=translation_peak_rss_mb,
+            combined_peak_rss_mb=combined_peak_rss_mb,
+            base_grounding_peak_rss_mb=grounding_output.base_grounding_peak_rss_mb,
+            base_grounding_sec=grounding_output.base_grounding_sec,
+            horizon_records=horizon_records,
+            translation_path=None,
+            translation_summary_path=translation_summary_path,
+            grounding_summary_path=grounding_summary_path,
+            grounded_horizons=grounding_output.grounded_horizons,
+            run_log_path=run_log_path,
+            run_summary_path=run_summary_path,
+        )
