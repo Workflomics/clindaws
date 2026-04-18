@@ -17,14 +17,14 @@ goal_output_candidate(t, GoalID, out(TProd, ToolProd, Port)) :-
 goal_dim_match(t, GoalID, WF, RequirementID) :-
     query(t),
     goal_output_candidate(t, GoalID, WF),
-    compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
+    optimized_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
     artifact_dim(WF, ActualV, Category),
     dynamic_profile_accepts(ProfileId, ActualV).
 
 goal_dim_missing(t, GoalID, WF, RequirementID) :-
     query(t),
     goal_output_candidate(t, GoalID, WF),
-    compressed_goal_requirement_profile(GoalID, RequirementID, _, _),
+    optimized_goal_requirement_profile(GoalID, RequirementID, _, _),
     not goal_dim_match(t, GoalID, WF, RequirementID).
 
 goal_satisfied_by(t, GoalID, WF) :-
@@ -61,7 +61,7 @@ used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
     query(t),
     occurs(TUse, bind(ToolUse, PortUse, out(TProd, ToolProd, Port))),
     occurs(TUse, use_dynamic_candidate(ToolUse, ConsumerCandidate)),
-    compressed_candidate_input_profile(ConsumerCandidate, PortUse, Category, ProfileId).
+    optimized_candidate_input_profile(ConsumerCandidate, PortUse, Category, ProfileId).
 
 query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     query_output_filter_active(t),

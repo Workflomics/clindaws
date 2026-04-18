@@ -106,14 +106,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="Enable the optimized backend. For multi-shot this uses the compressed-candidate optimizer. Single-shot optimized mode is not implemented yet.",
+        help="Enable the optimized backend. For multi-shot this uses the optimized-candidate backend. Single-shot optimized mode is not implemented yet.",
     )
     parser.add_argument(
         "--translation-workers",
         type=int,
         default=1,
         metavar="N",
-        help="Number of worker processes for optimized compressed-candidate translation. Default 1 (sequential). Values >1 use ProcessPoolExecutor.",
+        help="Number of worker processes for optimized-candidate translation. Default 1 (sequential). Values >1 use ProcessPoolExecutor.",
     )
     parser.add_argument(
         "--ground-only",

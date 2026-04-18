@@ -1,4 +1,4 @@
-"""Compressed-candidate precomputation and optimization pipeline.
+"""Optimized-candidate precomputation and optimization pipeline.
 
 This is the translation-time optimization layer behind ``multi-shot
 --optimized``. It expands tools into candidate records, prunes candidates that
@@ -17,7 +17,7 @@ from clindaws.translators.resolvers import _ExpansionResolver
 from clindaws.translators.builder import _build_roots
 
 from collections import defaultdict, deque
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
@@ -28,7 +28,7 @@ from clindaws.core.ontology import Ontology
 
 @dataclass(frozen=True)
 class CompressedCandidateOptimizationResult:
-    """Optimized compressed-candidate surface ready for fact emission."""
+    """Optimized-candidate surface ready for fact emission."""
 
     tool_stats: tuple[ToolExpansionStat, ...]
     relevant_records: tuple[dict[str, object], ...]
@@ -43,14 +43,199 @@ class CompressedCandidateOptimizationResult:
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]]
     signature_support_class_by_id: dict[int, int]
     support_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
+    association_class_by_input: dict[tuple[str, int], int]
+    association_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
     candidate_output_id_map: Mapping[tuple[str, int], int]
     canonical_producers: Mapping[tuple[int, int], tuple[int, int]]
     cache_stats: dict[str, int]
+    must_run_tools_global: tuple[str, ...]
+    must_run_candidates_global: tuple[str, ...]
     must_run_tools_by_step: dict[int, tuple[str, ...]]
     must_run_candidates_by_step: dict[int, tuple[str, ...]]
+    forced_associations_global: tuple[tuple[str, int, str, int], ...]
+    forced_associations_by_step: dict[int, tuple[tuple[str, int, str, int], ...]]
+    fixpoint_rounds: int
+    structural_probe_horizons: tuple[int, ...]
     structural_horizon_skip_count: int
     earliest_solution_step: int
     phase_timings: dict[str, float]
+
+
+def _reverse_edges_from_produced_bindable_ports(
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+) -> dict[str, set[str]]:
+    reverse_edges: dict[str, set[str]] = defaultdict(set)
+    for consumer_candidate, by_port in produced_bindable_ports.items():
+        for producers in by_port.values():
+            for producer_candidate in producers:
+                reverse_edges[consumer_candidate].add(producer_candidate)
+    return reverse_edges
+
+
+def _close_relevant_candidates(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    goal_candidates: Iterable[str],
+    active_candidates: Iterable[str] | None = None,
+) -> set[str]:
+    """Compute a fixed-point of forward feasible and backward goal-relevant candidates."""
+
+    allowed = set(candidate_records_by_id) if active_candidates is None else set(active_candidates)
+    reverse_edges = _reverse_edges_from_produced_bindable_ports(produced_bindable_ports)
+
+    stable = set(allowed)
+    while True:
+        forward_reachable: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for candidate_id in sorted(stable):
+                record = candidate_records_by_id[candidate_id]
+                input_ports = tuple(record["input_ports"])
+                if all(
+                    int(port["port_idx"]) in workflow_bindable_ports.get(candidate_id, set())
+                    or any(
+                        producer_candidate in forward_reachable
+                        for producer_candidate in produced_bindable_ports.get(candidate_id, {}).get(int(port["port_idx"]), set())
+                    )
+                    for port in input_ports
+                ):
+                    if candidate_id not in forward_reachable:
+                        forward_reachable.add(candidate_id)
+                        changed = True
+
+        backward_relevant: set[str] = set()
+        frontier = deque(
+            sorted(
+                candidate_id
+                for candidate_id in goal_candidates
+                if candidate_id in forward_reachable
+            )
+        )
+        while frontier:
+            candidate_id = frontier.popleft()
+            if candidate_id in backward_relevant:
+                continue
+            backward_relevant.add(candidate_id)
+            for producer_candidate in sorted(reverse_edges.get(candidate_id, set())):
+                if producer_candidate in forward_reachable and producer_candidate not in backward_relevant:
+                    frontier.append(producer_candidate)
+
+        new_stable = forward_reachable & backward_relevant
+        if new_stable == stable:
+            return new_stable
+        stable = new_stable
+
+
+def _filter_bindability_by_temporal_overlap(
+    *,
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[dict[str, dict[int, set[str]]], int]:
+    """Drop producer-consumer associations that can never respect temporal order."""
+
+    filtered: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
+    dropped = 0
+    for consumer_candidate, by_port in produced_bindable_ports.items():
+        consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+        if consumer_max_step is None:
+            continue
+        for consumer_port, producer_candidates in by_port.items():
+            for producer_candidate in producer_candidates:
+                producer_min_step = min_step_by_candidate.get(producer_candidate)
+                if producer_min_step is None or producer_min_step >= consumer_max_step:
+                    dropped += 1
+                    continue
+                filtered[consumer_candidate][consumer_port].add(producer_candidate)
+    return (
+        {
+            consumer_candidate: {
+                consumer_port: set(producer_candidates)
+                for consumer_port, producer_candidates in by_port.items()
+                if producer_candidates
+            }
+            for consumer_candidate, by_port in filtered.items()
+            if any(by_port.values())
+        },
+        dropped,
+    )
+
+
+def _filter_signature_bindable_ports(
+    signature_bindable_ports: Mapping[int, set[tuple[str, int]]],
+    *,
+    active_candidates: Iterable[str],
+) -> dict[int, set[tuple[str, int]]]:
+    """Filter signature support classes to the surviving candidate universe."""
+
+    active = set(active_candidates)
+    return {
+        signature_id: {
+            (producer_candidate, producer_port)
+            for producer_candidate, producer_port in producer_ports
+            if producer_candidate in active
+        }
+        for signature_id, producer_ports in signature_bindable_ports.items()
+    }
+
+
+def _candidate_set_supports_any_goal(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    query_goal_candidates: Iterable[str],
+    active_candidates: Iterable[str],
+) -> bool:
+    closed = _close_relevant_candidates(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=produced_bindable_ports,
+        goal_candidates=query_goal_candidates,
+        active_candidates=active_candidates,
+    )
+    return any(candidate_id in closed for candidate_id in query_goal_candidates)
+
+
+def _compute_global_must_run_candidates(
+    *,
+    relevant_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    query_goal_candidates: Iterable[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Derive conservative global must-run candidates/tools by removal testing."""
+
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
+    active_candidates = tuple(sorted(candidate_records_by_id))
+    must_run_candidates: list[str] = []
+
+    for candidate_id in active_candidates:
+        remaining_candidates = tuple(other for other in active_candidates if other != candidate_id)
+        if not _candidate_set_supports_any_goal(
+            candidate_records_by_id=candidate_records_by_id,
+            workflow_bindable_ports=workflow_bindable_ports,
+            produced_bindable_ports=produced_bindable_ports,
+            query_goal_candidates=query_goal_candidates,
+            active_candidates=remaining_candidates,
+        ):
+            must_run_candidates.append(candidate_id)
+
+    must_run_tools = tuple(
+        sorted(
+            {
+                str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                for candidate_id in must_run_candidates
+            }
+        )
+    )
+    return tuple(sorted(must_run_candidates)), must_run_tools
 
 
 def _factor_signature_support_classes(
@@ -86,6 +271,120 @@ def _factor_signature_support_classes(
                 for producer_ports in support_class_bindable_ports.values()
             ),
         },
+    )
+
+
+def _factor_input_association_classes(
+    *,
+    relevant_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    signature_bindable_ports: Mapping[int, set[tuple[str, int]]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[tuple[str, int], int],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[tuple[str, int], tuple[tuple[str, int], ...]],
+    dict[str, int],
+]:
+    """Factor feasible producer-port options per concrete consumer input port."""
+
+    association_class_by_key: dict[tuple[tuple[str, int], ...], int] = {}
+    association_class_by_input: dict[tuple[str, int], int] = {}
+    association_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]] = {}
+    feasible_associations_by_input: dict[tuple[str, int], tuple[tuple[str, int], ...]] = {}
+    raw_port_options = 0
+
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        consumer_max_step = max_step_by_candidate.get(candidate_id)
+        if consumer_max_step is None:
+            continue
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            signature_id = int(input_port["signature_id"])
+            feasible_producer_ports = tuple(
+                sorted(
+                    (producer_candidate, int(producer_port))
+                    for producer_candidate, producer_port in signature_bindable_ports.get(signature_id, set())
+                    if producer_candidate != candidate_id
+                    and producer_candidate in min_step_by_candidate
+                    and min_step_by_candidate[producer_candidate] < consumer_max_step
+                )
+            )
+            feasible_associations_by_input[(candidate_id, port_idx)] = feasible_producer_ports
+            raw_port_options += len(feasible_producer_ports)
+            if not feasible_producer_ports:
+                continue
+            class_id = association_class_by_key.setdefault(
+                feasible_producer_ports,
+                len(association_class_by_key),
+            )
+            association_class_by_input[(candidate_id, port_idx)] = class_id
+            association_class_bindable_ports.setdefault(class_id, feasible_producer_ports)
+
+    return (
+        association_class_by_input,
+        association_class_bindable_ports,
+        feasible_associations_by_input,
+        {
+            "dynamic_association_classes": len(association_class_bindable_ports),
+            "dynamic_association_port_options": raw_port_options,
+            "dynamic_association_port_options_collapsed": max(
+                0,
+                raw_port_options - len(association_class_bindable_ports),
+            ),
+        },
+    )
+
+
+def _propagate_forced_associations(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    seed_required_candidates: Iterable[str],
+) -> tuple[tuple[str, ...], tuple[tuple[str, int, str, int], ...], int]:
+    """Propagate unique producer choices from required candidates until stable."""
+
+    required_candidates = set(seed_required_candidates)
+    forced_associations: dict[tuple[str, int], tuple[str, int]] = {}
+    fixpoint_rounds = 0
+
+    while True:
+        changed = False
+        fixpoint_rounds += 1
+        for candidate_id in sorted(required_candidates):
+            record = candidate_records_by_id.get(candidate_id)
+            if record is None:
+                continue
+            for input_port in tuple(record["input_ports"]):
+                port_idx = int(input_port["port_idx"])
+                if port_idx in workflow_bindable_ports.get(candidate_id, set()):
+                    continue
+                feasible = feasible_associations_by_input.get((candidate_id, port_idx), ())
+                if len(feasible) != 1:
+                    continue
+                producer_candidate, producer_port = feasible[0]
+                key = (candidate_id, port_idx)
+                if forced_associations.get(key) == (producer_candidate, producer_port):
+                    continue
+                forced_associations[key] = (producer_candidate, producer_port)
+                if producer_candidate not in required_candidates:
+                    required_candidates.add(producer_candidate)
+                changed = True
+        if not changed:
+            break
+
+    return (
+        tuple(sorted(required_candidates)),
+        tuple(
+            sorted(
+                (candidate_id, port_idx, producer_candidate, producer_port)
+                for (candidate_id, port_idx), (producer_candidate, producer_port) in forced_associations.items()
+            )
+        ),
+        fixpoint_rounds,
     )
 
 
@@ -185,7 +484,7 @@ def optimize_compressed_candidates(
     *,
     max_workers: int = 1,
 ) -> CompressedCandidateOptimizationResult:
-    """Precompute the compressed-candidate surface before fact emission.
+    """Precompute the optimized-candidate surface before fact emission.
 
     The resulting record is intentionally close to the optimized ASP schema:
     candidate-step eligibility, signature support classes, goal distances, and
@@ -442,30 +741,11 @@ def optimize_compressed_candidates(
             profile_accepts_by_id=profile_accepts_by_id,
         )
     )
-    (
-        signature_support_class_by_id,
-        support_class_bindable_ports,
-        support_class_stats,
-    ) = _factor_signature_support_classes(signature_bindable_ports)
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
 
-    candidate_output_id_map: dict[tuple[str, int], int] = {}
-    for record in relevant_records:
-        candidate_id = str(record["candidate_id"])
-        for output_port in tuple(record["output_ports"]):
-            port_idx = int(output_port["port_idx"])
-            candidate_output_id_map[(candidate_id, port_idx)] = len(candidate_output_id_map) + 1
-
-    # Precompute canonical producers for each SupportClass at each possible step
-    canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
-    # (Not strictly necessary to precompute EVERYTHING here, but we can do it for Step 8)
-    # Actually, the canonical producer depends on which tools ARE RUNNING. 
-    # Python can't know that. Only ASP knows.
-    # So I must find a better way for Point 8.
-
-    t4 = perf_counter()
-
-
-    relevant_tools = tuple(record["tool"] for record in relevant_records)
     query_goal_candidates: set[str] = set()
     for record in relevant_records:
         candidate_id = str(record["candidate_id"])
@@ -505,20 +785,6 @@ def optimize_compressed_candidates(
         for record in relevant_records
         if str(record["candidate_id"]) in query_goal_candidates
     }
-    min_goal_distance_by_candidate: dict[str, int] = {}
-    frontier = deque(sorted(query_goal_candidates))
-    for candidate_id in frontier:
-        min_goal_distance_by_candidate[candidate_id] = 0
-    while frontier:
-        consumer_candidate = frontier.popleft()
-        next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
-        for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
-            if producer_candidate in min_goal_distance_by_candidate:
-                continue
-            if producer_candidate not in relevant_candidates:
-                continue
-            min_goal_distance_by_candidate[producer_candidate] = next_distance
-            frontier.append(producer_candidate)
 
     min_step_by_candidate = _compute_dynamic_candidate_min_steps(
         relevant_records,
@@ -570,6 +836,143 @@ def optimize_compressed_candidates(
         if max_step < min_step:
             continue
         max_step_by_candidate[candidate_id] = max_step
+
+    compressed_produced_bindable_ports, temporally_dropped_associations = _filter_bindability_by_temporal_overlap(
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+    )
+    compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+
+    brave_closed_candidates = _close_relevant_candidates(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        goal_candidates=query_goal_candidates,
+    )
+    relevant_records = [
+        record
+        for record in relevant_records
+        if str(record["candidate_id"]) in brave_closed_candidates
+    ]
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
+    query_goal_candidates &= brave_closed_candidates
+    query_goal_tools = {
+        str(record["tool"].mode_id)
+        for record in relevant_records
+        if str(record["candidate_id"]) in query_goal_candidates
+    }
+    compressed_produced_bindable_ports = {
+        consumer_candidate: {
+            consumer_port: {
+                producer_candidate
+                for producer_candidate in producer_candidates
+                if producer_candidate in brave_closed_candidates
+            }
+            for consumer_port, producer_candidates in by_port.items()
+            if any(producer_candidate in brave_closed_candidates for producer_candidate in producer_candidates)
+        }
+        for consumer_candidate, by_port in compressed_produced_bindable_ports.items()
+        if consumer_candidate in brave_closed_candidates
+    }
+    compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+    min_step_by_candidate = _compute_dynamic_candidate_min_steps(
+        relevant_records,
+        workflow_bindable_ports,
+        compressed_produced_bindable_ports,
+    )
+    max_step_by_candidate = {
+        candidate_id: max_step
+        for candidate_id, max_step in max_step_by_candidate.items()
+        if candidate_id in brave_closed_candidates
+    }
+    signature_bindable_ports = _filter_signature_bindable_ports(
+        signature_bindable_ports,
+        active_candidates=brave_closed_candidates,
+    )
+    (
+        signature_support_class_by_id,
+        support_class_bindable_ports,
+        support_class_stats,
+    ) = _factor_signature_support_classes(signature_bindable_ports)
+    (
+        association_class_by_input,
+        association_class_bindable_ports,
+        feasible_associations_by_input,
+        association_class_stats,
+    ) = _factor_input_association_classes(
+        relevant_records=relevant_records,
+        workflow_bindable_ports=workflow_bindable_ports,
+        signature_bindable_ports=signature_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+    )
+
+    candidate_output_id_map: dict[tuple[str, int], int] = {}
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            candidate_output_id_map[(candidate_id, port_idx)] = len(candidate_output_id_map) + 1
+
+    # Still intentionally empty; canonical producers remain a solve-time notion.
+    canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
+
+    relevant_tools = tuple(record["tool"] for record in relevant_records)
+    min_goal_distance_by_candidate: dict[str, int] = {}
+    frontier = deque(sorted(query_goal_candidates))
+    for candidate_id in frontier:
+        min_goal_distance_by_candidate[candidate_id] = 0
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
+        for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
+            if producer_candidate in min_goal_distance_by_candidate:
+                continue
+            if producer_candidate not in candidate_records_by_id:
+                continue
+            min_goal_distance_by_candidate[producer_candidate] = next_distance
+            frontier.append(producer_candidate)
+
+    must_run_candidates_global, must_run_tools_global = _compute_global_must_run_candidates(
+        relevant_records=relevant_records,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        query_goal_candidates=query_goal_candidates,
+    )
+    (
+        propagated_required_candidates,
+        forced_associations_global,
+        fixpoint_rounds,
+    ) = _propagate_forced_associations(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        feasible_associations_by_input=feasible_associations_by_input,
+        seed_required_candidates=must_run_candidates_global,
+    )
+    must_run_candidates_global = propagated_required_candidates
+    must_run_tools_global = tuple(
+        sorted(
+            {
+                str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                for candidate_id in must_run_candidates_global
+                if candidate_id in candidate_records_by_id
+            }
+        )
+    )
+
+    t4 = perf_counter()
+
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        tool_id = str(record["tool"].mode_id)
+        min_step = min_step_by_candidate.get(candidate_id)
+        max_step = max_step_by_candidate.get(candidate_id)
+        if min_step is None or max_step is None or max_step < min_step:
+            continue
         for step_index in range(min_step, max_step + 1):
             allowed_candidates_by_step[step_index].add(candidate_id)
             allowed_tools_by_step[step_index].add(tool_id)
@@ -578,12 +981,22 @@ def optimize_compressed_candidates(
 
     must_run_tools_by_step: dict[int, tuple[str, ...]] = {}
     must_run_candidates_by_step: dict[int, tuple[str, ...]] = {}
+    forced_associations_by_step: dict[int, tuple[tuple[str, int, str, int], ...]] = {}
     for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
         if len(tool_ids) == 1:
             must_run_tools_by_step[step_index] = tuple(sorted(tool_ids))
     for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
         if len(candidate_ids) == 1:
             must_run_candidates_by_step[step_index] = tuple(sorted(candidate_ids))
+        step_forced_associations = tuple(
+            sorted(
+                association
+                for association in forced_associations_global
+                if association[0] in candidate_ids
+            )
+        )
+        if step_forced_associations:
+            forced_associations_by_step[step_index] = step_forced_associations
 
     earliest_goal_step = min(
         (
@@ -602,6 +1015,22 @@ def optimize_compressed_candidates(
     )
     structural_horizon_skip_count = max(0, earliest_solution_step - config.solution_length_min)
     candidate_pruned_count = max(0, candidate_count_before_pruning - len(relevant_records))
+    structural_probe_horizons = tuple(
+        sorted(
+            step_index
+            for step_index, candidate_ids in allowed_candidates_by_step.items()
+            if step_index >= earliest_solution_step
+            and any(candidate_id in query_goal_candidates for candidate_id in candidate_ids)
+        )
+    )
+    structural_horizon_skip_count += max(
+        0,
+        sum(
+            1
+            for step_index in range(max(config.solution_length_min, earliest_solution_step), config.solution_length_max + 1)
+            if step_index not in set(structural_probe_horizons)
+        )
+    )
 
     return CompressedCandidateOptimizationResult(
         tool_stats=tuple(tool_stats),
@@ -630,13 +1059,26 @@ def optimize_compressed_candidates(
             **dynamic_schema_stats,
             **bindability_stats,
             **support_class_stats,
+            **association_class_stats,
             **goal_profile_stats,
             "dynamic_candidates_before_pruning": candidate_count_before_pruning,
             "dynamic_candidates_after_pruning": len(relevant_records),
             "dynamic_candidates_pruned": candidate_pruned_count,
+            "dynamic_brave_relevant_candidates_after_closure": len(brave_closed_candidates),
+            "dynamic_temporally_impossible_associations_pruned": temporally_dropped_associations,
+            "dynamic_forced_associations_global": len(forced_associations_global),
+            "dynamic_fixpoint_rounds": fixpoint_rounds,
         },
+        must_run_tools_global=must_run_tools_global,
+        must_run_candidates_global=must_run_candidates_global,
         must_run_tools_by_step=must_run_tools_by_step,
         must_run_candidates_by_step=must_run_candidates_by_step,
+        forced_associations_global=forced_associations_global,
+        forced_associations_by_step=forced_associations_by_step,
+        association_class_by_input=association_class_by_input,
+        association_class_bindable_ports=association_class_bindable_ports,
+        fixpoint_rounds=fixpoint_rounds,
+        structural_probe_horizons=structural_probe_horizons,
         structural_horizon_skip_count=structural_horizon_skip_count,
         earliest_solution_step=earliest_solution_step,
         phase_timings={

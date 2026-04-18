@@ -4,7 +4,7 @@ This module maps the public CLI modes onto concrete ASP program families and
 then drives grounding/solving in clingo.
 
 - ``multi-shot`` uses the direct incremental encoding family.
-- ``multi-shot --optimized`` uses the compressed-candidate incremental family.
+- ``multi-shot --optimized`` uses the optimized-candidate incremental family.
 - ``single-shot`` currently reuses the direct ``multi_shot`` encoding files but
   grounds them once over ``time(1..max_length)`` and solves on that single
   control object.
@@ -204,9 +204,9 @@ def _multi_shot_program_paths() -> tuple[Path, ...]:
 
 
 
-def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
-    """Return the optimized compressed-candidate incremental program set."""
-    base = ENCODINGS_ROOT / "multi_shot_compressed_candidate"
+def _multi_shot_optimized_candidate_program_paths() -> tuple[Path, ...]:
+    """Return the optimized-candidate incremental program set."""
+    base = ENCODINGS_ROOT / "multi_shot_optimized_candidate"
     return (
         base / "base.lp",
         base / "step_initial.lp",
@@ -222,6 +222,12 @@ def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
     )
 
 
+def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
+    """Compatibility alias for the legacy optimized backend path helper."""
+
+    return _multi_shot_optimized_candidate_program_paths()
+
+
 def program_paths_for_mode(
     mode: str,
     *,
@@ -233,10 +239,10 @@ def program_paths_for_mode(
         return _single_shot_program_paths(optimized=optimized)
     if mode == "multi-shot":
         if optimized:
-            return _multi_shot_compressed_candidate_program_paths()
+            return _multi_shot_optimized_candidate_program_paths()
         return _multi_shot_program_paths()
-    if mode == "multi-shot-compressed-candidate":
-        return _multi_shot_compressed_candidate_program_paths()
+    if mode in {"multi-shot-optimized-candidate", "multi-shot-compressed-candidate"}:
+        return _multi_shot_optimized_candidate_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")
 
 
@@ -513,32 +519,69 @@ def _dynamic_grounding_horizon_parts(
 
 
 def _smart_expansion_enabled(facts: FactBundle) -> bool:
-    return facts.internal_solver_mode == "multi-shot-compressed-candidate"
+    return facts.internal_solver_mode in {
+        "multi-shot-optimized-candidate",
+        "multi-shot-compressed-candidate",
+    }
+
+
+def _optimized_query_assumptions(
+    *,
+    horizon: int,
+    grounded_horizon: int,
+    query_active: bool,
+) -> list[tuple[clingo.Symbol, bool]]:
+    """Build a complete assumption set for optimized query activation."""
+
+    assumptions: list[tuple[clingo.Symbol, bool]] = []
+    for current_horizon in range(1, grounded_horizon + 1):
+        assumptions.append(
+            (
+                clingo.Function("query_assumption", [clingo.Number(current_horizon)]),
+                query_active and current_horizon == horizon,
+            )
+        )
+        assumptions.append(
+            (
+                clingo.Function("possible_query_assumption", [clingo.Number(current_horizon)]),
+                (not query_active) and current_horizon == horizon,
+            )
+        )
+    return assumptions
+
+
+def _optimized_structural_probe_horizons(facts: FactBundle) -> tuple[int, ...]:
+    smart_expansion = facts.backend_stats.get("smart_expansion", {})
+    probe_horizons = smart_expansion.get("structural_probe_horizons", [])
+    return tuple(int(horizon) for horizon in probe_horizons)
 
 
 def _run_feasibility_precheck(
     control: clingo.Control,
     *,
     horizon: int,
+    grounded_horizon: int,
     is_interrupted: Callable[[], bool],
 ) -> tuple[bool, float]:
     """Run a lightweight existence check for one optimized horizon."""
 
-    possible_symbol = clingo.Function("possible_query", [clingo.Number(horizon)])
-    control.assign_external(possible_symbol, True)
     feasible = False
     start = perf_counter()
     try:
         def _solve() -> None:
             nonlocal feasible
-            with control.solve(yield_=True) as handle:
+            assumptions = _optimized_query_assumptions(
+                horizon=horizon,
+                grounded_horizon=grounded_horizon,
+                query_active=False,
+            )
+            with control.solve(yield_=True, assumptions=assumptions) as handle:
                 for _model in handle:
                     feasible = True
                     break
 
         _run_interruptible(_solve, is_interrupted)
     finally:
-        control.release_external(possible_symbol)
         control.cleanup()
     return feasible, perf_counter() - start
 
@@ -596,6 +639,7 @@ def _solve_multi_shot_with_programs(
     tool_input_signatures = dict(facts.tool_input_signatures)
     effective_solve_start = solve_start_horizon if solve_start_horizon is not None else config.solution_length_min
     collect_horizon_metrics = _collect_direct_multishot_metrics(facts)
+    structural_probe_horizons = set(_optimized_structural_probe_horizons(facts))
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -645,6 +689,48 @@ def _solve_multi_shot_with_programs(
                     progress_callback,
                     f"Grounding progress: horizon {horizon} finished after {ground_elapsed:.3f}s.",
                 )
+
+                if _smart_expansion_enabled(facts) and structural_probe_horizons and horizon >= effective_solve_start and horizon not in structural_probe_horizons:
+                    record = HorizonRecord(
+                        horizon=horizon,
+                        grounding_sec=ground_elapsed,
+                        solving_sec=0.0,
+                        peak_rss_mb=current_peak_rss_mb(),
+                        satisfiable=False,
+                        models_seen=0,
+                        models_stored=0,
+                        unique_workflows_seen=0,
+                        unique_workflows_stored=0,
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                        eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                        eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                        eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                        bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                        feasibility_checked=False,
+                        feasibility_possible=None,
+                        feasibility_sec=None,
+                        full_solve_performed=False,
+                        solve_skipped_reason="structural_goal_window",
+                        grounding_parts=grounding_parts,
+                    )
+                    horizon_records.append(record)
+                    if horizon_record_callback is not None:
+                        horizon_record_callback(record)
+                    if progress_callback is not None:
+                        progress_callback(
+                            {
+                                "event": "horizon_complete",
+                                "horizon": horizon,
+                                "timestamp_ns": perf_counter_ns(),
+                            }
+                        )
+                    _report(
+                        progress_callback,
+                        f"Solving skipped: horizon {horizon} is outside the current structural probe horizons.",
+                    )
+                    horizon += 1
+                    continue
 
                 if horizon < effective_solve_start:
                     record = HorizonRecord(
@@ -700,6 +786,7 @@ def _solve_multi_shot_with_programs(
                     feasibility_possible, feasibility_sec = _run_feasibility_precheck(
                         control,
                         horizon=horizon,
+                        grounded_horizon=horizon,
                         is_interrupted=is_interrupted,
                     )
                     _report(
@@ -747,8 +834,6 @@ def _solve_multi_shot_with_programs(
                         horizon += 1
                         continue
 
-                query_symbol = clingo.Function("query", [clingo.Number(horizon)])
-                control.assign_external(query_symbol, True)
                 any_model_seen = False
                 models_seen = 0
                 models_stored = 0
@@ -769,8 +854,17 @@ def _solve_multi_shot_with_programs(
                     start = perf_counter()
 
                     def _solve() -> None:
+                        assumptions = (
+                            _optimized_query_assumptions(
+                                horizon=horizon,
+                                grounded_horizon=horizon,
+                                query_active=True,
+                            )
+                            if _smart_expansion_enabled(facts)
+                            else None
+                        )
                         while True:
-                            with control.solve(yield_=True) as handle:
+                            with control.solve(yield_=True, assumptions=assumptions) as handle:
                                 for model in handle:
                                     nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
                                     nonlocal model_callback_sec, shown_symbols_sec
@@ -843,10 +937,6 @@ def _solve_multi_shot_with_programs(
                     solve_elapsed = perf_counter() - start
                     total_solving += solve_elapsed
                 finally:
-                    # Permanently retire the external: clingo can now
-                    # garbage-collect all check(t)/step_query(t) rules whose
-                    # bodies referenced query(t).
-                    control.release_external(query_symbol)
                     control.cleanup()
 
                 record = HorizonRecord(
@@ -1757,7 +1847,7 @@ def ground_multi_shot(
 
 
 
-def solve_multi_shot_compressed_candidate(
+def solve_multi_shot_optimized_candidate(
     config: SnakeConfig,
     facts: FactBundle,
     *,
@@ -1769,13 +1859,13 @@ def solve_multi_shot_compressed_candidate(
     parallel_mode: str | None = None,
     project_models: bool = False,
 ) -> SolveOutput:
-    """Solve using the compressed-candidate multi-shot encoding."""
+    """Solve using the optimized-candidate multi-shot encoding."""
 
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _multi_shot_compressed_candidate_program_paths(),
-        mode="multi-shot-compressed-candidate",
+        _multi_shot_optimized_candidate_program_paths(),
+        mode="multi-shot-optimized-candidate",
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -1795,10 +1885,34 @@ def solve_multi_shot_compressed_candidate(
     )
 
 
+def solve_multi_shot_compressed_candidate(
+    config: SnakeConfig,
+    facts: FactBundle,
+    *,
+    progress_callback: ProgressCallback = None,
+    base_grounding_callback: BaseGroundingCallback = None,
+    horizon_record_callback: HorizonRecordCallback = None,
+    capture_raw_models: bool = False,
+    diagnostic_counts_enabled: bool = True,
+    parallel_mode: str | None = None,
+    project_models: bool = False,
+) -> SolveOutput:
+    """Compatibility wrapper for the legacy optimized backend entrypoint."""
+
+    return solve_multi_shot_optimized_candidate(
+        config,
+        facts,
+        progress_callback=progress_callback,
+        base_grounding_callback=base_grounding_callback,
+        horizon_record_callback=horizon_record_callback,
+        capture_raw_models=capture_raw_models,
+        diagnostic_counts_enabled=diagnostic_counts_enabled,
+        parallel_mode=parallel_mode,
+        project_models=project_models,
+    )
 
 
-
-def ground_multi_shot_compressed_candidate(
+def ground_multi_shot_optimized_candidate(
     config: SnakeConfig,
     facts: FactBundle,
     *,
@@ -1807,10 +1921,10 @@ def ground_multi_shot_compressed_candidate(
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
 ) -> GroundingOutput:
-    """Ground the compressed-candidate multi-shot encoding without solving."""
+    """Ground the optimized-candidate multi-shot encoding without solving."""
 
     control = _make_grounding_control()
-    for program_path in _multi_shot_compressed_candidate_program_paths():
+    for program_path in _multi_shot_optimized_candidate_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     return _ground_multi_shot_control(
@@ -1826,4 +1940,25 @@ def ground_multi_shot_compressed_candidate(
             initial_step_program="step_initial",
             initial_seed_program=None,
         ),
+    )
+
+
+def ground_multi_shot_compressed_candidate(
+    config: SnakeConfig,
+    facts: FactBundle,
+    *,
+    stage: str = "base",
+    progress_callback: ProgressCallback = None,
+    base_grounding_callback: BaseGroundingCallback = None,
+    horizon_record_callback: HorizonRecordCallback = None,
+) -> GroundingOutput:
+    """Compatibility wrapper for the legacy optimized grounding entrypoint."""
+
+    return ground_multi_shot_optimized_candidate(
+        config,
+        facts,
+        stage=stage,
+        progress_callback=progress_callback,
+        base_grounding_callback=base_grounding_callback,
+        horizon_record_callback=horizon_record_callback,
     )

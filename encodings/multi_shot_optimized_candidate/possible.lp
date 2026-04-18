@@ -17,14 +17,14 @@ possible_goal_output_candidate(t, GoalID, out(TProd, ToolProd, Port)) :-
 possible_goal_dim_match(t, GoalID, WF, RequirementID) :-
     possible_query(t),
     possible_goal_output_candidate(t, GoalID, WF),
-    compressed_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
+    optimized_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId),
     artifact_dim(WF, ActualV, Category),
     dynamic_profile_accepts(ProfileId, ActualV).
 
 possible_goal_dim_missing(t, GoalID, WF, RequirementID) :-
     possible_query(t),
     possible_goal_output_candidate(t, GoalID, WF),
-    compressed_goal_requirement_profile(GoalID, RequirementID, _, _),
+    optimized_goal_requirement_profile(GoalID, RequirementID, _, _),
     not possible_goal_dim_match(t, GoalID, WF, RequirementID).
 
 possible_goal_satisfied_by(t, GoalID, WF) :-

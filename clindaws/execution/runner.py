@@ -57,9 +57,11 @@ from clindaws.core.runtime_stats import (
 from clindaws.execution.solver import (
     ground_single_shot,
     ground_multi_shot,
+    ground_multi_shot_optimized_candidate,
     ground_multi_shot_compressed_candidate,
     program_paths_for_mode,
     solve_multi_shot,
+    solve_multi_shot_optimized_candidate,
     solve_multi_shot_compressed_candidate,
     solve_single_shot,
     solve_single_shot_sliding_window,
@@ -73,7 +75,7 @@ from clindaws.translators.translator_direct import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
 )
-from clindaws.translators.translator_compressed_candidate import build_compressed_candidate_fact_bundle
+from clindaws.translators.translator_optimized_candidate import build_optimized_candidate_fact_bundle
 from clindaws.core.workflow import reconstruct_solution
 
 
@@ -89,10 +91,16 @@ SCHEMA_PREDICATES = (
     "dynamic_initial_bindable",
     "dynamic_candidate_input_port",
     "dynamic_candidate_input_signature_id",
+    "optimized_candidate_input_support_class",
+    "dynamic_candidate_input_association_class",
     "dynamic_signature_support_class",
     "dynamic_support_class_bindable_producer_port",
+    "dynamic_association_class_bindable_producer_port",
+    "optimized_candidate_input_profile",
     "dynamic_signature_profile",
     "dynamic_profile_accepts",
+    "optimized_goal_requirement_profile",
+    "dynamic_forced_produced_bind",
     "dynamic_candidate_output_port",
     "dynamic_candidate_output_multiplicity",
     "dynamic_candidate_total_output_multiplicity",
@@ -101,6 +109,7 @@ SCHEMA_PREDICATES = (
     "dynamic_candidate_output_declared_type",
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
+OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER = "candidate_optimized"
 COMPRESSED_CANDIDATE_TRANSLATION_BUILDER = "candidate_compressed"
 ProgressCallback = Callable[[object], None] | None
 
@@ -138,13 +147,20 @@ _MODE_CONFIGS = {
         translation_builder=RUNTIME_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
-    # Optimized multi-shot is an explicit compressed-candidate backend rather
+    # Optimized multi-shot is an explicit optimized-candidate backend rather
     # than a small variation of the direct multi-shot encoding family.
+    "multi-shot-optimized-candidate": _ModeConfig(
+        solver_family="multi-shot",
+        solver_approach="optimized_candidate",
+        translation_pathway="optimized_candidate",
+        translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
+        supports_ground_only=True,
+    ),
     "multi-shot-compressed-candidate": _ModeConfig(
         solver_family="multi-shot",
-        solver_approach="compressed_candidate",
-        translation_pathway="compressed_candidate",
-        translation_builder=COMPRESSED_CANDIDATE_TRANSLATION_BUILDER,
+        solver_approach="optimized_candidate",
+        translation_pathway="optimized_candidate",
+        translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
 }
@@ -153,12 +169,14 @@ _SOLVER_DISPATCH = {
     "single-shot": solve_single_shot,
     "single-shot-sliding-window": solve_single_shot_sliding_window,
     "multi-shot": solve_multi_shot,
+    "multi-shot-optimized-candidate": solve_multi_shot_optimized_candidate,
     "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
 
 _GROUNDER_DISPATCH = {
     "single-shot": ground_single_shot,
     "multi-shot": ground_multi_shot,
+    "multi-shot-optimized-candidate": ground_multi_shot_optimized_candidate,
     "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
 
@@ -189,7 +207,7 @@ def _mode_config(mode: str) -> _ModeConfig:
 
 def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
     translation_pathway = _mode_config(mode).translation_pathway
-    if translation_pathway == "compressed_candidate":
+    if translation_pathway == "optimized_candidate":
         return "python"
     if translation_pathway == "ape_multi_shot":
         return "ape_clingo_legacy"
@@ -218,7 +236,7 @@ def _tool_output_dims_lookup(tools: tuple) -> dict[tuple[str, int], dict[str, tu
 
 
 def _load_tools_for_mode(config, translation_pathway: str):
-    if translation_pathway == "compressed_candidate":
+    if translation_pathway == "optimized_candidate":
         return load_candidate_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     if translation_pathway == "ape_multi_shot":
         return load_multi_shot_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
@@ -583,7 +601,10 @@ def _run_metadata_payload(*, config, ontology, tools) -> dict[str, object]:
 
 
 def _compressed_candidate_engaged(fact_bundle) -> bool:
-    return fact_bundle.internal_solver_mode == "multi-shot-compressed-candidate"
+    return fact_bundle.internal_solver_mode in {
+        "multi-shot-optimized-candidate",
+        "multi-shot-compressed-candidate",
+    }
 
 
 def _effective_solve_start_horizon(*, config, fact_bundle) -> int:
@@ -964,7 +985,7 @@ def _translation_schema(fact_bundle) -> str:
             "dynamic_candidate_output_choice_value",
         )
     ):
-        return "compressed_candidate"
+        return "optimized_candidate"
     if any(fact_bundle.predicate_counts.get(name, 0) for name in ("tool_candidate", "candidate_in", "candidate_out")):
         return "candidate"
     if any(fact_bundle.predicate_counts.get(name, 0) for name in ("tool_input", "input_port", "tool_output", "output_port")):
@@ -995,7 +1016,7 @@ def _encoding_schema_summary(
         "program_paths": [str(path) for path in program_paths],
         "predicate_presence": predicate_presence,
         "schema": (
-            "compressed_candidate"
+            "optimized_candidate"
             if any(
                 predicate_presence[name]
                 for name in (
@@ -1028,13 +1049,13 @@ def _translation_warnings(
     encoding_presence = encoding_summary["predicate_presence"]
     translation_pathway = _mode_config(mode).translation_pathway
 
-    if translation_pathway in {"dynamic", "compressed_candidate"} and translation_schema != "compressed_candidate":
+    if translation_pathway in {"dynamic", "optimized_candidate"} and translation_schema != "optimized_candidate":
         warnings.append(
-            f"{mode} expects compressed-candidate translation, but the emitted translation schema is {translation_schema}."
+            f"{mode} expects optimized-candidate translation, but the emitted translation schema is {translation_schema}."
         )
-    if translation_schema == "compressed_candidate" and encoding_summary["schema"] != "compressed_candidate":
+    if translation_schema == "optimized_candidate" and encoding_summary["schema"] != "optimized_candidate":
         warnings.append(
-            "Compressed-candidate translation is not compatible with the selected encoding."
+            "Optimized-candidate translation is not compatible with the selected encoding."
         )
 
     if translation_schema == "candidate" and not any(
@@ -1044,7 +1065,7 @@ def _translation_warnings(
             "Translated facts use candidate predicates, but the selected encoding does not reference candidate predicates."
         )
 
-    if translation_schema == "compressed_candidate" and not any(
+    if translation_schema == "optimized_candidate" and not any(
         encoding_presence[name]
         for name in (
             "dynamic_tool_candidate",
@@ -1056,7 +1077,7 @@ def _translation_warnings(
         )
     ):
         warnings.append(
-            "Translated facts use compressed-candidate predicates, but the selected encoding does not reference the compressed-candidate predicate family."
+            "Translated facts use optimized-candidate predicates, but the selected encoding does not reference the optimized-candidate predicate family."
         )
 
     if translation_schema == "legacy" and not any(
@@ -1274,6 +1295,7 @@ def _effective_parallel_mode(
         return parallel_mode
     if mode != "multi-shot" or fact_bundle.internal_schema not in {
         "direct_precompute_legacy",
+        "optimized_candidate",
         "compressed_candidate_optimized",
     }:
         return None
@@ -1311,7 +1333,7 @@ def _legacy_direct_bundle(
     )
 
 
-def _compressed_candidate_internal_bundle(
+def _optimized_candidate_internal_bundle(
     config: SnakeConfig,
     ontology: Ontology,
     tools,
@@ -1319,9 +1341,24 @@ def _compressed_candidate_internal_bundle(
     max_workers: int = 1,
 ):
     return replace(
-        build_compressed_candidate_fact_bundle(config, ontology, tools, max_workers=max_workers),
-        internal_schema="compressed_candidate_optimized",
-        internal_solver_mode="multi-shot-compressed-candidate",
+        build_optimized_candidate_fact_bundle(config, ontology, tools, max_workers=max_workers),
+        internal_schema="optimized_candidate",
+        internal_solver_mode="multi-shot-optimized-candidate",
+    )
+
+
+def _compressed_candidate_internal_bundle(
+    config: SnakeConfig,
+    ontology: Ontology,
+    tools,
+    *,
+    max_workers: int = 1,
+):
+    return _optimized_candidate_internal_bundle(
+        config,
+        ontology,
+        tools,
+        max_workers=max_workers,
     )
 
 
@@ -1371,7 +1408,7 @@ def _select_fact_bundle(
     if mode_config.translation_pathway == "ape_multi_shot":
         # Plain multi-shot and the public single-shot modes both start from the
         # APE-style direct fact surface. Optional precompute augments that
-        # bundle, while optimized multi-shot swaps to the compressed-candidate
+        # bundle, while optimized multi-shot swaps to the optimized-candidate
         # internal bundle entirely.
         fact_bundle = _ape_multi_shot_direct_bundle(
             config,
@@ -1388,21 +1425,21 @@ def _select_fact_bundle(
         if optimized:
             if mode_config.solver_family == "single-shot":
                 raise ValueError("--optimized is not yet supported for single-shot modes.")
-            compressed_candidate_tools = load_candidate_tool_annotations(
+            optimized_candidate_tools = load_candidate_tool_annotations(
                 config.tool_annotations_path,
                 config.ontology_prefix,
             )
-            _report(progress_callback, "Step 1b: compressed-candidate optimization started.")
-            fact_bundle = _compressed_candidate_internal_bundle(
+            _report(progress_callback, "Step 1b: optimized-candidate translation started.")
+            fact_bundle = _optimized_candidate_internal_bundle(
                 config,
                 ontology,
-                compressed_candidate_tools,
+                optimized_candidate_tools,
                 max_workers=max_workers,
             )
-            resolved_translation_builder = COMPRESSED_CANDIDATE_TRANSLATION_BUILDER
+            resolved_translation_builder = OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER
             _report(
                 progress_callback,
-                "Step 1b complete: selected compressed-candidate optimized schema "
+                "Step 1b complete: selected optimized-candidate schema "
                 f"with {fact_bundle.fact_count} facts.",
             )
         else:
