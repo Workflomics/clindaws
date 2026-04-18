@@ -586,6 +586,12 @@ def _compressed_candidate_engaged(fact_bundle) -> bool:
     return fact_bundle.internal_solver_mode == "multi-shot-compressed-candidate"
 
 
+def _effective_solve_start_horizon(*, config, fact_bundle) -> int:
+    if _compressed_candidate_engaged(fact_bundle):
+        return max(config.solution_length_min, fact_bundle.earliest_solution_step)
+    return config.solution_length_min
+
+
 def _sanitize_filename_token(value: str) -> str:
     sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
     sanitized = re.sub(r"_+", "_", sanitized).strip("._-")
@@ -1905,7 +1911,10 @@ def run_once(
                     "internal_schema": fact_bundle.internal_schema,
                     "internal_solver_mode": internal_solver_mode,
                     "earliest_solution_step": fact_bundle.earliest_solution_step,
-                    "effective_solve_start_horizon": config.solution_length_min,
+                    "effective_solve_start_horizon": _effective_solve_start_horizon(
+                        config=config,
+                        fact_bundle=fact_bundle,
+                    ),
                     "python_precompute_enabled": fact_bundle.python_precompute_enabled,
                     "python_precompute_fact_count": fact_bundle.python_precompute_fact_count,
                     "python_precompute_stats": dict(sorted(fact_bundle.python_precompute_stats.items())),

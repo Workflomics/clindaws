@@ -187,6 +187,11 @@ class HorizonRecord:
     shown_symbols_sec: float | None = None
     workflow_signature_key_sec: float | None = None
     canonicalization_sec: float | None = None
+    feasibility_checked: bool = False
+    feasibility_possible: bool | None = None
+    feasibility_sec: float | None = None
+    full_solve_performed: bool = True
+    solve_skipped_reason: str | None = None
     grounding_parts: tuple[tuple[str, float], ...] = ()
 
 

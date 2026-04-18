@@ -12,12 +12,20 @@ time(t).
 
 1 { occurs(t, run(Tool)) : dynamic_step_allowed_tool(Tool, t) } 1.
 
+:- dynamic_must_run_tool_at_step(ToolMust, t),
+   occurs(t, run(Tool)),
+   Tool != ToolMust.
+
 1 {
     occurs(t, use_dynamic_candidate(Tool, Candidate)) :
         dynamic_tool_candidate(Candidate, Tool),
         dynamic_candidate_allowed_at_step(Candidate, t)
 } 1 :-
     occurs(t, run(Tool)).
+
+:- dynamic_must_run_candidate_at_step(CandidateMust, t),
+   occurs(t, use_dynamic_candidate(_, Candidate)),
+   Candidate != CandidateMust.
 
 occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
 

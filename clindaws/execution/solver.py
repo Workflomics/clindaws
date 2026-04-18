@@ -212,6 +212,7 @@ def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
         base / "step_initial.lp",
         base / "step.lp",
         base / "step_query.lp",
+        base / "possible.lp",
         base / "constraints.lp",
         base / "check.lp",
         base / "ape_extract.lp",
@@ -439,6 +440,7 @@ def _dynamic_horizon_parts(
             parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
         parts.append(("step", (clingo.Number(horizon),)))
         parts.append(("step_query", (clingo.Number(horizon),)))
+    parts.append(("possible", (clingo.Number(horizon),)))
     parts.append(("constraint_step", (clingo.Number(horizon),)))
     parts.append(("check", (clingo.Number(horizon),)))
     parts.append(("check_usage", (clingo.Number(horizon),)))
@@ -508,6 +510,37 @@ def _dynamic_grounding_horizon_parts(
             parts.append((initial_seed_program, (clingo.Number(horizon - 1),)))
         parts.append(("step", (clingo.Number(horizon),)))
     return tuple(parts)
+
+
+def _smart_expansion_enabled(facts: FactBundle) -> bool:
+    return facts.internal_solver_mode == "multi-shot-compressed-candidate"
+
+
+def _run_feasibility_precheck(
+    control: clingo.Control,
+    *,
+    horizon: int,
+    is_interrupted: Callable[[], bool],
+) -> tuple[bool, float]:
+    """Run a lightweight existence check for one optimized horizon."""
+
+    possible_symbol = clingo.Function("possible_query", [clingo.Number(horizon)])
+    control.assign_external(possible_symbol, True)
+    feasible = False
+    start = perf_counter()
+    try:
+        def _solve() -> None:
+            nonlocal feasible
+            with control.solve(yield_=True) as handle:
+                for _model in handle:
+                    feasible = True
+                    break
+
+        _run_interruptible(_solve, is_interrupted)
+    finally:
+        control.release_external(possible_symbol)
+        control.cleanup()
+    return feasible, perf_counter() - start
 
 
 def _has_translated_constraints(facts: FactBundle) -> bool:
@@ -614,8 +647,105 @@ def _solve_multi_shot_with_programs(
                 )
 
                 if horizon < effective_solve_start:
+                    record = HorizonRecord(
+                        horizon=horizon,
+                        grounding_sec=ground_elapsed,
+                        solving_sec=0.0,
+                        peak_rss_mb=current_peak_rss_mb(),
+                        satisfiable=False,
+                        models_seen=0,
+                        models_stored=0,
+                        unique_workflows_seen=0,
+                        unique_workflows_stored=0,
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                        eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                        eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                        eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                        bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                        feasibility_checked=False,
+                        feasibility_possible=None,
+                        feasibility_sec=None,
+                        full_solve_performed=False,
+                        solve_skipped_reason="structural_lower_bound",
+                        grounding_parts=grounding_parts,
+                    )
+                    horizon_records.append(record)
+                    if horizon_record_callback is not None:
+                        horizon_record_callback(record)
+                    if progress_callback is not None:
+                        progress_callback(
+                            {
+                                "event": "horizon_complete",
+                                "horizon": horizon,
+                                "timestamp_ns": perf_counter_ns(),
+                            }
+                        )
+                    _report(
+                        progress_callback,
+                        f"Solving skipped: horizon {horizon} is below earliest feasible horizon {effective_solve_start}.",
+                    )
                     horizon += 1
                     continue
+
+                feasibility_checked = False
+                feasibility_possible: bool | None = None
+                feasibility_sec: float | None = None
+                full_solve_performed = True
+                solve_skipped_reason: str | None = None
+                solve_elapsed = 0.0
+                if _smart_expansion_enabled(facts):
+                    feasibility_checked = True
+                    _report(progress_callback, f"Feasibility: horizon {horizon}...")
+                    feasibility_possible, feasibility_sec = _run_feasibility_precheck(
+                        control,
+                        horizon=horizon,
+                        is_interrupted=is_interrupted,
+                    )
+                    _report(
+                        progress_callback,
+                        f"Feasibility progress: horizon {horizon} finished after {feasibility_sec:.3f}s, "
+                        f"possible={'yes' if feasibility_possible else 'no'}.",
+                    )
+                    if not feasibility_possible:
+                        full_solve_performed = False
+                        solve_skipped_reason = "feasibility_precheck"
+                        record = HorizonRecord(
+                            horizon=horizon,
+                            grounding_sec=ground_elapsed,
+                            solving_sec=0.0,
+                            peak_rss_mb=current_peak_rss_mb(),
+                            satisfiable=False,
+                            models_seen=0,
+                            models_stored=0,
+                            unique_workflows_seen=0,
+                            unique_workflows_stored=0,
+                            diagnostic_counts_enabled=diagnostic_counts_enabled,
+                            available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                            eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                            eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                            eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                            bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                            feasibility_checked=feasibility_checked,
+                            feasibility_possible=feasibility_possible,
+                            feasibility_sec=feasibility_sec,
+                            full_solve_performed=full_solve_performed,
+                            solve_skipped_reason=solve_skipped_reason,
+                            grounding_parts=grounding_parts,
+                        )
+                        horizon_records.append(record)
+                        if horizon_record_callback is not None:
+                            horizon_record_callback(record)
+                        if progress_callback is not None:
+                            progress_callback(
+                                {
+                                    "event": "horizon_complete",
+                                    "horizon": horizon,
+                                    "timestamp_ns": perf_counter_ns(),
+                                }
+                            )
+                        horizon += 1
+                        continue
 
                 query_symbol = clingo.Function("query", [clingo.Number(horizon)])
                 control.assign_external(query_symbol, True)
@@ -739,6 +869,11 @@ def _solve_multi_shot_with_programs(
                     shown_symbols_sec=shown_symbols_sec,
                     workflow_signature_key_sec=workflow_signature_key_sec,
                     canonicalization_sec=canonicalization_sec,
+                    feasibility_checked=feasibility_checked,
+                    feasibility_possible=feasibility_possible,
+                    feasibility_sec=feasibility_sec,
+                    full_solve_performed=full_solve_performed,
+                    solve_skipped_reason=solve_skipped_reason,
                     grounding_parts=grounding_parts,
                 )
                 horizon_records.append(record)
@@ -1654,6 +1789,7 @@ def solve_multi_shot_compressed_candidate(
         ),
         capture_raw_models=capture_raw_models,
         diagnostic_counts_enabled=diagnostic_counts_enabled,
+        solve_start_horizon=facts.earliest_solution_step,
         parallel_mode=parallel_mode,
         project_models=project_models,
     )

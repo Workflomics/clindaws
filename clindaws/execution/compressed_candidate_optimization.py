@@ -46,8 +46,9 @@ class CompressedCandidateOptimizationResult:
     candidate_output_id_map: Mapping[tuple[str, int], int]
     canonical_producers: Mapping[tuple[int, int], tuple[int, int]]
     cache_stats: dict[str, int]
-
-
+    must_run_tools_by_step: dict[int, tuple[str, ...]]
+    must_run_candidates_by_step: dict[int, tuple[str, ...]]
+    structural_horizon_skip_count: int
     earliest_solution_step: int
     phase_timings: dict[str, float]
 
@@ -253,6 +254,7 @@ def optimize_compressed_candidates(
     t0 = perf_counter()
 
     bindable_pairs: set[tuple[str, int, str, int]] = set()
+    candidate_count_before_pruning = len(candidate_records)
     reverse_edges: dict[str, set[str]] = defaultdict(set)
     candidate_records_by_id = {
         str(record["candidate_id"]): record
@@ -574,6 +576,15 @@ def optimize_compressed_candidates(
 
     t5 = perf_counter()
 
+    must_run_tools_by_step: dict[int, tuple[str, ...]] = {}
+    must_run_candidates_by_step: dict[int, tuple[str, ...]] = {}
+    for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
+        if len(tool_ids) == 1:
+            must_run_tools_by_step[step_index] = tuple(sorted(tool_ids))
+    for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
+        if len(candidate_ids) == 1:
+            must_run_candidates_by_step[step_index] = tuple(sorted(candidate_ids))
+
     earliest_goal_step = min(
         (
             min_step_by_candidate[candidate_id]
@@ -589,6 +600,8 @@ def optimize_compressed_candidates(
         *must_use_min_steps,
         *at_step_lower_bounds,
     )
+    structural_horizon_skip_count = max(0, earliest_solution_step - config.solution_length_min)
+    candidate_pruned_count = max(0, candidate_count_before_pruning - len(relevant_records))
 
     return CompressedCandidateOptimizationResult(
         tool_stats=tuple(tool_stats),
@@ -613,14 +626,18 @@ def optimize_compressed_candidates(
         candidate_output_id_map=candidate_output_id_map,
         canonical_producers=canonical_producers,
         cache_stats={
-
-
             **resolver.stats(),
             **dynamic_schema_stats,
             **bindability_stats,
             **support_class_stats,
             **goal_profile_stats,
+            "dynamic_candidates_before_pruning": candidate_count_before_pruning,
+            "dynamic_candidates_after_pruning": len(relevant_records),
+            "dynamic_candidates_pruned": candidate_pruned_count,
         },
+        must_run_tools_by_step=must_run_tools_by_step,
+        must_run_candidates_by_step=must_run_candidates_by_step,
+        structural_horizon_skip_count=structural_horizon_skip_count,
         earliest_solution_step=earliest_solution_step,
         phase_timings={
             "goal_check": t1 - t0,

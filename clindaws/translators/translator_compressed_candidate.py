@@ -62,6 +62,20 @@ def build_compressed_candidate_fact_bundle(
                 _quote(tool_id),
                 str(step_index),
             )
+    for step_index, tool_ids in optimization.must_run_tools_by_step.items():
+        for tool_id in tool_ids:
+            writer.emit_fact(
+                "dynamic_must_run_tool_at_step",
+                _quote(tool_id),
+                str(step_index),
+            )
+    for step_index, candidate_ids in optimization.must_run_candidates_by_step.items():
+        for candidate_id in candidate_ids:
+            writer.emit_fact(
+                "dynamic_must_run_candidate_at_step",
+                _quote(candidate_id),
+                str(step_index),
+            )
 
     # Fact emission is kept separate from optimization timing so translation
     # summaries can distinguish Python search/compression cost from plain output
@@ -235,6 +249,12 @@ def build_compressed_candidate_fact_bundle(
         backend_stats={
             "compressed_candidate_phase_timings": dict(sorted(optimization.phase_timings.items())),
             "translation_workers": max_workers,
+            "smart_expansion": {
+                "earliest_feasible_horizon": optimization.earliest_solution_step,
+                "structural_horizon_skip_count": optimization.structural_horizon_skip_count,
+                "must_run_tool_steps": len(optimization.must_run_tools_by_step),
+                "must_run_candidate_steps": len(optimization.must_run_candidates_by_step),
+            },
         },
         earliest_solution_step=optimization.earliest_solution_step,
     )
