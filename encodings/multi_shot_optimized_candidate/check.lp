@@ -113,55 +113,35 @@ query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     not query_output_filter_active(t),
     dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
-% Identify non-terminal outputs and their candidates
-candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category) :-
+% FastFound-style decoupling: keep the exact solve monolithic, but separate
+% port/value existence from profile demand so the grounder does not need to
+% carry producer identity through the profile-support join lattice.
+output_port_value(t, TProd, ToolProd, Port, V, Category) :-
     query(t),
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
     query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
 
-relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
     used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId).
 
-relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId).
 
-candidate_output_profile_candidate(
-    t,
-    TProd,
-    ToolProd,
-    ProducerCandidate,
-    Port,
-    V,
-    Category,
-    ProfileId
-) :-
-    candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
-    relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId).
-
-% Identify profile violations
-output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
-    candidate_output_profile_candidate(
-        t,
-        TProd,
-        ToolProd,
-        _,
-        Port,
-        V,
-        Category,
-        ProfileId
-    ),
+output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
+    output_port_value(t, TProd, ToolProd, Port, V, Category),
+    required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId),
     not dynamic_profile_accepts(ProfileId, V).
 
 output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category) :-
     used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
-    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
+    output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category) :-
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId),
-    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
+    output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
-    candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
+    output_port_value(t, TProd, ToolProd, Port, V, Category),
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category).
 
