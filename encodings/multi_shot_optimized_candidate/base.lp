@@ -22,6 +22,10 @@ available(A)          :- holds(0, avail(A)).
 artifact_dim(A, V, C) :- holds(0, dim(A, V, C)).
 artifact_unit(A, U)   :- holds(0, unit(A, U)).
 
+artifact_profile_member(A, Category, ProfileId) :-
+    artifact_dim(A, ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
+
 is_workflow_input(WF) :- holds(0, avail(WF)).
 
 workflow_input(WF) :-

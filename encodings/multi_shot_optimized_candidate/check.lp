@@ -57,11 +57,45 @@ holds(t, goal) :-
     query(t),
     goal_id(GoalID).
 
-used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+consumer_bound_output(
+    t,
+    TUse,
+    ToolUse,
+    ConsumerCandidate,
+    PortUse,
+    TProd,
+    ToolProd,
+    Port
+) :-
     query(t),
     occurs(TUse, bind(ToolUse, PortUse, out(TProd, ToolProd, Port))),
-    occurs(TUse, use_dynamic_candidate(ToolUse, ConsumerCandidate)),
+    occurs(TUse, use_dynamic_candidate(ToolUse, ConsumerCandidate)).
+
+used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+    consumer_bound_output(
+        t,
+        _,
+        _,
+        ConsumerCandidate,
+        PortUse,
+        TProd,
+        ToolProd,
+        Port
+    ),
     optimized_candidate_input_profile(ConsumerCandidate, PortUse, Category, ProfileId).
+
+chosen_output_goal_requirement_profile(
+    t,
+    TProd,
+    ToolProd,
+    Port,
+    GoalID,
+    RequirementID,
+    Category,
+    ProfileId
+) :-
+    chosen_goal_output(t, GoalID, out(TProd, ToolProd, Port)),
+    optimized_goal_requirement_profile(GoalID, RequirementID, Category, ProfileId).
 
 query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     query_output_filter_active(t),
@@ -85,19 +119,46 @@ candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category)
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
     query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
 
+relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+    used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId).
+
+relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
+    chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId).
+
+candidate_output_profile_candidate(
+    t,
+    TProd,
+    ToolProd,
+    ProducerCandidate,
+    Port,
+    V,
+    Category,
+    ProfileId
+) :-
+    candidate_output_value(t, TProd, ToolProd, ProducerCandidate, Port, V, Category),
+    relevant_output_profile(t, TProd, ToolProd, Port, Category, ProfileId).
+
 % Identify profile violations
 output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
-    candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
-    used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
+    candidate_output_profile_candidate(
+        t,
+        TProd,
+        ToolProd,
+        _,
+        Port,
+        V,
+        Category,
+        ProfileId
+    ),
     not dynamic_profile_accepts(ProfileId, V).
 
 output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category) :-
-    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, _).
+    used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId),
+    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
 
 output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category) :-
-    candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId),
-    not dynamic_profile_accepts(ProfileId, V).
+    output_dim_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId).
 
 output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
     candidate_output_value(t, TProd, ToolProd, _, Port, V, Category),

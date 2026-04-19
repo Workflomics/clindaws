@@ -29,6 +29,47 @@ time(t).
 
 occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
 
+selected_dynamic_candidate(t, Tool, Candidate) :-
+    occurs(t, use_dynamic_candidate(Tool, Candidate)).
+
+selected_candidate_bind_port(t, Candidate, Port) :-
+    selected_dynamic_candidate(t, _, Candidate),
+    dynamic_candidate_input_port(Candidate, Port).
+
+selected_candidate_support_class(
+    t,
+    Candidate,
+    Port,
+    SupportClassId
+) :-
+    selected_candidate_bind_port(t, Candidate, Port),
+    optimized_candidate_input_support_class(Candidate, Port, SupportClassId).
+
+selected_candidate_bindable_producer_port(
+    t,
+    Candidate,
+    Port,
+    ProducerCandidate,
+    ProducerPort
+) :-
+    selected_candidate_support_class(t, Candidate, Port, SupportClassId),
+    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort).
+
+active_producer_output(
+    t,
+    TPrev,
+    ToolPrev,
+    ProducerCandidate,
+    ProducerPort
+) :-
+    occurs(TPrev, use_dynamic_candidate(ToolPrev, ProducerCandidate)),
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t.
+
+input_profile_requirement(Candidate, Port, Category, ProfileId) :-
+    dynamic_candidate_input_signature_id(Candidate, Port, SignatureId),
+    dynamic_signature_profile(SignatureId, Category, ProfileId).
+
 1 {
     occurs(t, bind(Tool, Port, WF)) : eligible(Candidate, Port, WF);
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))) :
@@ -54,12 +95,20 @@ produced_bind_option(
     ProducerCandidate,
     ProducerPort
 ) :-
-    occurs(t, use_dynamic_candidate(_, Candidate)),
-    optimized_candidate_input_support_class(Candidate, Port, SupportClassId),
-    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
-    occurs(TPrev, use_dynamic_candidate(ToolPrev, ProducerCandidate)),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
-    TPrev < t.
+    selected_candidate_bindable_producer_port(
+        t,
+        Candidate,
+        Port,
+        ProducerCandidate,
+        ProducerPort
+    ),
+    active_producer_output(
+        t,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort
+    ).
 
 chosen_produced_bind(
     t,
@@ -71,7 +120,7 @@ chosen_produced_bind(
     ProducerCandidate,
     ProducerPort
 ) :-
-    occurs(t, use_dynamic_candidate(Tool, Candidate)),
+    selected_dynamic_candidate(t, Tool, Candidate),
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
     produced_bind_option(
         t,
@@ -101,11 +150,38 @@ forced_produced_bind_satisfied(
     ),
     dynamic_forced_produced_bind(Candidate, Port, ProducerCandidate, ProducerPort).
 
-:- occurs(t, use_dynamic_candidate(Tool, Candidate)),
-   dynamic_forced_produced_bind(Candidate, Port, _, _),
-   not forced_produced_bind_satisfied(t, Tool, Candidate, Port).
+bound_output_profile_match(
+    t,
+    Candidate,
+    Port,
+    TPrev,
+    ToolPrev,
+    ProducerCandidate,
+    ProducerPort,
+    Category,
+    ProfileId
+) :-
+    chosen_produced_bind(
+        t,
+        _,
+        Candidate,
+        Port,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort
+    ),
+    input_profile_requirement(Candidate, Port, Category, ProfileId),
+    artifact_profile_member(out(TPrev, ToolPrev, ProducerPort), Category, ProfileId).
 
-bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
+bound_output_category_match(
+    t,
+    Tool,
+    Candidate,
+    Port,
+    out(TPrev, ToolPrev, ProducerPort),
+    Category
+) :-
     chosen_produced_bind(
         t,
         Tool,
@@ -116,10 +192,17 @@ bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, Produ
         ProducerCandidate,
         ProducerPort
     ),
-    dynamic_candidate_input_signature_id(Candidate, Port, SignatureId),
-    dynamic_signature_profile(SignatureId, Category, ProfileId),
-    artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
-    dynamic_profile_accepts(ProfileId, ActualV).
+    bound_output_profile_match(
+        t,
+        Candidate,
+        Port,
+        TPrev,
+        ToolPrev,
+        ProducerCandidate,
+        ProducerPort,
+        Category,
+        _
+    ).
 
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
@@ -176,6 +259,10 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     dynamic_candidate_output_singleton(Candidate, Port, V, Category).
+
+artifact_profile_member(out(t, Tool, Port), Category, ProfileId) :-
+    artifact_dim(out(t, Tool, Port), ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).

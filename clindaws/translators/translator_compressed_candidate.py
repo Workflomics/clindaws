@@ -48,6 +48,32 @@ def build_compressed_candidate_fact_bundle(
         writer.emit_fact("dynamic_query_goal_tool", _quote(tool_id))
     for candidate_id, goal_distance in sorted(optimization.min_goal_distance_by_candidate.items()):
         writer.emit_fact("dynamic_candidate_goal_distance", _quote(candidate_id), str(goal_distance))
+    for candidate_id, min_step in sorted(optimization.min_step_by_candidate.items()):
+        writer.emit_fact("dynamic_candidate_min_step", _quote(candidate_id), str(min_step))
+    for candidate_id, max_step in sorted(optimization.max_step_by_candidate.items()):
+        writer.emit_fact("dynamic_candidate_max_step", _quote(candidate_id), str(max_step))
+    for horizon, candidate_ids in sorted(optimization.goal_support_candidates_by_horizon.items()):
+        for candidate_id in candidate_ids:
+            writer.emit_fact(
+                "dynamic_goal_support_candidate_at_horizon",
+                _quote(candidate_id),
+                str(horizon),
+            )
+    for horizon, tool_ids in sorted(optimization.goal_support_tools_by_horizon.items()):
+        for tool_id in tool_ids:
+            writer.emit_fact(
+                "dynamic_goal_support_tool_at_horizon",
+                _quote(tool_id),
+                str(horizon),
+            )
+    for horizon, input_ports in sorted(optimization.goal_support_inputs_by_horizon.items()):
+        for candidate_id, port_idx in input_ports:
+            writer.emit_fact(
+                "dynamic_goal_support_input_at_horizon",
+                _quote(candidate_id),
+                str(port_idx),
+                str(horizon),
+            )
     for step_index, candidate_ids in optimization.allowed_candidates_by_step.items():
         for candidate_id in candidate_ids:
             writer.emit_fact(
@@ -298,6 +324,7 @@ def build_compressed_candidate_fact_bundle(
                 "structural_horizon_skip_count": optimization.structural_horizon_skip_count,
                 "structural_probe_horizons": list(optimization.structural_probe_horizons),
                 "query_control_mode": "assumptions",
+                "available_model_blocking_modes": ["candidate_sequence_clause"],
                 "must_run_tools_global": len(optimization.must_run_tools_global),
                 "must_run_candidates_global": len(optimization.must_run_candidates_global),
                 "must_run_tool_steps": len(optimization.must_run_tools_by_step),

@@ -26,6 +26,9 @@ from clindaws.core.models import SnakeConfig, ToolExpansionStat, ToolMode
 from clindaws.core.ontology import Ontology
 
 
+MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS = 512
+
+
 @dataclass(frozen=True)
 class CompressedCandidateOptimizationResult:
     """Optimized-candidate surface ready for fact emission."""
@@ -36,6 +39,11 @@ class CompressedCandidateOptimizationResult:
     query_goal_candidates: tuple[str, ...]
     query_goal_tools: tuple[str, ...]
     min_goal_distance_by_candidate: dict[str, int]
+    min_step_by_candidate: dict[str, int]
+    max_step_by_candidate: dict[str, int]
+    goal_support_candidates_by_horizon: dict[int, tuple[str, ...]]
+    goal_support_tools_by_horizon: dict[int, tuple[str, ...]]
+    goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
     allowed_candidates_by_step: dict[int, tuple[str, ...]]
     allowed_tools_by_step: dict[int, tuple[str, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
@@ -59,6 +67,103 @@ class CompressedCandidateOptimizationResult:
     structural_horizon_skip_count: int
     earliest_solution_step: int
     phase_timings: dict[str, float]
+
+
+def _compute_goal_support_by_horizon(
+    *,
+    config: SnakeConfig,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    query_goal_candidates: Iterable[str],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+    min_goal_distance_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[tuple[str, int], ...]],
+]:
+    """Build a conservative horizon-indexed backward support surface for goals.
+
+    The surface is translator-side on purpose: the fast feasibility encoding can
+    then avoid recursive backward expansion over large association-class joins
+    and instead operate only on the horizon-specific candidate/input subset that
+    can still contribute to a goal.
+    """
+
+    query_goal_candidate_set = set(query_goal_candidates)
+    goal_support_candidates_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_tools_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]] = {}
+
+    for horizon in range(config.solution_length_min, config.solution_length_max + 1):
+        goal_support_candidates: set[str] = set()
+        goal_support_inputs: set[tuple[str, int]] = set()
+        frontier: deque[str] = deque()
+
+        for candidate_id in sorted(query_goal_candidate_set):
+            min_step = min_step_by_candidate.get(candidate_id)
+            max_step = max_step_by_candidate.get(candidate_id)
+            goal_distance = min_goal_distance_by_candidate.get(candidate_id)
+            if min_step is None or max_step is None or goal_distance is None:
+                continue
+            if min_step > horizon or horizon > max_step:
+                continue
+            if min_step + goal_distance > horizon:
+                continue
+            goal_support_candidates.add(candidate_id)
+            frontier.append(candidate_id)
+
+        while frontier:
+            consumer_candidate = frontier.popleft()
+            consumer_min_step = min_step_by_candidate.get(consumer_candidate)
+            consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+            if consumer_min_step is None or consumer_max_step is None:
+                continue
+            consumer_latest_step = min(horizon, consumer_max_step)
+            for input_port in tuple(candidate_records_by_id[consumer_candidate]["input_ports"]):
+                consumer_port = int(input_port["port_idx"])
+                workflow_input_matches = tuple(input_port.get("workflow_input_matches", ()))
+                if workflow_input_matches:
+                    goal_support_inputs.add((consumer_candidate, consumer_port))
+                    continue
+                producer_ports = feasible_associations_by_input.get((consumer_candidate, consumer_port), ())
+                support_found = False
+                for producer_candidate, _producer_port in producer_ports:
+                    producer_min_step = min_step_by_candidate.get(producer_candidate)
+                    producer_goal_distance = min_goal_distance_by_candidate.get(producer_candidate)
+                    if producer_min_step is None or producer_goal_distance is None:
+                        continue
+                    if producer_min_step + producer_goal_distance > horizon:
+                        continue
+                    if producer_min_step >= consumer_latest_step:
+                        continue
+                    support_found = True
+                    if producer_candidate not in goal_support_candidates:
+                        goal_support_candidates.add(producer_candidate)
+                        frontier.append(producer_candidate)
+                if support_found:
+                    goal_support_inputs.add((consumer_candidate, consumer_port))
+
+        if not goal_support_candidates:
+            continue
+
+        goal_support_candidates_by_horizon[horizon] = tuple(sorted(goal_support_candidates))
+        goal_support_tools_by_horizon[horizon] = tuple(
+            sorted(
+                {
+                    str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                    for candidate_id in goal_support_candidates
+                }
+            )
+        )
+        goal_support_inputs_by_horizon[horizon] = tuple(sorted(goal_support_inputs))
+
+    return (
+        goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon,
+    )
 
 
 def _reverse_edges_from_produced_bindable_ports(
@@ -214,6 +319,8 @@ def _compute_global_must_run_candidates(
         for record in relevant_records
     }
     active_candidates = tuple(sorted(candidate_records_by_id))
+    if len(active_candidates) > MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS:
+        return (), ()
     must_run_candidates: list[str] = []
 
     for candidate_id in active_candidates:
@@ -672,10 +779,24 @@ def optimize_compressed_candidates(
         for record in relevant_records
         for input_port in tuple(record["input_ports"])
     )
+    unique_input_signatures: dict[int, tuple[Mapping[str, object], Mapping[str, frozenset[str]]]] = {}
     signature_profiles_by_id, _profile_values_by_id, profile_accepts_by_id, dynamic_schema_stats = _assign_dynamic_signature_profiles(
         ontology,
         roots,
         relevant_input_ports,
+    )
+    for input_port in relevant_input_ports:
+        signature_id = int(input_port["signature_id"])
+        unique_input_signatures.setdefault(
+            signature_id,
+            (
+                input_port.get("signature_requirements", input_port["port_values_by_dimension"]),
+                input_port["port_values_fset"],
+            ),
+        )
+    bindable_input_signatures = tuple(
+        (signature_id, signature_requirements, signature_fsets)
+        for signature_id, (signature_requirements, signature_fsets) in sorted(unique_input_signatures.items())
     )
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]] = {}
     profile_id_by_accepts = {
@@ -717,7 +838,7 @@ def optimize_compressed_candidates(
                     ontology,
                     output_port["port_values_by_dimension"],
                     output_port["port_values_fset"],
-                    relevant_input_ports,
+                    bindable_input_signatures,
                     goal_port_values_tuple,
                     goal_fsets,
                     preserve_goal_profiles=preserve_goal_profiles,
@@ -964,6 +1085,20 @@ def optimize_compressed_candidates(
         )
     )
 
+    (
+        goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon,
+    ) = _compute_goal_support_by_horizon(
+        config=config,
+        candidate_records_by_id=candidate_records_by_id,
+        query_goal_candidates=query_goal_candidates,
+        feasible_associations_by_input=feasible_associations_by_input,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+        min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+    )
+
     t4 = perf_counter()
 
     for record in relevant_records:
@@ -1039,6 +1174,11 @@ def optimize_compressed_candidates(
         query_goal_candidates=tuple(sorted(query_goal_candidates)),
         query_goal_tools=tuple(sorted(query_goal_tools)),
         min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon=goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
         allowed_candidates_by_step={
             step_index: tuple(sorted(candidate_ids))
             for step_index, candidate_ids in sorted(allowed_candidates_by_step.items())
@@ -1068,6 +1208,15 @@ def optimize_compressed_candidates(
             "dynamic_temporally_impossible_associations_pruned": temporally_dropped_associations,
             "dynamic_forced_associations_global": len(forced_associations_global),
             "dynamic_fixpoint_rounds": fixpoint_rounds,
+            "dynamic_goal_support_horizons": len(goal_support_candidates_by_horizon),
+            "dynamic_goal_support_candidates": sum(
+                len(candidate_ids)
+                for candidate_ids in goal_support_candidates_by_horizon.values()
+            ),
+            "dynamic_goal_support_inputs": sum(
+                len(input_ports)
+                for input_ports in goal_support_inputs_by_horizon.values()
+            ),
         },
         must_run_tools_global=must_run_tools_global,
         must_run_candidates_global=must_run_candidates_global,

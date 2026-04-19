@@ -207,18 +207,18 @@ def _compress_dynamic_output_choice_values(
     ontology: Ontology,
     output_values_by_dimension: Mapping[str, tuple[str, ...]],
     output_fsets: Mapping[str, frozenset[str]],
-    bindable_input_ports: tuple[Mapping[str, object], ...],
+    bindable_input_signatures: tuple[tuple[int, Mapping[str, object], Mapping[str, frozenset[str]]], ...],
     goal_port_values: tuple[Mapping[str, tuple[str, ...]], ...],
     goal_fsets: tuple[Mapping[str, frozenset[str]], ...],
     *,
     preserve_goal_profiles: bool,
 ) -> dict[str, tuple[str, ...]]:
-    globally_bindable_input_ports = tuple(
-        input_port
-        for input_port in bindable_input_ports
+    globally_bindable_input_signatures = tuple(
+        (signature_id, input_dims)
+        for signature_id, input_dims, input_fsets in bindable_input_signatures
         if _dynamic_output_matches_dynamic_input_fset(
             output_fsets,
-            input_port["port_values_fset"],
+            input_fsets,
         )
     )
     globally_bindable_goal_ids = tuple(
@@ -231,10 +231,7 @@ def _compress_dynamic_output_choice_values(
     consumer_signatures_by_dimension_value: dict[str, dict[str, set[int]]] = defaultdict(
         lambda: defaultdict(set)
     )
-    for input_port in globally_bindable_input_ports:
-        signature_id = int(input_port["signature_id"])
-        input_dims = input_port.get("signature_requirements", input_port["port_values_by_dimension"])
-        assert isinstance(input_dims, Mapping)
+    for signature_id, input_dims in globally_bindable_input_signatures:
         for dim in output_values_by_dimension:
             required_values = input_dims.get(dim)
             if required_values is None:
@@ -257,29 +254,46 @@ def _compress_dynamic_output_choice_values(
             for value in required_values:
                 goal_ids_by_dimension_value[dim][value].add(goal_id)
 
+    default_consumer_signatures_by_dimension_fs = {
+        dim: frozenset(signature_ids)
+        for dim, signature_ids in default_consumer_signatures_by_dimension.items()
+    }
+    consumer_signatures_by_dimension_value_fs = {
+        dim: {
+            value: frozenset(signature_ids)
+            for value, signature_ids in value_map.items()
+        }
+        for dim, value_map in consumer_signatures_by_dimension_value.items()
+    }
+    default_goal_ids_by_dimension_fs = {
+        dim: frozenset(goal_ids)
+        for dim, goal_ids in default_goal_ids_by_dimension.items()
+    }
+    goal_ids_by_dimension_value_fs = {
+        dim: {
+            value: frozenset(goal_ids)
+            for value, goal_ids in value_map.items()
+        }
+        for dim, value_map in goal_ids_by_dimension_value.items()
+    }
+
     compressed: dict[str, tuple[str, ...]] = {}
     for dim, values in output_values_by_dimension.items():
         if len(values) <= 1:
             compressed[dim] = values
             continue
 
-        representatives: dict[tuple[tuple[int, ...], tuple[int, ...]], str] = {}
+        representatives: dict[tuple[frozenset[int], frozenset[int]], str] = {}
+        default_consumer_profile = default_consumer_signatures_by_dimension_fs.get(dim, frozenset())
+        consumer_value_profiles = consumer_signatures_by_dimension_value_fs.get(dim, {})
+        default_goal_profile = default_goal_ids_by_dimension_fs.get(dim, frozenset())
+        goal_value_profiles = goal_ids_by_dimension_value_fs.get(dim, {})
         for value in values:
-            consumer_profile = tuple(
-                sorted(
-                    default_consumer_signatures_by_dimension.get(dim, set())
-                    | consumer_signatures_by_dimension_value[dim].get(value, set())
-                )
-            )
-            goal_profile = tuple(
-                sorted(
-                    default_goal_ids_by_dimension.get(dim, set())
-                    | goal_ids_by_dimension_value[dim].get(value, set())
-                )
-            )
+            consumer_profile = default_consumer_profile | consumer_value_profiles.get(value, frozenset())
+            goal_profile = default_goal_profile | goal_value_profiles.get(value, frozenset())
             profile_key = (
                 consumer_profile,
-                goal_profile if preserve_goal_profiles else (),
+                goal_profile if preserve_goal_profiles else frozenset(),
             )
             if profile_key in representatives:
                 representatives[profile_key] = _prefer_less_specific_value(

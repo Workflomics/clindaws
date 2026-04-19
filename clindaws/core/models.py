@@ -190,8 +190,14 @@ class HorizonRecord:
     feasibility_checked: bool = False
     feasibility_possible: bool | None = None
     feasibility_sec: float | None = None
+    feasibility_failure_category: str | None = None
+    feasibility_failure_details: tuple[str, ...] = ()
+    feasibility_grounding_sec: float = 0.0
+    full_grounding_sec: float = 0.0
     full_solve_performed: bool = True
     solve_skipped_reason: str | None = None
+    clause_blocking_mode: str | None = None
+    clause_constraints_added: int = 0
     grounding_parts: tuple[tuple[str, float], ...] = ()
 
 

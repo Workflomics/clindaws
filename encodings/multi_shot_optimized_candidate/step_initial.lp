@@ -44,9 +44,6 @@ initial_goal_filter_active(t) :-
    occurs(t, use_dynamic_candidate(_, Candidate)),
    Candidate != CandidateMust.
 
-:- occurs(t, use_dynamic_candidate(_, Candidate)),
-   dynamic_forced_produced_bind(Candidate, _, _, _).
-
 occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
 
 :- initial_goal_filter_active(t),
@@ -100,6 +97,10 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     dynamic_candidate_output_singleton(Candidate, Port, V, Category).
+
+artifact_profile_member(out(t, Tool, Port), Category, ProfileId) :-
+    artifact_dim(out(t, Tool, Port), ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
