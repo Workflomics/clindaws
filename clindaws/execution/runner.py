@@ -110,6 +110,8 @@ SCHEMA_PREDICATES = (
     "dynamic_forced_produced_bind",
     "dynamic_candidate_output_port",
     "dynamic_candidate_output_multiplicity",
+    "dynamic_candidate_output_single_use",
+    "dynamic_candidate_output_multi_use",
     "dynamic_candidate_total_output_multiplicity",
     "dynamic_candidate_output_singleton",
     "dynamic_candidate_output_choice_value",

@@ -268,6 +268,7 @@ def build_compressed_candidate_fact_bundle(
 
         for output_port in tuple(record["output_ports"]):
             port_idx = int(output_port["port_idx"])
+            multiplicity = int(output_port.get("multiplicity", 1))
             writer.emit_fact(
                 "dynamic_candidate_output_port",
                 _quote(candidate_id),
@@ -278,8 +279,21 @@ def build_compressed_candidate_fact_bundle(
                 "dynamic_candidate_output_multiplicity",
                 _quote(candidate_id),
                 str(port_idx),
-                str(int(output_port.get("multiplicity", 1))),
+                str(multiplicity),
             )
+            if multiplicity == 1:
+                writer.emit_fact(
+                    "dynamic_candidate_output_single_use",
+                    _quote(candidate_id),
+                    str(port_idx),
+                )
+            elif multiplicity > 1:
+                writer.emit_fact(
+                    "dynamic_candidate_output_multi_use",
+                    _quote(candidate_id),
+                    str(port_idx),
+                    str(multiplicity),
+                )
             for dim, values in sorted(output_port["port_values_by_dimension"].items()):
                 if len(values) == 1:
                     writer.emit_fact(
