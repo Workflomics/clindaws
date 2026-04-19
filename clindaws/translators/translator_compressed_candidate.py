@@ -325,6 +325,13 @@ def build_compressed_candidate_fact_bundle(
                 "structural_probe_horizons": list(optimization.structural_probe_horizons),
                 "query_control_mode": "assumptions",
                 "available_model_blocking_modes": ["candidate_sequence_clause"],
+                "smart_expansion_rounds_by_horizon": dict(sorted(optimization.smart_expansion_rounds_by_horizon.items())),
+                "goal_support_candidate_counts_by_horizon": {
+                    int(horizon): len(candidate_ids)
+                    for horizon, candidate_ids in sorted(
+                        optimization.goal_support_candidates_by_horizon.items()
+                    )
+                },
                 "must_run_tools_global": len(optimization.must_run_tools_global),
                 "must_run_candidates_global": len(optimization.must_run_candidates_global),
                 "must_run_tool_steps": len(optimization.must_run_tools_by_step),

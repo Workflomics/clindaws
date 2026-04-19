@@ -44,6 +44,7 @@ class CompressedCandidateOptimizationResult:
     goal_support_candidates_by_horizon: dict[int, tuple[str, ...]]
     goal_support_tools_by_horizon: dict[int, tuple[str, ...]]
     goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
+    smart_expansion_rounds_by_horizon: dict[int, int]
     allowed_candidates_by_step: dict[int, tuple[str, ...]]
     allowed_tools_by_step: dict[int, tuple[str, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
@@ -163,6 +164,129 @@ def _compute_goal_support_by_horizon(
         goal_support_candidates_by_horizon,
         goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon,
+    )
+
+
+def _build_goal_support_for_horizon(
+    *,
+    horizon: int,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    query_goal_candidates: Iterable[str],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+    min_goal_distance_by_candidate: Mapping[str, int],
+) -> tuple[set[str], set[tuple[str, int]]]:
+    """Build horizon-local goal-support candidates and inputs for one horizon."""
+
+    query_goal_candidate_set = set(query_goal_candidates)
+    goal_support_candidates: set[str] = set()
+    goal_support_inputs: set[tuple[str, int]] = set()
+    frontier: deque[str] = deque()
+
+    for candidate_id in sorted(query_goal_candidate_set):
+        min_step = min_step_by_candidate.get(candidate_id)
+        max_step = max_step_by_candidate.get(candidate_id)
+        goal_distance = min_goal_distance_by_candidate.get(candidate_id)
+        if min_step is None or max_step is None or goal_distance is None:
+            continue
+        if min_step > horizon or horizon > max_step:
+            continue
+        if min_step + goal_distance > horizon:
+            continue
+        goal_support_candidates.add(candidate_id)
+        frontier.append(candidate_id)
+
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+        if consumer_max_step is None:
+            continue
+        consumer_latest_step = min(horizon, consumer_max_step)
+        for input_port in tuple(candidate_records_by_id[consumer_candidate]["input_ports"]):
+            consumer_port = int(input_port["port_idx"])
+            workflow_input_matches = tuple(input_port.get("workflow_input_matches", ()))
+            if workflow_input_matches:
+                goal_support_inputs.add((consumer_candidate, consumer_port))
+                continue
+            producer_ports = feasible_associations_by_input.get((consumer_candidate, consumer_port), ())
+            support_found = False
+            for producer_candidate, _producer_port in producer_ports:
+                producer_min_step = min_step_by_candidate.get(producer_candidate)
+                producer_goal_distance = min_goal_distance_by_candidate.get(producer_candidate)
+                if producer_min_step is None or producer_goal_distance is None:
+                    continue
+                if producer_min_step + producer_goal_distance > horizon:
+                    continue
+                if producer_min_step >= consumer_latest_step:
+                    continue
+                support_found = True
+                if producer_candidate not in goal_support_candidates:
+                    goal_support_candidates.add(producer_candidate)
+                    frontier.append(producer_candidate)
+            if support_found:
+                goal_support_inputs.add((consumer_candidate, consumer_port))
+
+    return goal_support_candidates, goal_support_inputs
+
+
+def _compute_smart_expansion_by_horizon(
+    *,
+    config: SnakeConfig,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    query_goal_candidates: Iterable[str],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+    min_goal_distance_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[int, int],
+]:
+    """Compute fixed-point smart-expansion surfaces for each horizon.
+
+    This keeps only the horizon-local candidate/input closure in Python. The
+    feasibility encoding applies temporal and reachability filtering over the
+    global association classes at solve time.
+    """
+
+    goal_support_candidates_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_tools_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]] = {}
+    smart_expansion_rounds_by_horizon: dict[int, int] = {}
+
+    for horizon in range(config.solution_length_min, config.solution_length_max + 1):
+        goal_support_candidates, goal_support_inputs = _build_goal_support_for_horizon(
+            horizon=horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            query_goal_candidates=query_goal_candidates,
+            feasible_associations_by_input=feasible_associations_by_input,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+            min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        )
+        smart_expansion_rounds_by_horizon[horizon] = 1
+        if not goal_support_candidates:
+            continue
+
+        goal_support_candidates_by_horizon[horizon] = tuple(sorted(goal_support_candidates))
+        goal_support_tools_by_horizon[horizon] = tuple(
+            sorted(
+                {
+                    str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                    for candidate_id in goal_support_candidates
+                }
+            )
+        )
+        goal_support_inputs_by_horizon[horizon] = tuple(sorted(goal_support_inputs))
+
+    return (
+        goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon,
+        smart_expansion_rounds_by_horizon,
     )
 
 
@@ -1089,7 +1213,8 @@ def optimize_compressed_candidates(
         goal_support_candidates_by_horizon,
         goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon,
-    ) = _compute_goal_support_by_horizon(
+        smart_expansion_rounds_by_horizon,
+    ) = _compute_smart_expansion_by_horizon(
         config=config,
         candidate_records_by_id=candidate_records_by_id,
         query_goal_candidates=query_goal_candidates,
@@ -1179,6 +1304,7 @@ def optimize_compressed_candidates(
         goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
         goal_support_tools_by_horizon=goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        smart_expansion_rounds_by_horizon=smart_expansion_rounds_by_horizon,
         allowed_candidates_by_step={
             step_index: tuple(sorted(candidate_ids))
             for step_index, candidate_ids in sorted(allowed_candidates_by_step.items())
@@ -1216,6 +1342,9 @@ def optimize_compressed_candidates(
             "dynamic_goal_support_inputs": sum(
                 len(input_ports)
                 for input_ports in goal_support_inputs_by_horizon.values()
+            ),
+            "dynamic_smart_expansion_rounds_total": sum(
+                smart_expansion_rounds_by_horizon.values()
             ),
         },
         must_run_tools_global=must_run_tools_global,

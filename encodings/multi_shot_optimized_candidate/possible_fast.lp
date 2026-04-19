@@ -42,7 +42,7 @@ fast_input_supported(t, Candidate, Port) :-
 fast_input_supported(t, Candidate, Port) :-
     dynamic_goal_support_input_at_horizon(Candidate, Port, t),
     dynamic_candidate_input_association_class(Candidate, Port, AssociationClassId),
-    dynamic_association_class_bindable_producer_port(AssociationClassId, ProducerCandidate, _),
+    dynamic_association_class_bindable_producer_port(AssociationClassId, ProducerCandidate, _ProducerPort),
     fast_reachable(t, ProducerCandidate),
     fast_candidate_can_precede(t, ProducerCandidate, Candidate).
 

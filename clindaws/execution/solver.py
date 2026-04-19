@@ -704,6 +704,7 @@ def _add_exact_model_blocking_clause(
 def _run_feasibility_precheck(
     control: clingo.Control,
     *,
+    facts: FactBundle,
     horizon: int,
     grounded_horizon: int,
     is_interrupted: Callable[[], bool],
@@ -712,6 +713,8 @@ def _run_feasibility_precheck(
 
     start = perf_counter()
     feasible = False
+    smart_expansion = facts.backend_stats.get("smart_expansion", {})
+    goal_support_counts_by_horizon = smart_expansion.get("goal_support_candidate_counts_by_horizon", {})
     try:
         enforcement = {
             "goal": True,
@@ -734,7 +737,11 @@ def _run_feasibility_precheck(
                     break
 
         _run_interruptible(_solve, is_interrupted)
-        return feasible, perf_counter() - start, None, ()
+        if feasible:
+            return True, perf_counter() - start, None, ()
+        if int(goal_support_counts_by_horizon.get(horizon, 0)) == 0:
+            return False, perf_counter() - start, "goal_support", ()
+        return False, perf_counter() - start, "feasibility", ()
     finally:
         control.cleanup()
 
@@ -991,6 +998,7 @@ def _solve_multi_shot_with_programs(
                         feasibility_failure_details,
                     ) = _run_feasibility_precheck(
                         feasibility_control if feasibility_control is not None else control,
+                        facts=facts,
                         horizon=horizon,
                         grounded_horizon=horizon,
                         is_interrupted=is_interrupted,
