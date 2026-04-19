@@ -45,6 +45,9 @@ class CompressedCandidateOptimizationResult:
     goal_support_tools_by_horizon: dict[int, tuple[str, ...]]
     goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
     smart_expansion_rounds_by_horizon: dict[int, int]
+    structurally_supportable_candidates_by_horizon: dict[int, tuple[str, ...]]
+    structurally_unsupported_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
+    input_support_rounds_by_horizon: dict[int, int]
     allowed_candidates_by_step: dict[int, tuple[str, ...]]
     allowed_tools_by_step: dict[int, tuple[str, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
@@ -54,7 +57,6 @@ class CompressedCandidateOptimizationResult:
     support_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
     association_class_by_input: dict[tuple[str, int], int]
     association_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
-    candidate_output_id_map: Mapping[tuple[str, int], int]
     canonical_producers: Mapping[tuple[int, int], tuple[int, int]]
     cache_stats: dict[str, int]
     must_run_tools_global: tuple[str, ...]
@@ -287,6 +289,112 @@ def _compute_smart_expansion_by_horizon(
         goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon,
         smart_expansion_rounds_by_horizon,
+    )
+
+
+def _compute_structural_input_support_by_horizon(
+    *,
+    goal_support_candidates_by_horizon: Mapping[int, tuple[str, ...]],
+    goal_support_inputs_by_horizon: Mapping[int, tuple[tuple[str, int], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    association_class_by_input: Mapping[tuple[str, int], int],
+    association_class_bindable_ports: Mapping[int, tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[int, int],
+]:
+    """Compute horizon-local structural supportability for goal-support candidates."""
+
+    producer_candidates_by_input: dict[tuple[str, int], tuple[str, ...]] = {}
+    for input_key, class_id in sorted(association_class_by_input.items()):
+        producer_candidates_by_input[input_key] = tuple(
+            sorted(
+                {
+                    producer_candidate
+                    for producer_candidate, _producer_port in association_class_bindable_ports.get(class_id, ())
+                }
+            )
+        )
+
+    input_records_by_key: dict[tuple[str, int], Mapping[str, object]] = {}
+    for candidate_id, record in candidate_records_by_id.items():
+        for input_port in tuple(record["input_ports"]):
+            input_records_by_key[(candidate_id, int(input_port["port_idx"]))] = input_port
+
+    structurally_supportable_candidates_by_horizon: dict[int, tuple[str, ...]] = {}
+    structurally_unsupported_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]] = {}
+    input_support_rounds_by_horizon: dict[int, int] = {}
+
+    for horizon, candidate_ids in sorted(goal_support_candidates_by_horizon.items()):
+        candidate_set = set(candidate_ids)
+        goal_inputs = set(goal_support_inputs_by_horizon.get(horizon, ()))
+        candidate_required_inputs: dict[str, list[tuple[str, int]]] = {
+            candidate_id: []
+            for candidate_id in candidate_ids
+        }
+        producer_options_by_input: dict[tuple[str, int], tuple[str, ...]] = {}
+
+        for candidate_id, port_idx in sorted(goal_inputs):
+            input_record = input_records_by_key.get((candidate_id, port_idx))
+            if input_record is None:
+                continue
+            if tuple(input_record.get("workflow_input_matches", ())):
+                continue
+            consumer_latest_step = min(
+                horizon,
+                max_step_by_candidate.get(candidate_id, horizon),
+            )
+            filtered_producers = tuple(
+                sorted(
+                    producer_candidate
+                    for producer_candidate in producer_candidates_by_input.get((candidate_id, port_idx), ())
+                    if producer_candidate in candidate_set
+                    and min_step_by_candidate.get(producer_candidate) is not None
+                    and min_step_by_candidate[producer_candidate] < consumer_latest_step
+                )
+            )
+            candidate_required_inputs[candidate_id].append((candidate_id, port_idx))
+            producer_options_by_input[(candidate_id, port_idx)] = filtered_producers
+
+        supportable_candidates = {
+            candidate_id
+            for candidate_id, required_inputs in candidate_required_inputs.items()
+            if not required_inputs
+        }
+        rounds = 0
+        changed = True
+        while changed:
+            changed = False
+            rounds += 1
+            for candidate_id in candidate_ids:
+                if candidate_id in supportable_candidates:
+                    continue
+                required_inputs = candidate_required_inputs.get(candidate_id, [])
+                if all(
+                    any(producer_candidate in supportable_candidates for producer_candidate in producer_options_by_input.get(input_key, ()))
+                    for input_key in required_inputs
+                ):
+                    supportable_candidates.add(candidate_id)
+                    changed = True
+
+        unsupported_inputs = tuple(
+            sorted(
+                input_key
+                for input_key, producer_candidates in producer_options_by_input.items()
+                if not any(producer_candidate in supportable_candidates for producer_candidate in producer_candidates)
+            )
+        )
+        structurally_supportable_candidates_by_horizon[horizon] = tuple(sorted(supportable_candidates))
+        structurally_unsupported_inputs_by_horizon[horizon] = unsupported_inputs
+        input_support_rounds_by_horizon[horizon] = max(rounds, 1)
+
+    return (
+        structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon,
     )
 
 
@@ -1156,13 +1264,6 @@ def optimize_compressed_candidates(
         max_step_by_candidate=max_step_by_candidate,
     )
 
-    candidate_output_id_map: dict[tuple[str, int], int] = {}
-    for record in relevant_records:
-        candidate_id = str(record["candidate_id"])
-        for output_port in tuple(record["output_ports"]):
-            port_idx = int(output_port["port_idx"])
-            candidate_output_id_map[(candidate_id, port_idx)] = len(candidate_output_id_map) + 1
-
     # Still intentionally empty; canonical producers remain a solve-time notion.
     canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
 
@@ -1222,6 +1323,19 @@ def optimize_compressed_candidates(
         min_step_by_candidate=min_step_by_candidate,
         max_step_by_candidate=max_step_by_candidate,
         min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+    )
+    (
+        structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon,
+    ) = _compute_structural_input_support_by_horizon(
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+        association_class_by_input=association_class_by_input,
+        association_class_bindable_ports=association_class_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
     )
 
     t4 = perf_counter()
@@ -1305,6 +1419,9 @@ def optimize_compressed_candidates(
         goal_support_tools_by_horizon=goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
         smart_expansion_rounds_by_horizon=smart_expansion_rounds_by_horizon,
+        structurally_supportable_candidates_by_horizon=structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon=structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon=input_support_rounds_by_horizon,
         allowed_candidates_by_step={
             step_index: tuple(sorted(candidate_ids))
             for step_index, candidate_ids in sorted(allowed_candidates_by_step.items())
@@ -1318,7 +1435,6 @@ def optimize_compressed_candidates(
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
         signature_support_class_by_id=signature_support_class_by_id,
         support_class_bindable_ports=support_class_bindable_ports,
-        candidate_output_id_map=candidate_output_id_map,
         canonical_producers=canonical_producers,
         cache_stats={
             **resolver.stats(),
@@ -1343,8 +1459,19 @@ def optimize_compressed_candidates(
                 len(input_ports)
                 for input_ports in goal_support_inputs_by_horizon.values()
             ),
+            "dynamic_structurally_supportable_candidates": sum(
+                len(candidate_ids)
+                for candidate_ids in structurally_supportable_candidates_by_horizon.values()
+            ),
+            "dynamic_structurally_unsupported_inputs": sum(
+                len(input_ports)
+                for input_ports in structurally_unsupported_inputs_by_horizon.values()
+            ),
             "dynamic_smart_expansion_rounds_total": sum(
                 smart_expansion_rounds_by_horizon.values()
+            ),
+            "dynamic_input_support_rounds_total": sum(
+                input_support_rounds_by_horizon.values()
             ),
         },
         must_run_tools_global=must_run_tools_global,

@@ -9,8 +9,13 @@ records, support classes, and step windows into emitted facts.
 from __future__ import annotations
 from clindaws.translators.utils import _quote
 from clindaws.translators.fact_writer import _FactWriter
-from clindaws.translators.builder import _build_common_facts, _finalize_fact_bundle
+from clindaws.translators.builder import _build_common_facts, _finalize_fact_bundle, _build_roots
 from clindaws.translators.constraints import _emit_dynamic_constraints
+from clindaws.translators.ports import (
+    _artifact_satisfies_port_requirements,
+    _artifact_profile_terminal_sets,
+    _port_requirement_terminal_sets,
+)
 
 from time import perf_counter
 
@@ -20,6 +25,62 @@ from clindaws.execution.compressed_candidate_optimization import (
 )
 from clindaws.core.models import FactBundle, SnakeConfig, ToolMode
 from clindaws.core.ontology import Ontology
+
+
+def _candidate_satisfies_goal(
+    goal_requirements: dict[str, tuple[frozenset[str], ...]],
+    artifact_profile: dict[str, frozenset[str]],
+) -> bool:
+    return _artifact_satisfies_port_requirements(artifact_profile, goal_requirements)
+
+
+def _goal_support_goal_stats(
+    *,
+    config: SnakeConfig,
+    ontology: Ontology,
+    candidate_ids_by_horizon: dict[int, tuple[str, ...]],
+    relevant_records: tuple[dict[str, object], ...],
+) -> tuple[dict[int, int], dict[int, tuple[int, ...]]]:
+    roots = _build_roots(config, ontology)
+    goal_requirements_by_id = {
+        goal_id: _port_requirement_terminal_sets(ontology, roots, goal_item)
+        for goal_id, goal_item in enumerate(config.outputs)
+    }
+    candidate_goal_ids: dict[str, frozenset[int]] = {}
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        covered_goals: set[int] = set()
+        for output_port in tuple(record["output_ports"]):
+            artifact_profile = _artifact_profile_terminal_sets(
+                ontology,
+                roots,
+                output_port["port_values_by_dimension"],
+            )
+            for goal_id, goal_requirements in goal_requirements_by_id.items():
+                if goal_id in covered_goals:
+                    continue
+                if _candidate_satisfies_goal(
+                    goal_requirements,
+                    artifact_profile,
+                ):
+                    covered_goals.add(goal_id)
+        candidate_goal_ids[candidate_id] = frozenset(covered_goals)
+
+    goal_support_goal_counts_by_horizon: dict[int, int] = {}
+    goal_support_missing_goals_by_horizon: dict[int, tuple[int, ...]] = {}
+
+    for horizon, candidate_ids in sorted(candidate_ids_by_horizon.items()):
+        covered_goals: set[int] = set()
+        for candidate_id in candidate_ids:
+            covered_goals.update(candidate_goal_ids.get(candidate_id, frozenset()))
+        goal_support_goal_counts_by_horizon[horizon] = len(covered_goals)
+        goal_support_missing_goals_by_horizon[horizon] = tuple(
+            goal_id
+            for goal_id in range(len(config.outputs))
+            if goal_id not in covered_goals
+        )
+
+    return goal_support_goal_counts_by_horizon, goal_support_missing_goals_by_horizon
 
 
 def build_compressed_candidate_fact_bundle(
@@ -70,6 +131,21 @@ def build_compressed_candidate_fact_bundle(
         for candidate_id, port_idx in input_ports:
             writer.emit_fact(
                 "dynamic_goal_support_input_at_horizon",
+                _quote(candidate_id),
+                str(port_idx),
+                str(horizon),
+            )
+    for horizon, candidate_ids in sorted(optimization.structurally_supportable_candidates_by_horizon.items()):
+        for candidate_id in candidate_ids:
+            writer.emit_fact(
+                "dynamic_structurally_supportable_candidate_at_horizon",
+                _quote(candidate_id),
+                str(horizon),
+            )
+    for horizon, input_ports in sorted(optimization.structurally_unsupported_inputs_by_horizon.items()):
+        for candidate_id, port_idx in input_ports:
+            writer.emit_fact(
+                "dynamic_structurally_unsupported_input_at_horizon",
                 _quote(candidate_id),
                 str(port_idx),
                 str(horizon),
@@ -163,13 +239,6 @@ def build_compressed_candidate_fact_bundle(
                     str(port_idx),
                     str(support_class_id),
                 )
-                # Helper for single-shot mode
-                writer.emit_fact(
-                    "precomputed_candidate_input_support_class",
-                    _quote(candidate_id),
-                    str(port_idx),
-                    str(support_class_id),
-                )
             association_class_id = optimization.association_class_by_input.get((candidate_id, port_idx))
             if association_class_id is not None:
                 writer.emit_fact(
@@ -199,19 +268,11 @@ def build_compressed_candidate_fact_bundle(
 
         for output_port in tuple(record["output_ports"]):
             port_idx = int(output_port["port_idx"])
-            output_id = optimization.candidate_output_id_map.get((candidate_id, port_idx))
             writer.emit_fact(
                 "dynamic_candidate_output_port",
                 _quote(candidate_id),
                 str(port_idx),
             )
-            if output_id is not None:
-                writer.emit_fact(
-                    "dynamic_candidate_output_id",
-                    _quote(candidate_id),
-                    str(port_idx),
-                    str(output_id),
-                )
 
             writer.emit_fact(
                 "dynamic_candidate_output_multiplicity",
@@ -219,15 +280,6 @@ def build_compressed_candidate_fact_bundle(
                 str(port_idx),
                 str(int(output_port.get("multiplicity", 1))),
             )
-            for dim, declared_values in output_port["declared_dims"].items():
-                for declared_value in declared_values:
-                    writer.emit_fact(
-                        "dynamic_candidate_output_declared_type",
-                        _quote(candidate_id),
-                        str(port_idx),
-                        _quote(declared_value),
-                        _quote(dim),
-                    )
             for dim, values in sorted(output_port["port_values_by_dimension"].items()):
                 if len(values) == 1:
                     writer.emit_fact(
@@ -274,12 +326,6 @@ def build_compressed_candidate_fact_bundle(
                 _quote(producer_candidate),
                 str(producer_port),
             )
-        for producer_candidate in sorted({candidate_id for candidate_id, _producer_port in producer_ports}):
-            writer.emit_fact(
-                "dynamic_association_class_bindable_producer_candidate",
-                str(association_class_id),
-                _quote(producer_candidate),
-            )
     for signature_id, category_profiles in sorted(optimization.signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(
@@ -306,6 +352,22 @@ def build_compressed_candidate_fact_bundle(
             )
 
     emit_elapsed = perf_counter() - emit_start
+    goal_support_goal_counts_by_horizon, goal_support_missing_goals_by_horizon = (
+        _goal_support_goal_stats(
+            config=config,
+            ontology=ontology,
+            candidate_ids_by_horizon=optimization.goal_support_candidates_by_horizon,
+            relevant_records=optimization.relevant_records,
+        )
+    )
+    supportable_goal_counts_by_horizon, supportable_missing_goals_by_horizon = (
+        _goal_support_goal_stats(
+            config=config,
+            ontology=ontology,
+            candidate_ids_by_horizon=optimization.structurally_supportable_candidates_by_horizon,
+            relevant_records=optimization.relevant_records,
+        )
+    )
     print(
         f"  optimized-candidate builder phases: "
         f"goal_check={optimization.phase_timings['goal_check']:.2f}s "
@@ -350,6 +412,41 @@ def build_compressed_candidate_fact_bundle(
                         optimization.goal_support_tools_by_horizon.items()
                     )
                 },
+                "goal_support_goal_counts_by_horizon": dict(
+                    sorted(goal_support_goal_counts_by_horizon.items())
+                ),
+                "goal_support_missing_goals_by_horizon": {
+                    int(horizon): list(goal_ids)
+                    for horizon, goal_ids in sorted(goal_support_missing_goals_by_horizon.items())
+                },
+                "supportable_candidate_counts_by_horizon": {
+                    int(horizon): len(candidate_ids)
+                    for horizon, candidate_ids in sorted(
+                        optimization.structurally_supportable_candidates_by_horizon.items()
+                    )
+                },
+                "unsupported_input_counts_by_horizon": {
+                    int(horizon): len(input_ports)
+                    for horizon, input_ports in sorted(
+                        optimization.structurally_unsupported_inputs_by_horizon.items()
+                    )
+                },
+                "unsupported_input_samples_by_horizon": {
+                    int(horizon): [f"{candidate_id}:{port_idx}" for candidate_id, port_idx in input_ports[:8]]
+                    for horizon, input_ports in sorted(
+                        optimization.structurally_unsupported_inputs_by_horizon.items()
+                    )
+                },
+                "supportable_goal_counts_by_horizon": dict(
+                    sorted(supportable_goal_counts_by_horizon.items())
+                ),
+                "supportable_missing_goals_by_horizon": {
+                    int(horizon): list(goal_ids)
+                    for horizon, goal_ids in sorted(supportable_missing_goals_by_horizon.items())
+                },
+                "input_support_rounds_by_horizon": dict(
+                    sorted(optimization.input_support_rounds_by_horizon.items())
+                ),
                 "must_run_tools_global": len(optimization.must_run_tools_global),
                 "must_run_candidates_global": len(optimization.must_run_candidates_global),
                 "must_run_tool_steps": len(optimization.must_run_tools_by_step),

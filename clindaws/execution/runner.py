@@ -93,6 +93,8 @@ SCHEMA_PREDICATES = (
     "dynamic_goal_support_candidate_at_horizon",
     "dynamic_goal_support_tool_at_horizon",
     "dynamic_goal_support_input_at_horizon",
+    "dynamic_structurally_supportable_candidate_at_horizon",
+    "dynamic_structurally_unsupported_input_at_horizon",
     "dynamic_initial_bindable",
     "dynamic_candidate_input_port",
     "dynamic_candidate_input_signature_id",
@@ -101,7 +103,6 @@ SCHEMA_PREDICATES = (
     "dynamic_signature_support_class",
     "dynamic_support_class_bindable_producer_port",
     "dynamic_association_class_bindable_producer_port",
-    "dynamic_association_class_bindable_producer_candidate",
     "optimized_candidate_input_profile",
     "dynamic_signature_profile",
     "dynamic_profile_accepts",
@@ -112,7 +113,6 @@ SCHEMA_PREDICATES = (
     "dynamic_candidate_total_output_multiplicity",
     "dynamic_candidate_output_singleton",
     "dynamic_candidate_output_choice_value",
-    "dynamic_candidate_output_declared_type",
 )
 RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
 OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER = "candidate_optimized"

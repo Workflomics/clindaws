@@ -191,6 +191,23 @@ class GroundingOutput:
     horizon_records: tuple[HorizonRecord, ...]
 
 
+@dataclass(frozen=True)
+class _SolvePassMetrics:
+    any_model_seen: bool
+    models_seen: int
+    models_stored: int
+    unique_workflows_seen: int
+    unique_workflows_stored: int
+    model_callback_sec: float
+    shown_symbols_sec: float
+    workflow_signature_key_sec: float
+    canonicalization_sec: float
+    clause_constraints_added: int
+    seen_tool_sequence_count: int
+    stored_tool_sequence_count: int
+    solve_elapsed: float
+
+
 def _single_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
     """Return the active program set for public single-shot mode.
 
@@ -514,6 +531,239 @@ def _optimized_fast_feasibility_horizon_parts(
     return (("possible_fast", (clingo.Number(horizon),)),)
 
 
+def _optimized_exact_replay_horizon_parts(
+    horizon: int,
+    *,
+    initial_step_program: str | None,
+    initial_seed_program: str | None,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
+    for current_horizon in range(1, horizon + 1):
+        if initial_step_program is not None and current_horizon == 1:
+            parts.append((initial_step_program, (clingo.Number(current_horizon),)))
+        else:
+            if initial_seed_program is not None and current_horizon > 1:
+                parts.append((initial_seed_program, (clingo.Number(current_horizon - 1),)))
+            parts.append(("step", (clingo.Number(current_horizon),)))
+        parts.append(("constraint_step", (clingo.Number(current_horizon),)))
+    return tuple(parts)
+
+
+def _ground_exact_replay_parts(
+    control: clingo.Control,
+    parts: tuple[tuple[str, tuple[clingo.Symbol, ...]], ...],
+    *,
+    is_interrupted: Callable[[], bool],
+    progress_callback: ProgressCallback,
+    horizon: int,
+) -> tuple[float, tuple[tuple[str, float], ...]]:
+    if not parts:
+        return 0.0, ()
+    _report(progress_callback, f"Grounding: horizon {horizon} exact_replay...")
+    start = perf_counter()
+    for program_name, program_args in parts:
+        _run_interruptible(
+            lambda name=program_name, args=program_args: control.ground([(name, list(args))]),
+            is_interrupted,
+        )
+    elapsed = perf_counter() - start
+    _report(
+        progress_callback,
+        f"Grounding progress: horizon {horizon} exact_replay finished after {elapsed:.3f}s.",
+    )
+    return elapsed, (("exact_replay", elapsed),)
+
+
+def _solve_on_control(
+    control: clingo.Control,
+    *,
+    config: SnakeConfig,
+    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+    horizon: int,
+    assumptions: list[tuple[clingo.Symbol, bool]] | None,
+    clause_blocking_mode: str | None,
+    capture_raw_models: bool,
+    diagnostic_counts_enabled: bool,
+    solve_all_horizons: bool,
+    raw_collected: list[tuple[clingo.Symbol, ...]],
+    unique_collected: list[tuple[clingo.Symbol, ...]],
+    stored_unique_keys: set[tuple[object, ...]],
+    progress_callback: ProgressCallback,
+    is_interrupted: Callable[[], bool],
+) -> _SolvePassMetrics:
+    any_model_seen = False
+    models_seen = 0
+    models_stored = 0
+    unique_workflows_seen = 0
+    unique_workflows_stored = 0
+    model_callback_sec = 0.0
+    shown_symbols_sec = 0.0
+    workflow_signature_key_sec = 0.0
+    canonicalization_sec = 0.0
+    clause_constraints_added = 0
+    seen_unique_keys: set[tuple[object, ...]] = set()
+    seen_tool_sequence_keys: set[tuple[object, ...]] = set()
+    stored_tool_sequence_keys: set[tuple[object, ...]] = set()
+
+    start = perf_counter()
+
+    def _solve() -> None:
+        nonlocal any_model_seen, models_seen, models_stored
+        nonlocal unique_workflows_seen, unique_workflows_stored
+        nonlocal model_callback_sec, shown_symbols_sec
+        nonlocal workflow_signature_key_sec, canonicalization_sec
+        nonlocal clause_constraints_added
+
+        if clause_blocking_mode == "candidate_sequence_clause":
+            while True:
+                model_found = False
+                blocking_symbols: tuple[clingo.Symbol, ...] = ()
+                with control.solve(yield_=True, assumptions=assumptions) as handle:
+                    for model in handle:
+                        model_found = True
+                        callback_start = perf_counter()
+                        any_model_seen = True
+                        if diagnostic_counts_enabled:
+                            models_seen += 1
+                        shown_start = perf_counter()
+                        shown_symbols = tuple(model.symbols(shown=True))
+                        shown_symbols_sec += perf_counter() - shown_start
+                        key_start = perf_counter()
+                        tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
+                            shown_symbols,
+                            tool_input_signatures,
+                        )
+                        workflow_signature_key_sec += perf_counter() - key_start
+                        workflow_length = workflow_signature_length(workflow_key)
+                        in_length_window = (
+                            config.solution_length_min
+                            <= workflow_length
+                            <= config.solution_length_max
+                        )
+                        if diagnostic_counts_enabled:
+                            if tool_sequence_key not in seen_tool_sequence_keys:
+                                seen_tool_sequence_keys.add(tool_sequence_key)
+                            if workflow_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_key)
+                                unique_workflows_seen += 1
+                        store_raw = (
+                            in_length_window
+                            and capture_raw_models
+                            and len(raw_collected) < config.solutions
+                        )
+                        store_unique = (
+                            in_length_window
+                            and workflow_key not in stored_unique_keys
+                            and len(unique_collected) < config.solutions
+                        )
+                        if store_raw:
+                            raw_collected.append(shown_symbols)
+                            models_stored += 1
+                        if store_unique:
+                            canonical_start = perf_counter()
+                            canonical_shown = canonicalize_shown_symbols(
+                                shown_symbols,
+                                tool_input_signatures,
+                            )
+                            canonicalization_sec += perf_counter() - canonical_start
+                            stored_unique_keys.add(workflow_key)
+                            stored_tool_sequence_keys.add(tool_sequence_key)
+                            unique_collected.append(canonical_shown)
+                            unique_workflows_stored += 1
+                        blocking_symbols = _exact_candidate_sequence_symbols(model)
+                        model_callback_sec += perf_counter() - callback_start
+                        break
+                if not model_found:
+                    break
+                if blocking_symbols and _add_exact_model_blocking_clause(control, symbols=blocking_symbols):
+                    clause_constraints_added += 1
+                else:
+                    break
+                if not solve_all_horizons and len(unique_collected) >= config.solutions:
+                    break
+                if solve_all_horizons and len(unique_collected) >= config.solutions:
+                    break
+        else:
+            while True:
+                with control.solve(yield_=True, assumptions=assumptions) as handle:
+                    for model in handle:
+                        callback_start = perf_counter()
+                        any_model_seen = True
+                        if diagnostic_counts_enabled:
+                            models_seen += 1
+                        shown_start = perf_counter()
+                        shown_symbols = tuple(model.symbols(shown=True))
+                        shown_symbols_sec += perf_counter() - shown_start
+                        key_start = perf_counter()
+                        tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
+                            shown_symbols,
+                            tool_input_signatures,
+                        )
+                        workflow_signature_key_sec += perf_counter() - key_start
+                        workflow_length = workflow_signature_length(workflow_key)
+                        in_length_window = (
+                            config.solution_length_min
+                            <= workflow_length
+                            <= config.solution_length_max
+                        )
+                        if diagnostic_counts_enabled:
+                            if tool_sequence_key not in seen_tool_sequence_keys:
+                                seen_tool_sequence_keys.add(tool_sequence_key)
+                            if workflow_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_key)
+                                unique_workflows_seen += 1
+                        store_raw = (
+                            in_length_window
+                            and capture_raw_models
+                            and len(raw_collected) < config.solutions
+                        )
+                        store_unique = (
+                            in_length_window
+                            and workflow_key not in stored_unique_keys
+                            and len(unique_collected) < config.solutions
+                        )
+                        if store_raw:
+                            raw_collected.append(shown_symbols)
+                            models_stored += 1
+                        if store_unique:
+                            canonical_start = perf_counter()
+                            canonical_shown = canonicalize_shown_symbols(
+                                shown_symbols,
+                                tool_input_signatures,
+                            )
+                            canonicalization_sec += perf_counter() - canonical_start
+                            stored_unique_keys.add(workflow_key)
+                            stored_tool_sequence_keys.add(tool_sequence_key)
+                            unique_collected.append(canonical_shown)
+                            unique_workflows_stored += 1
+                        elif solve_all_horizons and len(unique_collected) >= config.solutions:
+                            model_callback_sec += perf_counter() - callback_start
+                            break
+                        if not solve_all_horizons and len(unique_collected) >= config.solutions:
+                            model_callback_sec += perf_counter() - callback_start
+                            break
+                        model_callback_sec += perf_counter() - callback_start
+                    break
+
+    _run_interruptible(_solve, is_interrupted)
+    solve_elapsed = perf_counter() - start
+    return _SolvePassMetrics(
+        any_model_seen=any_model_seen,
+        models_seen=models_seen,
+        models_stored=models_stored,
+        unique_workflows_seen=unique_workflows_seen,
+        unique_workflows_stored=unique_workflows_stored,
+        model_callback_sec=model_callback_sec,
+        shown_symbols_sec=shown_symbols_sec,
+        workflow_signature_key_sec=workflow_signature_key_sec,
+        canonicalization_sec=canonicalization_sec,
+        clause_constraints_added=clause_constraints_added,
+        seen_tool_sequence_count=len(seen_tool_sequence_keys),
+        stored_tool_sequence_count=len(stored_tool_sequence_keys),
+        solve_elapsed=solve_elapsed,
+    )
+
+
 def _multi_shot_horizon_parts(horizon: int) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
     parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
     if horizon == 1:
@@ -714,34 +964,61 @@ def _run_feasibility_precheck(
     start = perf_counter()
     smart_expansion = facts.backend_stats.get("smart_expansion", {})
     goal_support_counts_by_horizon = smart_expansion.get("goal_support_candidate_counts_by_horizon", {})
+    goal_support_goal_counts_by_horizon = smart_expansion.get("goal_support_goal_counts_by_horizon", {})
+    goal_support_missing_goals_by_horizon = smart_expansion.get("goal_support_missing_goals_by_horizon", {})
+    supportable_candidate_counts_by_horizon = smart_expansion.get("supportable_candidate_counts_by_horizon", {})
+    unsupported_input_counts_by_horizon = smart_expansion.get("unsupported_input_counts_by_horizon", {})
+    unsupported_input_samples_by_horizon = smart_expansion.get("unsupported_input_samples_by_horizon", {})
+    supportable_goal_counts_by_horizon = smart_expansion.get("supportable_goal_counts_by_horizon", {})
+    supportable_missing_goals_by_horizon = smart_expansion.get("supportable_missing_goals_by_horizon", {})
     forced_associations_global = int(smart_expansion.get("forced_associations_global", 0))
     must_run_tools_global = int(smart_expansion.get("must_run_tools_global", 0))
     must_run_candidates_global = int(smart_expansion.get("must_run_candidates_global", 0))
     try:
         if int(goal_support_counts_by_horizon.get(horizon, 0)) == 0:
             return False, perf_counter() - start, (), "goal_support", ()
+        structural_stage_start = perf_counter()
+        missing_goals = tuple(
+            str(goal_id)
+            for goal_id in goal_support_missing_goals_by_horizon.get(horizon, ())
+        )
+        structural_stage_elapsed = perf_counter() - structural_stage_start
+        stage_timings: list[tuple[str, float]] = [("goal_only_structural", structural_stage_elapsed)]
+        if missing_goals or int(goal_support_goal_counts_by_horizon.get(horizon, 0)) == 0:
+            return (
+                False,
+                perf_counter() - start,
+                tuple(stage_timings),
+                "goal_only",
+                missing_goals,
+            )
+        input_support_stage_start = perf_counter()
+        unsupported_input_count = int(unsupported_input_counts_by_horizon.get(horizon, 0))
+        supportable_missing_goals = tuple(
+            str(goal_id)
+            for goal_id in supportable_missing_goals_by_horizon.get(horizon, ())
+        )
+        unsupported_input_samples = tuple(
+            str(value)
+            for value in unsupported_input_samples_by_horizon.get(horizon, ())
+        )
+        input_support_stage_elapsed = perf_counter() - input_support_stage_start
+        stage_timings.append(("input_support_structural", input_support_stage_elapsed))
+        if (
+            unsupported_input_count > 0
+            or int(supportable_candidate_counts_by_horizon.get(horizon, 0)) < int(goal_support_counts_by_horizon.get(horizon, 0))
+            or supportable_missing_goals
+            or int(supportable_goal_counts_by_horizon.get(horizon, 0)) == 0
+        ):
+            return (
+                False,
+                perf_counter() - start,
+                tuple(stage_timings),
+                "input_support",
+                tuple((*supportable_missing_goals, *unsupported_input_samples)),
+            )
 
         stage_profiles: list[tuple[str, dict[str, bool]]] = [
-            (
-                "goal_only",
-                {
-                    "goal": True,
-                    "input_support": False,
-                    "forced_binding": False,
-                    "must_run_tool": False,
-                    "must_run_candidate": False,
-                },
-            ),
-            (
-                "input_support",
-                {
-                    "goal": True,
-                    "input_support": True,
-                    "forced_binding": False,
-                    "must_run_tool": False,
-                    "must_run_candidate": False,
-                },
-            ),
         ]
         if forced_associations_global > 0:
             stage_profiles.append(
@@ -749,7 +1026,7 @@ def _run_feasibility_precheck(
                     "forced_binding",
                     {
                         "goal": True,
-                        "input_support": True,
+                        "input_support": False,
                         "forced_binding": True,
                         "must_run_tool": False,
                         "must_run_candidate": False,
@@ -762,15 +1039,13 @@ def _run_feasibility_precheck(
                     "must_run",
                     {
                         "goal": True,
-                        "input_support": True,
+                        "input_support": False,
                         "forced_binding": forced_associations_global > 0,
                         "must_run_tool": must_run_tools_global > 0,
                         "must_run_candidate": must_run_candidates_global > 0,
                     },
                 )
             )
-
-        stage_timings: list[tuple[str, float]] = []
 
         def _solve_stage(enforcement: dict[str, bool]) -> bool:
             feasible = False
@@ -1133,6 +1408,118 @@ def _solve_multi_shot_with_programs(
                         horizon += 1
                         continue
 
+                clause_blocking_mode = (
+                    _optimized_model_blocking_mode(facts)
+                    if _smart_expansion_enabled(facts)
+                    else None
+                )
+                any_model_seen = False
+                models_seen = 0
+                models_stored = 0
+                unique_workflows_seen = 0
+                unique_workflows_stored = 0
+                model_callback_sec = 0.0
+                shown_symbols_sec = 0.0
+                workflow_signature_key_sec = 0.0
+                canonicalization_sec = 0.0
+                clause_constraints_added = 0
+                seen_tool_sequence_count = 0
+                stored_tool_sequence_count = 0
+                if not solving_started:
+                    _report(progress_callback, "Step 3: solving started.")
+                    solving_started = True
+                assumptions = (
+                    _optimized_query_assumptions(
+                        horizon=horizon,
+                        grounded_horizon=horizon,
+                        query_active=True,
+                    )
+                    if _smart_expansion_enabled(facts)
+                    else None
+                )
+
+                if optimized_two_phase and full_ground_parts:
+                    exact_control = _make_solve_control(
+                        parallel_mode=parallel_mode,
+                        project_models=project_models,
+                    )
+                    _load_control_programs(
+                        exact_control,
+                        program_paths=program_paths,
+                        facts=facts,
+                        mode=mode,
+                        project_models=project_models,
+                    )
+                    try:
+                        with _interrupt_guard(exact_control) as exact_is_interrupted:
+                            _report(progress_callback, f"Grounding: horizon {horizon} exact_base...")
+                            exact_base_start = perf_counter()
+                            _run_interruptible(lambda: exact_control.ground([("base", [])]), exact_is_interrupted)
+                            exact_base_elapsed = perf_counter() - exact_base_start
+                            full_ground_elapsed += exact_base_elapsed
+                            ground_elapsed += exact_base_elapsed
+                            total_grounding += exact_base_elapsed
+                            grounding_parts.append(("exact_base", exact_base_elapsed))
+                            _report(
+                                progress_callback,
+                                f"Grounding progress: horizon {horizon} exact_base finished after {exact_base_elapsed:.3f}s.",
+                            )
+
+                            replay_elapsed, replay_parts = _ground_exact_replay_parts(
+                                exact_control,
+                                _optimized_exact_replay_horizon_parts(
+                                    horizon,
+                                    initial_step_program=initial_step_program,
+                                    initial_seed_program=initial_seed_program,
+                                ),
+                                is_interrupted=exact_is_interrupted,
+                                progress_callback=progress_callback,
+                                horizon=horizon,
+                            )
+                            full_ground_elapsed += replay_elapsed
+                            ground_elapsed += replay_elapsed
+                            total_grounding += replay_elapsed
+                            grounding_parts.extend(replay_parts)
+
+                            deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
+                                exact_control,
+                                full_ground_parts,
+                                is_interrupted=exact_is_interrupted,
+                                progress_callback=progress_callback,
+                                horizon=horizon,
+                            )
+                            full_ground_elapsed += deferred_ground_elapsed
+                            ground_elapsed += deferred_ground_elapsed
+                            total_grounding += deferred_ground_elapsed
+                            grounding_parts.extend(
+                                tuple((f"exact_{name}", elapsed) for name, elapsed in deferred_grounding_parts)
+                            )
+                            _report(
+                                progress_callback,
+                                f"Grounding progress: horizon {horizon} deferred solve parts finished after "
+                                f"{deferred_ground_elapsed:.3f}s.",
+                            )
+
+                            _report(progress_callback, f"Solving: horizon {horizon}...")
+                            solve_metrics = _solve_on_control(
+                                exact_control,
+                                config=config,
+                                tool_input_signatures=tool_input_signatures,
+                                horizon=horizon,
+                                assumptions=assumptions,
+                                clause_blocking_mode=clause_blocking_mode,
+                                capture_raw_models=capture_raw_models,
+                                diagnostic_counts_enabled=diagnostic_counts_enabled,
+                                solve_all_horizons=solve_all_horizons,
+                                raw_collected=raw_collected,
+                                unique_collected=unique_collected,
+                                stored_unique_keys=stored_unique_keys,
+                                progress_callback=progress_callback,
+                                is_interrupted=exact_is_interrupted,
+                            )
+                    finally:
+                        exact_control.cleanup()
+                else:
                     if full_ground_parts:
                         deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
                             control,
@@ -1151,189 +1538,38 @@ def _solve_multi_shot_with_programs(
                             f"{deferred_ground_elapsed:.3f}s.",
                         )
 
-                any_model_seen = False
-                models_seen = 0
-                models_stored = 0
-                unique_workflows_seen = 0
-                unique_workflows_stored = 0
-                model_callback_sec = 0.0
-                shown_symbols_sec = 0.0
-                workflow_signature_key_sec = 0.0
-                canonicalization_sec = 0.0
-                clause_blocking_mode = (
-                    _optimized_model_blocking_mode(facts)
-                    if _smart_expansion_enabled(facts)
-                    else None
-                )
-                clause_constraints_added = 0
-                seen_unique_keys: set[tuple[object, ...]] = set()
-                seen_tool_sequence_keys: set[tuple[object, ...]] = set()
-                stored_tool_sequence_keys: set[tuple[object, ...]] = set()
-                try:
-                    if not solving_started:
-                        _report(progress_callback, "Step 3: solving started.")
-                        solving_started = True
                     _report(progress_callback, f"Solving: horizon {horizon}...")
-                    start = perf_counter()
+                    solve_metrics = _solve_on_control(
+                        control,
+                        config=config,
+                        tool_input_signatures=tool_input_signatures,
+                        horizon=horizon,
+                        assumptions=assumptions,
+                        clause_blocking_mode=clause_blocking_mode,
+                        capture_raw_models=capture_raw_models,
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        solve_all_horizons=solve_all_horizons,
+                        raw_collected=raw_collected,
+                        unique_collected=unique_collected,
+                        stored_unique_keys=stored_unique_keys,
+                        progress_callback=progress_callback,
+                        is_interrupted=is_interrupted,
+                    )
 
-                    def _solve() -> None:
-                        nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
-                        nonlocal model_callback_sec, shown_symbols_sec
-                        nonlocal workflow_signature_key_sec, canonicalization_sec
-                        nonlocal any_model_seen, clause_constraints_added
-                        assumptions = (
-                            _optimized_query_assumptions(
-                                horizon=horizon,
-                                grounded_horizon=horizon,
-                                query_active=True,
-                            )
-                            if _smart_expansion_enabled(facts)
-                            else None
-                        )
-                        if clause_blocking_mode == "candidate_sequence_clause":
-                            while True:
-                                model_found = False
-                                blocking_symbols: tuple[clingo.Symbol, ...] = ()
-                                with control.solve(yield_=True, assumptions=assumptions) as handle:
-                                    for model in handle:
-                                        model_found = True
-                                        callback_start = perf_counter()
-                                        any_model_seen = True
-                                        if diagnostic_counts_enabled:
-                                            models_seen += 1
-                                        start = perf_counter()
-                                        shown_symbols = tuple(model.symbols(shown=True))
-                                        shown_symbols_sec += perf_counter() - start
-                                        start = perf_counter()
-                                        tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
-                                            shown_symbols,
-                                            tool_input_signatures,
-                                        )
-                                        workflow_signature_key_sec += perf_counter() - start
-                                        workflow_length = workflow_signature_length(workflow_key)
-                                        in_length_window = (
-                                            config.solution_length_min
-                                            <= workflow_length
-                                            <= config.solution_length_max
-                                        )
-                                        if diagnostic_counts_enabled:
-                                            if tool_sequence_key not in seen_tool_sequence_keys:
-                                                seen_tool_sequence_keys.add(tool_sequence_key)
-                                            if workflow_key not in seen_unique_keys:
-                                                seen_unique_keys.add(workflow_key)
-                                                unique_workflows_seen += 1
-                                        store_raw = (
-                                            in_length_window
-                                            and capture_raw_models
-                                            and len(raw_collected) < config.solutions
-                                        )
-                                        store_unique = (
-                                            in_length_window
-                                            and workflow_key not in stored_unique_keys
-                                            and len(unique_collected) < config.solutions
-                                        )
-                                        if store_raw:
-                                            raw_collected.append(shown_symbols)
-                                            models_stored += 1
-                                        if store_unique:
-                                            start = perf_counter()
-                                            canonical_shown = canonicalize_shown_symbols(
-                                                shown_symbols,
-                                                tool_input_signatures,
-                                            )
-                                            canonicalization_sec += perf_counter() - start
-                                            stored_unique_keys.add(workflow_key)
-                                            stored_tool_sequence_keys.add(tool_sequence_key)
-                                            unique_collected.append(canonical_shown)
-                                            unique_workflows_stored += 1
-                                        blocking_symbols = _exact_candidate_sequence_symbols(model)
-                                        model_callback_sec += perf_counter() - callback_start
-                                        break
-                                if not model_found:
-                                    break
-                                if blocking_symbols and _add_exact_model_blocking_clause(
-                                    control,
-                                    symbols=blocking_symbols,
-                                ):
-                                    clause_constraints_added += 1
-                                else:
-                                    break
-                                if not solve_all_horizons and len(unique_collected) >= config.solutions:
-                                    break
-                                if solve_all_horizons and len(unique_collected) >= config.solutions:
-                                    break
-                        else:
-                            while True:
-                                with control.solve(yield_=True, assumptions=assumptions) as handle:
-                                    for model in handle:
-                                        callback_start = perf_counter()
-                                        any_model_seen = True
-                                        if diagnostic_counts_enabled:
-                                            models_seen += 1
-                                        start = perf_counter()
-                                        shown_symbols = tuple(model.symbols(shown=True))
-                                        shown_symbols_sec += perf_counter() - start
-                                        start = perf_counter()
-                                        tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
-                                            shown_symbols,
-                                            tool_input_signatures,
-                                        )
-                                        workflow_signature_key_sec += perf_counter() - start
-                                        workflow_length = workflow_signature_length(workflow_key)
-                                        in_length_window = (
-                                            config.solution_length_min
-                                            <= workflow_length
-                                            <= config.solution_length_max
-                                        )
-                                        if diagnostic_counts_enabled:
-                                            if tool_sequence_key not in seen_tool_sequence_keys:
-                                                seen_tool_sequence_keys.add(tool_sequence_key)
-                                            if workflow_key not in seen_unique_keys:
-                                                seen_unique_keys.add(workflow_key)
-                                                unique_workflows_seen += 1
-                                        store_raw = (
-                                            in_length_window
-                                            and
-                                            capture_raw_models
-                                            and len(raw_collected) < config.solutions
-                                        )
-                                        store_unique = (
-                                            in_length_window
-                                            and
-                                            workflow_key not in stored_unique_keys
-                                            and len(unique_collected) < config.solutions
-                                        )
-                                        if store_raw:
-                                            raw_collected.append(shown_symbols)
-                                            models_stored += 1
-                                        if store_unique:
-                                            start = perf_counter()
-                                            canonical_shown = canonicalize_shown_symbols(
-                                                shown_symbols,
-                                                tool_input_signatures,
-                                            )
-                                            canonicalization_sec += perf_counter() - start
-                                            stored_unique_keys.add(workflow_key)
-                                            stored_tool_sequence_keys.add(tool_sequence_key)
-                                            unique_collected.append(canonical_shown)
-                                            unique_workflows_stored += 1
-                                        elif (
-                                            solve_all_horizons
-                                            and len(unique_collected) >= config.solutions
-                                        ):
-                                            model_callback_sec += perf_counter() - callback_start
-                                            break
-                                        if not solve_all_horizons and len(unique_collected) >= config.solutions:
-                                            model_callback_sec += perf_counter() - callback_start
-                                            break
-                                        model_callback_sec += perf_counter() - callback_start
-                                    break
-
-                    _run_interruptible(_solve, is_interrupted)
-                    solve_elapsed = perf_counter() - start
-                    total_solving += solve_elapsed
-                finally:
-                    control.cleanup()
+                solve_elapsed = solve_metrics.solve_elapsed
+                total_solving += solve_elapsed
+                any_model_seen = solve_metrics.any_model_seen
+                models_seen = solve_metrics.models_seen
+                models_stored = solve_metrics.models_stored
+                unique_workflows_seen = solve_metrics.unique_workflows_seen
+                unique_workflows_stored = solve_metrics.unique_workflows_stored
+                model_callback_sec = solve_metrics.model_callback_sec
+                shown_symbols_sec = solve_metrics.shown_symbols_sec
+                workflow_signature_key_sec = solve_metrics.workflow_signature_key_sec
+                canonicalization_sec = solve_metrics.canonicalization_sec
+                clause_constraints_added = solve_metrics.clause_constraints_added
+                seen_tool_sequence_count = solve_metrics.seen_tool_sequence_count
+                stored_tool_sequence_count = solve_metrics.stored_tool_sequence_count
 
                 record = HorizonRecord(
                     horizon=horizon,
@@ -1390,8 +1626,8 @@ def _solve_multi_shot_with_programs(
                         models_stored=models_stored,
                         unique_workflows_seen=unique_workflows_seen,
                         unique_workflows_stored=unique_workflows_stored,
-                        seen_tool_sequence_count=len(seen_tool_sequence_keys),
-                        stored_tool_sequence_count=len(stored_tool_sequence_keys),
+                        seen_tool_sequence_count=seen_tool_sequence_count,
+                        stored_tool_sequence_count=stored_tool_sequence_count,
                     )}, "
                     f"satisfiable={'yes' if any_model_seen else 'no'}.",
                 )
