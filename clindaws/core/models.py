@@ -190,6 +190,7 @@ class HorizonRecord:
     feasibility_checked: bool = False
     feasibility_possible: bool | None = None
     feasibility_sec: float | None = None
+    feasibility_stage_timings: tuple[tuple[str, float], ...] = ()
     feasibility_failure_category: str | None = None
     feasibility_failure_details: tuple[str, ...] = ()
     feasibility_grounding_sec: float = 0.0

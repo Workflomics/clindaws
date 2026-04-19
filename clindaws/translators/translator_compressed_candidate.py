@@ -274,6 +274,12 @@ def build_compressed_candidate_fact_bundle(
                 _quote(producer_candidate),
                 str(producer_port),
             )
+        for producer_candidate in sorted({candidate_id for candidate_id, _producer_port in producer_ports}):
+            writer.emit_fact(
+                "dynamic_association_class_bindable_producer_candidate",
+                str(association_class_id),
+                _quote(producer_candidate),
+            )
     for signature_id, category_profiles in sorted(optimization.signature_profiles_by_id.items()):
         for dim, (profile_id, _values) in sorted(category_profiles.items()):
             writer.emit_fact(
@@ -332,6 +338,18 @@ def build_compressed_candidate_fact_bundle(
                         optimization.goal_support_candidates_by_horizon.items()
                     )
                 },
+                "goal_support_input_counts_by_horizon": {
+                    int(horizon): len(input_ports)
+                    for horizon, input_ports in sorted(
+                        optimization.goal_support_inputs_by_horizon.items()
+                    )
+                },
+                "goal_support_tool_counts_by_horizon": {
+                    int(horizon): len(tool_ids)
+                    for horizon, tool_ids in sorted(
+                        optimization.goal_support_tools_by_horizon.items()
+                    )
+                },
                 "must_run_tools_global": len(optimization.must_run_tools_global),
                 "must_run_candidates_global": len(optimization.must_run_candidates_global),
                 "must_run_tool_steps": len(optimization.must_run_tools_by_step),
@@ -339,6 +357,10 @@ def build_compressed_candidate_fact_bundle(
                 "forced_associations_global": len(optimization.forced_associations_global),
                 "forced_association_steps": len(optimization.forced_associations_by_step),
                 "association_class_count": len(optimization.association_class_bindable_ports),
+                "association_class_candidate_edges": sum(
+                    len({candidate_id for candidate_id, _producer_port in producer_ports})
+                    for producer_ports in optimization.association_class_bindable_ports.values()
+                ),
                 "fixpoint_rounds": optimization.fixpoint_rounds,
             },
         },

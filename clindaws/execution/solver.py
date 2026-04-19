@@ -708,40 +708,104 @@ def _run_feasibility_precheck(
     horizon: int,
     grounded_horizon: int,
     is_interrupted: Callable[[], bool],
-) -> tuple[bool, float, str | None, tuple[str, ...]]:
+) -> tuple[bool, float, tuple[tuple[str, float], ...], str | None, tuple[str, ...]]:
     """Run a lightweight existence check for one optimized horizon."""
 
     start = perf_counter()
-    feasible = False
     smart_expansion = facts.backend_stats.get("smart_expansion", {})
     goal_support_counts_by_horizon = smart_expansion.get("goal_support_candidate_counts_by_horizon", {})
+    forced_associations_global = int(smart_expansion.get("forced_associations_global", 0))
+    must_run_tools_global = int(smart_expansion.get("must_run_tools_global", 0))
+    must_run_candidates_global = int(smart_expansion.get("must_run_candidates_global", 0))
     try:
-        enforcement = {
-            "goal": True,
-            "input_support": True,
-            "forced_binding": True,
-            "must_run_tool": True,
-            "must_run_candidate": True,
-        }
-        def _solve() -> None:
-            nonlocal feasible
-            assumptions = _optimized_query_assumptions(
-                horizon=horizon,
-                grounded_horizon=grounded_horizon,
-                query_active=False,
-                possible_enforcement=enforcement,
-            )
-            with control.solve(yield_=True, assumptions=assumptions) as handle:
-                for _model in handle:
-                    feasible = True
-                    break
-
-        _run_interruptible(_solve, is_interrupted)
-        if feasible:
-            return True, perf_counter() - start, None, ()
         if int(goal_support_counts_by_horizon.get(horizon, 0)) == 0:
-            return False, perf_counter() - start, "goal_support", ()
-        return False, perf_counter() - start, "feasibility", ()
+            return False, perf_counter() - start, (), "goal_support", ()
+
+        stage_profiles: list[tuple[str, dict[str, bool]]] = [
+            (
+                "goal_only",
+                {
+                    "goal": True,
+                    "input_support": False,
+                    "forced_binding": False,
+                    "must_run_tool": False,
+                    "must_run_candidate": False,
+                },
+            ),
+            (
+                "input_support",
+                {
+                    "goal": True,
+                    "input_support": True,
+                    "forced_binding": False,
+                    "must_run_tool": False,
+                    "must_run_candidate": False,
+                },
+            ),
+        ]
+        if forced_associations_global > 0:
+            stage_profiles.append(
+                (
+                    "forced_binding",
+                    {
+                        "goal": True,
+                        "input_support": True,
+                        "forced_binding": True,
+                        "must_run_tool": False,
+                        "must_run_candidate": False,
+                    },
+                )
+            )
+        if must_run_tools_global > 0 or must_run_candidates_global > 0:
+            stage_profiles.append(
+                (
+                    "must_run",
+                    {
+                        "goal": True,
+                        "input_support": True,
+                        "forced_binding": forced_associations_global > 0,
+                        "must_run_tool": must_run_tools_global > 0,
+                        "must_run_candidate": must_run_candidates_global > 0,
+                    },
+                )
+            )
+
+        stage_timings: list[tuple[str, float]] = []
+
+        def _solve_stage(enforcement: dict[str, bool]) -> bool:
+            feasible = False
+
+            def _solve() -> None:
+                nonlocal feasible
+                assumptions = _optimized_query_assumptions(
+                    horizon=horizon,
+                    grounded_horizon=grounded_horizon,
+                    query_active=False,
+                    possible_enforcement=enforcement,
+                )
+                with control.solve(yield_=True, assumptions=assumptions) as handle:
+                    for _model in handle:
+                        feasible = True
+                        break
+
+            _run_interruptible(_solve, is_interrupted)
+            return feasible
+
+        for stage_name, enforcement in stage_profiles:
+            stage_start = perf_counter()
+            stage_feasible = _solve_stage(enforcement)
+            stage_elapsed = perf_counter() - stage_start
+            stage_timings.append((stage_name, stage_elapsed))
+            if not stage_feasible:
+                return (
+                    False,
+                    perf_counter() - start,
+                    tuple(stage_timings),
+                    stage_name,
+                    (),
+                )
+
+        return True, perf_counter() - start, tuple(stage_timings), None, ()
     finally:
         control.cleanup()
 
@@ -982,6 +1046,7 @@ def _solve_multi_shot_with_programs(
                 feasibility_checked = False
                 feasibility_possible: bool | None = None
                 feasibility_sec: float | None = None
+                feasibility_stage_timings: tuple[tuple[str, float], ...] = ()
                 feasibility_failure_category: str | None = None
                 feasibility_failure_details: tuple[str, ...] = ()
                 full_ground_elapsed = 0.0
@@ -994,6 +1059,7 @@ def _solve_multi_shot_with_programs(
                     (
                         feasibility_possible,
                         feasibility_sec,
+                        feasibility_stage_timings,
                         feasibility_failure_category,
                         feasibility_failure_details,
                     ) = _run_feasibility_precheck(
@@ -1044,6 +1110,7 @@ def _solve_multi_shot_with_programs(
                             feasibility_checked=feasibility_checked,
                             feasibility_possible=feasibility_possible,
                             feasibility_sec=feasibility_sec,
+                            feasibility_stage_timings=feasibility_stage_timings,
                             feasibility_failure_category=feasibility_failure_category,
                             feasibility_failure_details=feasibility_failure_details,
                             feasibility_grounding_sec=feasibility_ground_elapsed,
@@ -1291,6 +1358,7 @@ def _solve_multi_shot_with_programs(
                     feasibility_checked=feasibility_checked,
                     feasibility_possible=feasibility_possible,
                     feasibility_sec=feasibility_sec,
+                    feasibility_stage_timings=feasibility_stage_timings,
                     feasibility_failure_category=feasibility_failure_category,
                     feasibility_failure_details=feasibility_failure_details,
                     feasibility_grounding_sec=feasibility_ground_elapsed,

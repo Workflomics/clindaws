@@ -101,6 +101,7 @@ SCHEMA_PREDICATES = (
     "dynamic_signature_support_class",
     "dynamic_support_class_bindable_producer_port",
     "dynamic_association_class_bindable_producer_port",
+    "dynamic_association_class_bindable_producer_candidate",
     "optimized_candidate_input_profile",
     "dynamic_signature_profile",
     "dynamic_profile_accepts",
