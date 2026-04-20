@@ -194,8 +194,11 @@ class HorizonRecord:
     feasibility_failure_category: str | None = None
     feasibility_failure_details: tuple[str, ...] = ()
     feasibility_grounding_sec: float = 0.0
+    certificate_grounding_sec: float = 0.0
+    certificate_solving_sec: float | None = None
     full_grounding_sec: float = 0.0
     full_solve_performed: bool = True
+    structural_skip_only: bool = False
     solve_skipped_reason: str | None = None
     clause_blocking_mode: str | None = None
     clause_constraints_added: int = 0
