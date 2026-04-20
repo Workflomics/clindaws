@@ -574,6 +574,29 @@ def _ground_exact_replay_parts(
     return elapsed, (("exact_replay", elapsed),)
 
 
+def _ground_exact_horizon_selector(
+    control: clingo.Control,
+    *,
+    horizon: int,
+    is_interrupted: Callable[[], bool],
+    progress_callback: ProgressCallback,
+) -> float:
+    """Ground exact-horizon runtime toggles for one fresh exact control."""
+
+    _report(progress_callback, f"Grounding: horizon {horizon} exact_horizon...")
+    start = perf_counter()
+    _run_interruptible(
+        lambda: control.ground([("exact_horizon", [clingo.Number(horizon)])]),
+        is_interrupted,
+    )
+    elapsed = perf_counter() - start
+    _report(
+        progress_callback,
+        f"Grounding progress: horizon {horizon} exact_horizon finished after {elapsed:.3f}s.",
+    )
+    return elapsed
+
+
 def _solve_on_control(
     control: clingo.Control,
     *,
@@ -1450,6 +1473,12 @@ def _solve_multi_shot_with_programs(
                         mode=mode,
                         project_models=project_models,
                     )
+                    exact_control.add(
+                        "exact_horizon",
+                        ["h"],
+                        "exact_horizon_mode.\n"
+                        "exact_target_horizon(h).\n",
+                    )
                     try:
                         with _interrupt_guard(exact_control) as exact_is_interrupted:
                             _report(progress_callback, f"Grounding: horizon {horizon} exact_base...")
@@ -1464,6 +1493,17 @@ def _solve_multi_shot_with_programs(
                                 progress_callback,
                                 f"Grounding progress: horizon {horizon} exact_base finished after {exact_base_elapsed:.3f}s.",
                             )
+
+                            exact_horizon_elapsed = _ground_exact_horizon_selector(
+                                exact_control,
+                                horizon=horizon,
+                                is_interrupted=exact_is_interrupted,
+                                progress_callback=progress_callback,
+                            )
+                            full_ground_elapsed += exact_horizon_elapsed
+                            ground_elapsed += exact_horizon_elapsed
+                            total_grounding += exact_horizon_elapsed
+                            grounding_parts.append(("exact_horizon", exact_horizon_elapsed))
 
                             replay_elapsed, replay_parts = _ground_exact_replay_parts(
                                 exact_control,

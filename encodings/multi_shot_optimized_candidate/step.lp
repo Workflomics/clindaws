@@ -10,7 +10,26 @@
 
 time(t).
 
+exact_support_filter_active(t, H) :-
+    exact_horizon_mode,
+    exact_target_horizon(H).
+
+exact_support_filter_present(t) :-
+    exact_support_filter_active(t, _).
+
+exact_support_tool_allowed(t, Tool) :-
+    exact_support_filter_active(t, H),
+    dynamic_goal_support_tool_at_horizon(Tool, H).
+
+exact_support_candidate_allowed(t, Candidate) :-
+    exact_support_filter_active(t, H),
+    dynamic_structurally_supportable_candidate_at_horizon(Candidate, H).
+
 1 { occurs(t, run(Tool)) : dynamic_step_allowed_tool(Tool, t) } 1.
+
+:- exact_support_filter_active(t, _),
+   occurs(t, run(Tool)),
+   not exact_support_tool_allowed(t, Tool).
 
 :- dynamic_must_run_tool_at_step(ToolMust, t),
    occurs(t, run(Tool)),
@@ -22,6 +41,10 @@ time(t).
         dynamic_candidate_allowed_at_step(Candidate, t)
 } 1 :-
     occurs(t, run(Tool)).
+
+:- exact_support_filter_active(t, _),
+   occurs(t, use_dynamic_candidate(_, Candidate)),
+   not exact_support_candidate_allowed(t, Candidate).
 
 :- dynamic_must_run_candidate_at_step(CandidateMust, t),
    occurs(t, use_dynamic_candidate(_, Candidate)),
