@@ -247,6 +247,7 @@ def _multi_shot_optimized_candidate_program_paths() -> tuple[Path, ...]:
         base / "step_initial.lp",
         base / "step.lp",
         base / "step_query.lp",
+        base / "exact_certificate.lp",
         base / "possible.lp",
         base / "constraints.lp",
         base / "check.lp",
@@ -254,16 +255,6 @@ def _multi_shot_optimized_candidate_program_paths() -> tuple[Path, ...]:
         base / "tool_inclusion.lp",
         base / "input_usage.lp",
         base / "output_usage.lp",
-    )
-
-
-def _multi_shot_optimized_candidate_feasibility_program_paths() -> tuple[Path, ...]:
-    """Return the optimized-candidate program subset needed for feasibility only."""
-
-    base = ENCODINGS_ROOT / "multi_shot_optimized_candidate"
-    return (
-        base / "base.lp",
-        base / "possible_fast.lp",
     )
 
 
@@ -498,7 +489,23 @@ def _dynamic_horizon_parts(
     return tuple(parts)
 
 
-def _optimized_feasibility_horizon_parts(
+def _optimized_full_solve_horizon_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    return (
+        ("step_query", (clingo.Number(horizon),)),
+        ("check", (clingo.Number(horizon),)),
+        ("check_usage", (clingo.Number(horizon),)),
+    )
+
+
+def _optimized_certificate_horizon_parts(
+    horizon: int,
+) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
+    return (("certificate_check", (clingo.Number(horizon),)),)
+
+
+def _optimized_exact_incremental_horizon_parts(
     horizon: int,
     *,
     initial_step_program: str | None,
@@ -515,41 +522,7 @@ def _optimized_feasibility_horizon_parts(
     return tuple(parts)
 
 
-def _optimized_full_solve_horizon_parts(
-    horizon: int,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    return (
-        ("step_query", (clingo.Number(horizon),)),
-        ("check", (clingo.Number(horizon),)),
-        ("check_usage", (clingo.Number(horizon),)),
-    )
-
-
-def _optimized_fast_feasibility_horizon_parts(
-    horizon: int,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    return (("possible_fast", (clingo.Number(horizon),)),)
-
-
-def _optimized_exact_replay_horizon_parts(
-    horizon: int,
-    *,
-    initial_step_program: str | None,
-    initial_seed_program: str | None,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
-    for current_horizon in range(1, horizon + 1):
-        if initial_step_program is not None and current_horizon == 1:
-            parts.append((initial_step_program, (clingo.Number(current_horizon),)))
-        else:
-            if initial_seed_program is not None and current_horizon > 1:
-                parts.append((initial_seed_program, (clingo.Number(current_horizon - 1),)))
-            parts.append(("step", (clingo.Number(current_horizon),)))
-        parts.append(("constraint_step", (clingo.Number(current_horizon),)))
-    return tuple(parts)
-
-
-def _ground_exact_replay_parts(
+def _ground_exact_incremental_parts(
     control: clingo.Control,
     parts: tuple[tuple[str, tuple[clingo.Symbol, ...]], ...],
     *,
@@ -559,7 +532,7 @@ def _ground_exact_replay_parts(
 ) -> tuple[float, tuple[tuple[str, float], ...]]:
     if not parts:
         return 0.0, ()
-    _report(progress_callback, f"Grounding: horizon {horizon} exact_replay...")
+    _report(progress_callback, f"Grounding: horizon {horizon} exact_incremental...")
     start = perf_counter()
     for program_name, program_args in parts:
         _run_interruptible(
@@ -569,32 +542,9 @@ def _ground_exact_replay_parts(
     elapsed = perf_counter() - start
     _report(
         progress_callback,
-        f"Grounding progress: horizon {horizon} exact_replay finished after {elapsed:.3f}s.",
+        f"Grounding progress: horizon {horizon} exact_incremental finished after {elapsed:.3f}s.",
     )
-    return elapsed, (("exact_replay", elapsed),)
-
-
-def _ground_exact_horizon_selector(
-    control: clingo.Control,
-    *,
-    horizon: int,
-    is_interrupted: Callable[[], bool],
-    progress_callback: ProgressCallback,
-) -> float:
-    """Ground exact-horizon runtime toggles for one fresh exact control."""
-
-    _report(progress_callback, f"Grounding: horizon {horizon} exact_horizon...")
-    start = perf_counter()
-    _run_interruptible(
-        lambda: control.ground([("exact_horizon", [clingo.Number(horizon)])]),
-        is_interrupted,
-    )
-    elapsed = perf_counter() - start
-    _report(
-        progress_callback,
-        f"Grounding progress: horizon {horizon} exact_horizon finished after {elapsed:.3f}s.",
-    )
-    return elapsed
+    return elapsed, (("exact_incremental", elapsed),)
 
 
 def _solve_on_control(
@@ -864,6 +814,7 @@ def _optimized_query_assumptions(
     horizon: int,
     grounded_horizon: int,
     query_active: bool,
+    certificate_active: bool = False,
     possible_enforcement: dict[str, bool] | None = None,
 ) -> list[tuple[clingo.Symbol, bool]]:
     """Build a complete assumption set for optimized query activation."""
@@ -885,38 +836,44 @@ def _optimized_query_assumptions(
         )
         assumptions.append(
             (
+                clingo.Function("certificate_query_assumption", [clingo.Number(current_horizon)]),
+                certificate_active and current_horizon == horizon,
+            )
+        )
+        assumptions.append(
+            (
                 clingo.Function("possible_query_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon,
+                (not query_active) and (not certificate_active) and current_horizon == horizon,
             )
         )
         assumptions.append(
             (
                 clingo.Function("possible_enforce_goal_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon and enforcement["goal"],
+                (not query_active) and (not certificate_active) and current_horizon == horizon and enforcement["goal"],
             )
         )
         assumptions.append(
             (
                 clingo.Function("possible_enforce_input_support_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon and enforcement["input_support"],
+                (not query_active) and (not certificate_active) and current_horizon == horizon and enforcement["input_support"],
             )
         )
         assumptions.append(
             (
                 clingo.Function("possible_enforce_forced_binding_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon and enforcement["forced_binding"],
+                (not query_active) and (not certificate_active) and current_horizon == horizon and enforcement["forced_binding"],
             )
         )
         assumptions.append(
             (
                 clingo.Function("possible_enforce_must_run_tool_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon and enforcement["must_run_tool"],
+                (not query_active) and (not certificate_active) and current_horizon == horizon and enforcement["must_run_tool"],
             )
         )
         assumptions.append(
             (
                 clingo.Function("possible_enforce_must_run_candidate_assumption", [clingo.Number(current_horizon)]),
-                (not query_active) and current_horizon == horizon and enforcement["must_run_candidate"],
+                (not query_active) and (not certificate_active) and current_horizon == horizon and enforcement["must_run_candidate"],
             )
         )
     return assumptions
@@ -975,14 +932,11 @@ def _add_exact_model_blocking_clause(
 
 
 def _run_feasibility_precheck(
-    control: clingo.Control,
     *,
     facts: FactBundle,
     horizon: int,
-    grounded_horizon: int,
-    is_interrupted: Callable[[], bool],
 ) -> tuple[bool, float, tuple[tuple[str, float], ...], str | None, tuple[str, ...]]:
-    """Run a lightweight existence check for one optimized horizon."""
+    """Run translator-side structural feasibility checks for one optimized horizon."""
 
     start = perf_counter()
     smart_expansion = facts.backend_stats.get("smart_expansion", {})
@@ -997,115 +951,82 @@ def _run_feasibility_precheck(
     forced_associations_global = int(smart_expansion.get("forced_associations_global", 0))
     must_run_tools_global = int(smart_expansion.get("must_run_tools_global", 0))
     must_run_candidates_global = int(smart_expansion.get("must_run_candidates_global", 0))
-    try:
-        if int(goal_support_counts_by_horizon.get(horizon, 0)) == 0:
-            return False, perf_counter() - start, (), "goal_support", ()
-        structural_stage_start = perf_counter()
-        missing_goals = tuple(
-            str(goal_id)
-            for goal_id in goal_support_missing_goals_by_horizon.get(horizon, ())
+    if int(goal_support_counts_by_horizon.get(horizon, 0)) == 0:
+        return False, perf_counter() - start, (), "goal_support", ()
+    structural_stage_start = perf_counter()
+    missing_goals = tuple(
+        str(goal_id)
+        for goal_id in goal_support_missing_goals_by_horizon.get(horizon, ())
+    )
+    structural_stage_elapsed = perf_counter() - structural_stage_start
+    stage_timings: list[tuple[str, float]] = [("goal_only_structural", structural_stage_elapsed)]
+    if missing_goals or int(goal_support_goal_counts_by_horizon.get(horizon, 0)) == 0:
+        return (
+            False,
+            perf_counter() - start,
+            tuple(stage_timings),
+            "goal_only",
+            missing_goals,
         )
-        structural_stage_elapsed = perf_counter() - structural_stage_start
-        stage_timings: list[tuple[str, float]] = [("goal_only_structural", structural_stage_elapsed)]
-        if missing_goals or int(goal_support_goal_counts_by_horizon.get(horizon, 0)) == 0:
-            return (
-                False,
-                perf_counter() - start,
-                tuple(stage_timings),
-                "goal_only",
-                missing_goals,
-            )
-        input_support_stage_start = perf_counter()
-        unsupported_input_count = int(unsupported_input_counts_by_horizon.get(horizon, 0))
-        supportable_missing_goals = tuple(
-            str(goal_id)
-            for goal_id in supportable_missing_goals_by_horizon.get(horizon, ())
+    input_support_stage_start = perf_counter()
+    unsupported_input_count = int(unsupported_input_counts_by_horizon.get(horizon, 0))
+    supportable_missing_goals = tuple(
+        str(goal_id)
+        for goal_id in supportable_missing_goals_by_horizon.get(horizon, ())
+    )
+    unsupported_input_samples = tuple(
+        str(value)
+        for value in unsupported_input_samples_by_horizon.get(horizon, ())
+    )
+    input_support_stage_elapsed = perf_counter() - input_support_stage_start
+    stage_timings.append(("input_support_structural", input_support_stage_elapsed))
+    if (
+        unsupported_input_count > 0
+        or int(supportable_candidate_counts_by_horizon.get(horizon, 0)) < int(goal_support_counts_by_horizon.get(horizon, 0))
+        or supportable_missing_goals
+        or int(supportable_goal_counts_by_horizon.get(horizon, 0)) == 0
+    ):
+        return (
+            False,
+            perf_counter() - start,
+            tuple(stage_timings),
+            "input_support",
+            tuple((*supportable_missing_goals, *unsupported_input_samples)),
         )
-        unsupported_input_samples = tuple(
-            str(value)
-            for value in unsupported_input_samples_by_horizon.get(horizon, ())
+    if forced_associations_global > 0:
+        stage_timings.append(("forced_binding_structural", 0.0))
+    if must_run_tools_global > 0 or must_run_candidates_global > 0:
+        stage_timings.append(("must_run_structural", 0.0))
+    return True, perf_counter() - start, tuple(stage_timings), None, ()
+
+
+def _run_optimized_exact_certificate(
+    control: clingo.Control,
+    *,
+    horizon: int,
+    grounded_horizon: int,
+    is_interrupted: Callable[[], bool],
+) -> tuple[bool, float]:
+    """Check whether the exact horizon is satisfiable before full query grounding."""
+
+    start = perf_counter()
+    certificate_ok = False
+
+    def _solve() -> None:
+        nonlocal certificate_ok
+        assumptions = _optimized_query_assumptions(
+            horizon=horizon,
+            grounded_horizon=grounded_horizon,
+            query_active=False,
+            certificate_active=True,
         )
-        input_support_stage_elapsed = perf_counter() - input_support_stage_start
-        stage_timings.append(("input_support_structural", input_support_stage_elapsed))
-        if (
-            unsupported_input_count > 0
-            or int(supportable_candidate_counts_by_horizon.get(horizon, 0)) < int(goal_support_counts_by_horizon.get(horizon, 0))
-            or supportable_missing_goals
-            or int(supportable_goal_counts_by_horizon.get(horizon, 0)) == 0
-        ):
-            return (
-                False,
-                perf_counter() - start,
-                tuple(stage_timings),
-                "input_support",
-                tuple((*supportable_missing_goals, *unsupported_input_samples)),
-            )
+        with control.solve(yield_=True, assumptions=assumptions) as handle:
+            for _model in handle:
+                certificate_ok = True
+                break
 
-        stage_profiles: list[tuple[str, dict[str, bool]]] = [
-        ]
-        if forced_associations_global > 0:
-            stage_profiles.append(
-                (
-                    "forced_binding",
-                    {
-                        "goal": True,
-                        "input_support": False,
-                        "forced_binding": True,
-                        "must_run_tool": False,
-                        "must_run_candidate": False,
-                    },
-                )
-            )
-        if must_run_tools_global > 0 or must_run_candidates_global > 0:
-            stage_profiles.append(
-                (
-                    "must_run",
-                    {
-                        "goal": True,
-                        "input_support": False,
-                        "forced_binding": forced_associations_global > 0,
-                        "must_run_tool": must_run_tools_global > 0,
-                        "must_run_candidate": must_run_candidates_global > 0,
-                    },
-                )
-            )
-
-        def _solve_stage(enforcement: dict[str, bool]) -> bool:
-            feasible = False
-
-            def _solve() -> None:
-                nonlocal feasible
-                assumptions = _optimized_query_assumptions(
-                    horizon=horizon,
-                    grounded_horizon=grounded_horizon,
-                    query_active=False,
-                    possible_enforcement=enforcement,
-                )
-                with control.solve(yield_=True, assumptions=assumptions) as handle:
-                    for _model in handle:
-                        feasible = True
-                        break
-
-            _run_interruptible(_solve, is_interrupted)
-            return feasible
-
-        for stage_name, enforcement in stage_profiles:
-            stage_start = perf_counter()
-            stage_feasible = _solve_stage(enforcement)
-            stage_elapsed = perf_counter() - stage_start
-            stage_timings.append((stage_name, stage_elapsed))
-            if not stage_feasible:
-                return (
-                    False,
-                    perf_counter() - start,
-                    tuple(stage_timings),
-                    stage_name,
-                    (),
-                )
-
-        return True, perf_counter() - start, tuple(stage_timings), None, ()
-    finally:
-        control.cleanup()
+    _run_interruptible(_solve, is_interrupted)
+    return certificate_ok, perf_counter() - start
 
 
 def _has_translated_constraints(facts: FactBundle) -> bool:
@@ -1147,20 +1068,6 @@ def _solve_multi_shot_with_programs(
         mode=mode,
         project_models=project_models,
     )
-    feasibility_control: clingo.Control | None = None
-    if _smart_expansion_enabled(facts):
-        feasibility_control = _make_solve_control(
-            parallel_mode=None,
-            project_models=False,
-        )
-        _load_control_programs(
-            feasibility_control,
-            program_paths=_multi_shot_optimized_candidate_feasibility_program_paths(),
-            facts=facts,
-            mode=mode,
-            project_models=False,
-        )
-
     total_grounding = 0.0
     total_solving = 0.0
     base_grounding_peak_rss_mb = 0.0
@@ -1181,8 +1088,6 @@ def _solve_multi_shot_with_programs(
             _report(progress_callback, "Grounding: base program...")
             start = perf_counter()
             _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
-            if feasibility_control is not None:
-                _run_interruptible(lambda: feasibility_control.ground([("base", [])]), is_interrupted)
             elapsed = perf_counter() - start
             total_grounding += elapsed
             base_grounding_sec = elapsed
@@ -1202,7 +1107,7 @@ def _solve_multi_shot_with_programs(
                 _report(progress_callback, f"Grounding: horizon {horizon}...")
                 optimized_two_phase = _smart_expansion_enabled(facts)
                 if optimized_two_phase:
-                    feasibility_ground_parts = _optimized_feasibility_horizon_parts(
+                    feasibility_ground_parts = _optimized_exact_incremental_horizon_parts(
                         horizon,
                         initial_step_program=initial_step_program,
                         initial_seed_program=initial_seed_program,
@@ -1225,14 +1130,6 @@ def _solve_multi_shot_with_programs(
                     progress_callback=progress_callback,
                     horizon=horizon,
                 )
-                if feasibility_control is not None:
-                    _ground_program_parts(
-                        feasibility_control,
-                        _optimized_fast_feasibility_horizon_parts(horizon),
-                        is_interrupted=is_interrupted,
-                        progress_callback=None,
-                        horizon=horizon,
-                    )
                 ground_elapsed = feasibility_ground_elapsed
                 grounding_parts = list(feasibility_grounding_parts)
                 horizon_metrics = (
@@ -1274,8 +1171,11 @@ def _solve_multi_shot_with_programs(
                         feasibility_possible=None,
                         feasibility_sec=None,
                         feasibility_grounding_sec=feasibility_ground_elapsed,
+                        certificate_grounding_sec=0.0,
+                        certificate_solving_sec=None,
                         full_grounding_sec=0.0,
                         full_solve_performed=False,
+                        structural_skip_only=True,
                         solve_skipped_reason="structural_goal_window",
                         grounding_parts=tuple(grounding_parts),
                     )
@@ -1318,8 +1218,11 @@ def _solve_multi_shot_with_programs(
                         feasibility_possible=None,
                         feasibility_sec=None,
                         feasibility_grounding_sec=feasibility_ground_elapsed,
+                        certificate_grounding_sec=0.0,
+                        certificate_solving_sec=None,
                         full_grounding_sec=0.0,
                         full_solve_performed=False,
+                        structural_skip_only=True,
                         solve_skipped_reason="structural_lower_bound",
                         grounding_parts=tuple(grounding_parts),
                     )
@@ -1361,11 +1264,8 @@ def _solve_multi_shot_with_programs(
                         feasibility_failure_category,
                         feasibility_failure_details,
                     ) = _run_feasibility_precheck(
-                        feasibility_control if feasibility_control is not None else control,
                         facts=facts,
                         horizon=horizon,
-                        grounded_horizon=horizon,
-                        is_interrupted=is_interrupted,
                     )
                     _report(
                         progress_callback,
@@ -1412,8 +1312,11 @@ def _solve_multi_shot_with_programs(
                             feasibility_failure_category=feasibility_failure_category,
                             feasibility_failure_details=feasibility_failure_details,
                             feasibility_grounding_sec=feasibility_ground_elapsed,
+                            certificate_grounding_sec=0.0,
+                            certificate_solving_sec=None,
                             full_grounding_sec=0.0,
                             full_solve_performed=full_solve_performed,
+                            structural_skip_only=False,
                             solve_skipped_reason=solve_skipped_reason,
                             grounding_parts=tuple(grounding_parts),
                         )
@@ -1462,103 +1365,115 @@ def _solve_multi_shot_with_programs(
                 )
 
                 if optimized_two_phase and full_ground_parts:
-                    exact_control = _make_solve_control(
-                        parallel_mode=parallel_mode,
-                        project_models=project_models,
+                    certificate_ground_elapsed, certificate_grounding_parts = _ground_program_parts(
+                        control,
+                        _optimized_certificate_horizon_parts(horizon),
+                        is_interrupted=is_interrupted,
+                        progress_callback=progress_callback,
+                        horizon=horizon,
                     )
-                    _load_control_programs(
-                        exact_control,
-                        program_paths=program_paths,
-                        facts=facts,
-                        mode=mode,
-                        project_models=project_models,
+                    full_ground_elapsed += certificate_ground_elapsed
+                    ground_elapsed += certificate_ground_elapsed
+                    total_grounding += certificate_ground_elapsed
+                    grounding_parts.extend(
+                        tuple((f"exact_{name}", elapsed) for name, elapsed in certificate_grounding_parts)
                     )
-                    exact_control.add(
-                        "exact_horizon",
-                        ["h"],
-                        "exact_horizon_mode.\n"
-                        "exact_target_horizon(h).\n",
+                    _report(progress_callback, f"Certificate: horizon {horizon}...")
+                    certificate_ok, certificate_sec = _run_optimized_exact_certificate(
+                        control,
+                        horizon=horizon,
+                        grounded_horizon=horizon,
+                        is_interrupted=is_interrupted,
                     )
-                    try:
-                        with _interrupt_guard(exact_control) as exact_is_interrupted:
-                            _report(progress_callback, f"Grounding: horizon {horizon} exact_base...")
-                            exact_base_start = perf_counter()
-                            _run_interruptible(lambda: exact_control.ground([("base", [])]), exact_is_interrupted)
-                            exact_base_elapsed = perf_counter() - exact_base_start
-                            full_ground_elapsed += exact_base_elapsed
-                            ground_elapsed += exact_base_elapsed
-                            total_grounding += exact_base_elapsed
-                            grounding_parts.append(("exact_base", exact_base_elapsed))
-                            _report(
-                                progress_callback,
-                                f"Grounding progress: horizon {horizon} exact_base finished after {exact_base_elapsed:.3f}s.",
+                    _report(
+                        progress_callback,
+                        f"Certificate progress: horizon {horizon} finished after {certificate_sec:.3f}s, "
+                        f"possible={'yes' if certificate_ok else 'no'}.",
+                    )
+                    if not certificate_ok:
+                        full_solve_performed = False
+                        solve_skipped_reason = "exact_certificate"
+                        record = HorizonRecord(
+                            horizon=horizon,
+                            grounding_sec=ground_elapsed,
+                            solving_sec=0.0,
+                            peak_rss_mb=current_peak_rss_mb(),
+                            satisfiable=False,
+                            models_seen=0,
+                            models_stored=0,
+                            unique_workflows_seen=0,
+                            unique_workflows_stored=0,
+                            diagnostic_counts_enabled=diagnostic_counts_enabled,
+                            available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                            eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                            eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                            eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                            bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                            feasibility_checked=feasibility_checked,
+                            feasibility_possible=feasibility_possible,
+                            feasibility_sec=feasibility_sec,
+                            feasibility_stage_timings=feasibility_stage_timings,
+                            feasibility_failure_category=feasibility_failure_category,
+                            feasibility_failure_details=feasibility_failure_details,
+                            feasibility_grounding_sec=feasibility_ground_elapsed,
+                            certificate_grounding_sec=certificate_ground_elapsed,
+                            certificate_solving_sec=certificate_sec,
+                            full_grounding_sec=full_ground_elapsed,
+                            full_solve_performed=full_solve_performed,
+                            structural_skip_only=False,
+                            solve_skipped_reason=solve_skipped_reason,
+                            grounding_parts=tuple(grounding_parts),
+                        )
+                        horizon_records.append(record)
+                        if horizon_record_callback is not None:
+                            horizon_record_callback(record)
+                        if progress_callback is not None:
+                            progress_callback(
+                                {
+                                    "event": "horizon_complete",
+                                    "horizon": horizon,
+                                    "timestamp_ns": perf_counter_ns(),
+                                }
                             )
+                        horizon += 1
+                        continue
+                    _report(progress_callback, f"Grounding: horizon {horizon} exact_query...")
+                    deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
+                        control,
+                        full_ground_parts,
+                        is_interrupted=is_interrupted,
+                        progress_callback=progress_callback,
+                        horizon=horizon,
+                    )
+                    full_ground_elapsed += deferred_ground_elapsed
+                    ground_elapsed += deferred_ground_elapsed
+                    total_grounding += deferred_ground_elapsed
+                    grounding_parts.extend(
+                        tuple((f"exact_{name}", elapsed) for name, elapsed in deferred_grounding_parts)
+                    )
+                    _report(
+                        progress_callback,
+                        f"Grounding progress: horizon {horizon} deferred solve parts finished after "
+                        f"{deferred_ground_elapsed:.3f}s.",
+                    )
 
-                            exact_horizon_elapsed = _ground_exact_horizon_selector(
-                                exact_control,
-                                horizon=horizon,
-                                is_interrupted=exact_is_interrupted,
-                                progress_callback=progress_callback,
-                            )
-                            full_ground_elapsed += exact_horizon_elapsed
-                            ground_elapsed += exact_horizon_elapsed
-                            total_grounding += exact_horizon_elapsed
-                            grounding_parts.append(("exact_horizon", exact_horizon_elapsed))
-
-                            replay_elapsed, replay_parts = _ground_exact_replay_parts(
-                                exact_control,
-                                _optimized_exact_replay_horizon_parts(
-                                    horizon,
-                                    initial_step_program=initial_step_program,
-                                    initial_seed_program=initial_seed_program,
-                                ),
-                                is_interrupted=exact_is_interrupted,
-                                progress_callback=progress_callback,
-                                horizon=horizon,
-                            )
-                            full_ground_elapsed += replay_elapsed
-                            ground_elapsed += replay_elapsed
-                            total_grounding += replay_elapsed
-                            grounding_parts.extend(replay_parts)
-
-                            deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
-                                exact_control,
-                                full_ground_parts,
-                                is_interrupted=exact_is_interrupted,
-                                progress_callback=progress_callback,
-                                horizon=horizon,
-                            )
-                            full_ground_elapsed += deferred_ground_elapsed
-                            ground_elapsed += deferred_ground_elapsed
-                            total_grounding += deferred_ground_elapsed
-                            grounding_parts.extend(
-                                tuple((f"exact_{name}", elapsed) for name, elapsed in deferred_grounding_parts)
-                            )
-                            _report(
-                                progress_callback,
-                                f"Grounding progress: horizon {horizon} deferred solve parts finished after "
-                                f"{deferred_ground_elapsed:.3f}s.",
-                            )
-
-                            _report(progress_callback, f"Solving: horizon {horizon}...")
-                            solve_metrics = _solve_on_control(
-                                exact_control,
-                                config=config,
-                                tool_input_signatures=tool_input_signatures,
-                                horizon=horizon,
-                                assumptions=assumptions,
-                                clause_blocking_mode=clause_blocking_mode,
-                                capture_raw_models=capture_raw_models,
-                                diagnostic_counts_enabled=diagnostic_counts_enabled,
-                                solve_all_horizons=solve_all_horizons,
-                                raw_collected=raw_collected,
-                                unique_collected=unique_collected,
-                                stored_unique_keys=stored_unique_keys,
-                                progress_callback=progress_callback,
-                                is_interrupted=exact_is_interrupted,
-                            )
-                    finally:
-                        exact_control.cleanup()
+                    _report(progress_callback, f"Solving: horizon {horizon}...")
+                    solve_metrics = _solve_on_control(
+                        control,
+                        config=config,
+                        tool_input_signatures=tool_input_signatures,
+                        horizon=horizon,
+                        assumptions=assumptions,
+                        clause_blocking_mode=clause_blocking_mode,
+                        capture_raw_models=capture_raw_models,
+                        diagnostic_counts_enabled=diagnostic_counts_enabled,
+                        solve_all_horizons=solve_all_horizons,
+                        raw_collected=raw_collected,
+                        unique_collected=unique_collected,
+                        stored_unique_keys=stored_unique_keys,
+                        progress_callback=progress_callback,
+                        is_interrupted=is_interrupted,
+                    )
                 else:
                     if full_ground_parts:
                         deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
@@ -1638,8 +1553,11 @@ def _solve_multi_shot_with_programs(
                     feasibility_failure_category=feasibility_failure_category,
                     feasibility_failure_details=feasibility_failure_details,
                     feasibility_grounding_sec=feasibility_ground_elapsed,
+                    certificate_grounding_sec=certificate_ground_elapsed if optimized_two_phase else 0.0,
+                    certificate_solving_sec=certificate_sec if optimized_two_phase else None,
                     full_grounding_sec=full_ground_elapsed,
                     full_solve_performed=full_solve_performed,
+                    structural_skip_only=False,
                     solve_skipped_reason=solve_skipped_reason,
                     clause_blocking_mode=clause_blocking_mode,
                     clause_constraints_added=clause_constraints_added,
@@ -1682,8 +1600,6 @@ def _solve_multi_shot_with_programs(
     except KeyboardInterrupt:
         _report(progress_callback, "Interrupted/timeout: returning partial results.")
     finally:
-        if feasibility_control is not None:
-            feasibility_control.cleanup()
         control.cleanup()
 
     return SolveOutput(
