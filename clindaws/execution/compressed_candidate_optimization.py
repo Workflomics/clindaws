@@ -50,6 +50,9 @@ class CompressedCandidateOptimizationResult:
     input_support_rounds_by_horizon: dict[int, int]
     allowed_candidates_by_step: dict[int, tuple[str, ...]]
     allowed_tools_by_step: dict[int, tuple[str, ...]]
+    check_relevant_output_categories_by_horizon: dict[int, tuple[tuple[str, int, str], ...]]
+    check_required_profile_classes_by_horizon: dict[int, tuple[tuple[str, int, str, int], ...]]
+    check_profile_class_members: dict[int, tuple[int, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
     profile_accepts_by_id: dict[int, tuple[str, ...]]
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]]
@@ -289,6 +292,107 @@ def _compute_smart_expansion_by_horizon(
         goal_support_tools_by_horizon,
         goal_support_inputs_by_horizon,
         smart_expansion_rounds_by_horizon,
+    )
+
+
+def _compute_check_surface_by_horizon(
+    *,
+    goal_support_candidates_by_horizon: Mapping[int, tuple[str, ...]],
+    goal_support_inputs_by_horizon: Mapping[int, tuple[tuple[str, int], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    signature_profiles_by_id: Mapping[int, Mapping[str, tuple[int, tuple[str, ...]]]],
+    query_goal_candidates: Iterable[str],
+    goal_requirement_profiles_by_id: Mapping[int, tuple[tuple[int, str, int], ...]],
+    goal_fsets: tuple[Mapping[str, frozenset[str]], ...],
+) -> tuple[
+    dict[int, tuple[tuple[str, int, str], ...]],
+    dict[int, tuple[tuple[str, int, str, int], ...]],
+    dict[int, tuple[int, ...]],
+]:
+    """Precompute the exact output/category/profile surface consumed by check.
+
+    This keeps the exact semantics in ASP, but removes the expensive rebuild of
+    all producer/category/profile combinations from raw bind occurrences.
+    """
+
+    query_goal_candidate_set = set(query_goal_candidates)
+    input_profiles_by_port: dict[tuple[str, int], tuple[tuple[str, int], ...]] = {}
+    goal_categories_by_output: dict[tuple[str, int], tuple[str, ...]] = {}
+
+    for candidate_id, record in candidate_records_by_id.items():
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            signature_id = int(input_port["signature_id"])
+            input_profiles_by_port[(candidate_id, port_idx)] = tuple(
+                sorted(
+                    (str(category), int(profile_id))
+                    for category, (profile_id, _values) in
+                    signature_profiles_by_id.get(signature_id, {}).items()
+                )
+            )
+
+        if candidate_id not in query_goal_candidate_set:
+            continue
+
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            port_fset = output_port["port_values_fset"]
+            categories: set[str] = set()
+            for goal_id, goal_fset in enumerate(goal_fsets):
+                if not _dynamic_output_matches_dynamic_input_fset(port_fset, goal_fset):
+                    continue
+                for _requirement_id, category, _profile_id in goal_requirement_profiles_by_id.get(goal_id, ()):
+                    categories.add(str(category))
+            if categories:
+                goal_categories_by_output[(candidate_id, port_idx)] = tuple(sorted(categories))
+
+    profile_class_id_by_members: dict[tuple[int, ...], int] = {}
+    profile_class_members: dict[int, tuple[int, ...]] = {}
+    next_profile_class_id = 0
+    relevant_output_categories_by_horizon: dict[int, tuple[tuple[str, int, str], ...]] = {}
+    required_profile_classes_by_horizon: dict[int, tuple[tuple[str, int, str, int], ...]] = {}
+
+    for horizon, goal_support_candidates in sorted(goal_support_candidates_by_horizon.items()):
+        active_candidates = set(goal_support_candidates)
+        relevant_output_categories: set[tuple[str, int, str]] = set()
+        profile_ids_by_output_category: dict[tuple[str, int, str], set[int]] = defaultdict(set)
+
+        for consumer_candidate, consumer_port in goal_support_inputs_by_horizon.get(horizon, ()):
+            for producer_candidate, producer_port in feasible_associations_by_input.get((consumer_candidate, consumer_port), ()):
+                if producer_candidate not in active_candidates:
+                    continue
+                for category, profile_id in input_profiles_by_port.get((consumer_candidate, consumer_port), ()):
+                    relevant_output_categories.add((producer_candidate, producer_port, category))
+                    profile_ids_by_output_category[(producer_candidate, producer_port, category)].add(profile_id)
+
+        for candidate_id in sorted(active_candidates & query_goal_candidate_set):
+            for (goal_candidate_id, port_idx), categories in goal_categories_by_output.items():
+                if goal_candidate_id != candidate_id:
+                    continue
+                for category in categories:
+                    relevant_output_categories.add((candidate_id, port_idx, category))
+
+        relevant_output_categories_by_horizon[horizon] = tuple(sorted(relevant_output_categories))
+
+        horizon_profile_classes: set[tuple[str, int, str, int]] = set()
+        for (producer_candidate, producer_port, category), profile_ids in sorted(profile_ids_by_output_category.items()):
+            members = tuple(sorted(profile_ids))
+            if not members:
+                continue
+            profile_class_id = profile_class_id_by_members.get(members)
+            if profile_class_id is None:
+                profile_class_id = next_profile_class_id
+                next_profile_class_id += 1
+                profile_class_id_by_members[members] = profile_class_id
+                profile_class_members[profile_class_id] = members
+            horizon_profile_classes.add((producer_candidate, producer_port, category, profile_class_id))
+        required_profile_classes_by_horizon[horizon] = tuple(sorted(horizon_profile_classes))
+
+    return (
+        relevant_output_categories_by_horizon,
+        required_profile_classes_by_horizon,
+        dict(sorted(profile_class_members.items())),
     )
 
 
@@ -982,20 +1086,21 @@ def optimize_compressed_candidates(
     t3 = perf_counter()
 
     min_anchor_distance_by_candidate: dict[str, int] = {}
+    backward_relevant_candidates, min_anchor_distance_by_candidate = _collect_dynamic_backward_relevant_candidates(
+        config,
+        ontology,
+        tools,
+        candidate_records=candidate_records,
+        reverse_edges=reverse_edges,
+        direct_goal_candidates=direct_goal_candidates,
+    )
     if config.use_all_generated_data == "ALL":
-        backward_relevant_candidates, min_anchor_distance_by_candidate = _collect_dynamic_backward_relevant_candidates(
-            config,
-            ontology,
-            tools,
-            candidate_records=(
-                record
-                for record in candidate_records
-                if str(record["candidate_id"]) in relevant_candidates
-            ),
-            reverse_edges=reverse_edges,
-            direct_goal_candidates=direct_goal_candidates,
-        )
         relevant_candidates &= backward_relevant_candidates
+    else:
+        # Positive temporal/tool constraints can still require candidates that do
+        # not sit on the strict goal-only backward closure. Keep that surface
+        # available so exact solve is not starved before check runs.
+        relevant_candidates |= backward_relevant_candidates
 
     relevant_records = [
         record
@@ -1197,11 +1302,12 @@ def optimize_compressed_candidates(
     )
     compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
 
+    closure_goal_candidates = set(query_goal_candidates) | set(backward_relevant_candidates)
     brave_closed_candidates = _close_relevant_candidates(
         candidate_records_by_id=candidate_records_by_id,
         workflow_bindable_ports=workflow_bindable_ports,
         produced_bindable_ports=compressed_produced_bindable_ports,
-        goal_candidates=query_goal_candidates,
+        goal_candidates=closure_goal_candidates,
     )
     relevant_records = [
         record
@@ -1337,6 +1443,20 @@ def optimize_compressed_candidates(
         min_step_by_candidate=min_step_by_candidate,
         max_step_by_candidate=max_step_by_candidate,
     )
+    (
+        check_relevant_output_categories_by_horizon,
+        check_required_profile_classes_by_horizon,
+        check_profile_class_members,
+    ) = _compute_check_surface_by_horizon(
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+        feasible_associations_by_input=feasible_associations_by_input,
+        signature_profiles_by_id=signature_profiles_by_id,
+        query_goal_candidates=query_goal_candidates,
+        goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
+        goal_fsets=goal_fsets,
+    )
 
     t4 = perf_counter()
 
@@ -1430,6 +1550,9 @@ def optimize_compressed_candidates(
             step_index: tuple(sorted(tool_ids))
             for step_index, tool_ids in sorted(allowed_tools_by_step.items())
         },
+        check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+        check_required_profile_classes_by_horizon=check_required_profile_classes_by_horizon,
+        check_profile_class_members=check_profile_class_members,
         signature_profiles_by_id=signature_profiles_by_id,
         profile_accepts_by_id=profile_accepts_by_id,
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
@@ -1448,6 +1571,13 @@ def optimize_compressed_candidates(
             "dynamic_candidates_pruned": candidate_pruned_count,
             "dynamic_brave_relevant_candidates_after_closure": len(brave_closed_candidates),
             "dynamic_temporally_impossible_associations_pruned": temporally_dropped_associations,
+            "dynamic_check_profile_classes": len(check_profile_class_members),
+            "dynamic_check_relevant_output_categories": sum(
+                len(entries) for entries in check_relevant_output_categories_by_horizon.values()
+            ),
+            "dynamic_check_required_profile_classes": sum(
+                len(entries) for entries in check_required_profile_classes_by_horizon.values()
+            ),
             "dynamic_forced_associations_global": len(forced_associations_global),
             "dynamic_fixpoint_rounds": fixpoint_rounds,
             "dynamic_goal_support_horizons": len(goal_support_candidates_by_horizon),

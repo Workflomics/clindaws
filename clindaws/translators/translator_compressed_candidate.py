@@ -364,6 +364,32 @@ def build_compressed_candidate_fact_bundle(
                 _quote(category),
                 str(profile_id),
             )
+    for horizon, output_categories in sorted(optimization.check_relevant_output_categories_by_horizon.items()):
+        for candidate_id, port_idx, category in output_categories:
+            writer.emit_fact(
+                "dynamic_check_relevant_output_category_at_horizon",
+                _quote(candidate_id),
+                str(port_idx),
+                _quote(category),
+                str(horizon),
+            )
+    for horizon, output_profile_classes in sorted(optimization.check_required_profile_classes_by_horizon.items()):
+        for candidate_id, port_idx, category, profile_class_id in output_profile_classes:
+            writer.emit_fact(
+                "dynamic_check_required_profile_class_at_horizon",
+                _quote(candidate_id),
+                str(port_idx),
+                _quote(category),
+                str(profile_class_id),
+                str(horizon),
+            )
+    for profile_class_id, profile_ids in sorted(optimization.check_profile_class_members.items()):
+        for profile_id in profile_ids:
+            writer.emit_fact(
+                "dynamic_check_profile_class_member",
+                str(profile_class_id),
+                str(profile_id),
+            )
 
     emit_elapsed = perf_counter() - emit_start
     goal_support_goal_counts_by_horizon, goal_support_missing_goals_by_horizon = (
@@ -420,6 +446,19 @@ def build_compressed_candidate_fact_bundle(
                         optimization.goal_support_inputs_by_horizon.items()
                     )
                 },
+                "check_relevant_output_category_counts_by_horizon": {
+                    int(horizon): len(entries)
+                    for horizon, entries in sorted(
+                        optimization.check_relevant_output_categories_by_horizon.items()
+                    )
+                },
+                "check_required_profile_class_counts_by_horizon": {
+                    int(horizon): len(entries)
+                    for horizon, entries in sorted(
+                        optimization.check_required_profile_classes_by_horizon.items()
+                    )
+                },
+                "check_profile_class_count": len(optimization.check_profile_class_members),
                 "goal_support_tool_counts_by_horizon": {
                     int(horizon): len(tool_ids)
                     for horizon, tool_ids in sorted(

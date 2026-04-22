@@ -107,6 +107,9 @@ SCHEMA_PREDICATES = (
     "dynamic_signature_profile",
     "dynamic_profile_accepts",
     "optimized_goal_requirement_profile",
+    "dynamic_check_relevant_output_category_at_horizon",
+    "dynamic_check_required_profile_class_at_horizon",
+    "dynamic_check_profile_class_member",
     "dynamic_forced_produced_bind",
     "dynamic_candidate_output_port",
     "dynamic_candidate_output_multiplicity",
@@ -194,6 +197,7 @@ class RunContext:
     """All translation-phase results, passed from _prepare_run_context to callers."""
 
     config: SnakeConfig
+    ontology: Ontology
     solution_dir: Path
     fact_bundle: FactBundle
     workflow_input_dims: dict[str, dict[str, tuple[str, ...]]]
@@ -234,12 +238,20 @@ def _workflow_input_dims_from_config(config: SnakeConfig) -> dict[str, dict[str,
 
 def _tool_output_dims_lookup(tools: tuple) -> dict[tuple[str, int], dict[str, tuple[str, ...]]]:
     output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] = {}
+    output_dims_by_label: dict[str, dict[int, set[tuple[tuple[str, tuple[str, ...]], ...]]]] = {}
     for tool in tools:
+        label_ports = output_dims_by_label.setdefault(str(tool.label), {})
         for port_index, output_spec in enumerate(getattr(tool, "outputs", ())):
-            output_dims[(str(tool.mode_id), port_index)] = {
+            dims = {
                 str(dim): tuple(str(value) for value in values)
                 for dim, values in output_spec.dimensions.items()
             }
+            output_dims[(str(tool.mode_id), port_index)] = dims
+            label_ports.setdefault(port_index, set()).add(tuple(sorted(dims.items())))
+    for label, port_variants in output_dims_by_label.items():
+        for port_index, variants in port_variants.items():
+            if len(variants) == 1:
+                output_dims[(label, port_index)] = dict(next(iter(variants)))
     return output_dims
 
 
@@ -423,7 +435,10 @@ def _solve_worker_entrypoint(
     *,
     mode: str,
     config,
+    ontology,
     fact_bundle,
+    workflow_input_dims,
+    tool_output_dims,
     capture_raw_models: bool,
     diagnostic_counts_enabled: bool,
     parallel_mode: str | None,
@@ -438,6 +453,9 @@ def _solve_worker_entrypoint(
         solve_output = _SOLVER_DISPATCH[mode](
             config,
             fact_bundle,
+            ontology=ontology,
+            workflow_input_dims=workflow_input_dims,
+            tool_output_dims=tool_output_dims,
             progress_callback=_worker_progress,
             capture_raw_models=capture_raw_models,
             diagnostic_counts_enabled=diagnostic_counts_enabled,
@@ -476,7 +494,10 @@ def _run_solve_in_worker(
     *,
     mode: str,
     config,
+    ontology,
     fact_bundle,
+    workflow_input_dims,
+    tool_output_dims,
     capture_raw_models: bool,
     diagnostic_counts_enabled: bool,
     parallel_mode: str | None,
@@ -493,7 +514,10 @@ def _run_solve_in_worker(
         kwargs={
             "mode": mode,
             "config": config,
+            "ontology": ontology,
             "fact_bundle": fact_bundle,
+            "workflow_input_dims": workflow_input_dims,
+            "tool_output_dims": tool_output_dims,
             "capture_raw_models": capture_raw_models,
             "diagnostic_counts_enabled": diagnostic_counts_enabled,
             "parallel_mode": parallel_mode,
@@ -1556,6 +1580,7 @@ def _prepare_run_context(
 
     return RunContext(
         config=config,
+        ontology=ontology,
         solution_dir=solution_dir,
         fact_bundle=fact_bundle,
         workflow_input_dims=_workflow_input_dims_from_config(config),
@@ -1783,7 +1808,10 @@ def run_once(
             solve_output, _timed_out, horizon_peak_rss_by_horizon = _run_solve_in_worker(
                 mode=internal_solver_mode,
                 config=config,
+                ontology=ctx.ontology,
                 fact_bundle=fact_bundle,
+                workflow_input_dims=ctx.workflow_input_dims,
+                tool_output_dims=ctx.tool_output_dims,
                 capture_raw_models=capture_raw_models,
                 diagnostic_counts_enabled=diagnostic_counts_enabled,
                 parallel_mode=effective_parallel_mode,

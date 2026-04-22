@@ -1,0 +1,16 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,workflow_candidates_found,constraints_used,timed_out
+E0,multi-shot,timeout,true,,true,13,900081,,40.42,0,true,true
+E0,multi-shot,1,true,,true,18,7,0,40.92,0,true,false
+E0,multi-shot,2,true,,true,18,7,0,40.92,0,true,false
+E0,multi-shot,3,true,,true,18,29,10,40.92,0,true,false
+E0,multi-shot,4,true,,true,18,51,34,40.97,0,true,false
+E0,multi-shot,5,true,,true,18,79,233,40.97,0,true,false
+E0,multi-shot,6,true,,true,18,125,14983,41.11,86,true,false
+E0,multi-shot,7,true,,true,18,194,660,41.11,100,true,false
+E0,multi-shot,1,false,,false,10,15,1,40.28,0,true,false
+E0,multi-shot,2,false,,false,10,14,5,40.28,0,true,false
+E0,multi-shot,3,false,,false,10,28,14,40.28,0,true,false
+E0,multi-shot,4,false,,false,10,46,50,40.28,0,true,false
+E0,multi-shot,5,false,,false,10,70,549,40.28,0,true,false
+E0,multi-shot,6,false,,false,10,92,29148,40.28,86,true,false
+E0,multi-shot,7,false,,false,10,115,260,40.28,100,true,false

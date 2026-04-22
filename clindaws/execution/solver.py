@@ -26,6 +26,7 @@ from typing import Callable, Iterator
 import clingo
 
 from clindaws.core.models import FactBundle, HorizonRecord, SnakeConfig
+from clindaws.core.ontology import Ontology
 from clindaws.core.runtime_stats import current_peak_rss_mb
 from clindaws.core.workflow import (
     canonicalize_shown_symbols,
@@ -297,6 +298,26 @@ def _stored_solution_quota_reached(
     return unique_count >= solution_limit
 
 
+def _stored_workflow_key(
+    *,
+    config: SnakeConfig,
+    tool_sequence_key: tuple[object, ...],
+    workflow_key: tuple[object, ...],
+) -> tuple[object, ...]:
+    """Return the deduplication key used for stored workflow candidates.
+
+    For non-repeating use-all-generated-data=ALL workflows, APE parity is at
+    the tool-sequence family level rather than the finer binding/target family.
+    Shortest-first collection must therefore stop on unique tool sequences, or
+    duplicate same-sequence witnesses exhaust the solution cap before later
+    horizons are reached.
+    """
+
+    if not config.tool_seq_repeat and config.use_all_generated_data == "ALL":
+        return tool_sequence_key
+    return workflow_key
+
+
 def _artifact_is_produced_output(symbol: clingo.Symbol) -> bool:
     return (
         symbol.type == clingo.SymbolType.Function
@@ -551,7 +572,10 @@ def _solve_on_control(
     control: clingo.Control,
     *,
     config: SnakeConfig,
+    ontology: Ontology | None = None,
     tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     horizon: int,
     assumptions: list[tuple[clingo.Symbol, bool]] | None,
     clause_blocking_mode: str | None,
@@ -564,6 +588,7 @@ def _solve_on_control(
     progress_callback: ProgressCallback,
     is_interrupted: Callable[[], bool],
 ) -> _SolvePassMetrics:
+    assumptions = list(assumptions or ())
     any_model_seen = False
     models_seen = 0
     models_stored = 0
@@ -605,19 +630,29 @@ def _solve_on_control(
                         tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                             shown_symbols,
                             tool_input_signatures,
+                            workflow_input_dims,
+                            tool_output_dims,
+                            ontology,
+                            use_binding_target_abstraction=(
+                                not config.tool_seq_repeat
+                            ),
                         )
                         workflow_signature_key_sec += perf_counter() - key_start
-                        workflow_length = workflow_signature_length(workflow_key)
+                        workflow_storage_key = _stored_workflow_key(
+                            config=config,
+                            tool_sequence_key=tool_sequence_key,
+                            workflow_key=workflow_key,
+                        )
                         in_length_window = (
                             config.solution_length_min
-                            <= workflow_length
+                            <= horizon
                             <= config.solution_length_max
                         )
                         if diagnostic_counts_enabled:
                             if tool_sequence_key not in seen_tool_sequence_keys:
                                 seen_tool_sequence_keys.add(tool_sequence_key)
-                            if workflow_key not in seen_unique_keys:
-                                seen_unique_keys.add(workflow_key)
+                            if workflow_storage_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_storage_key)
                                 unique_workflows_seen += 1
                         store_raw = (
                             in_length_window
@@ -626,7 +661,7 @@ def _solve_on_control(
                         )
                         store_unique = (
                             in_length_window
-                            and workflow_key not in stored_unique_keys
+                            and workflow_storage_key not in stored_unique_keys
                             and len(unique_collected) < config.solutions
                         )
                         if store_raw:
@@ -637,9 +672,11 @@ def _solve_on_control(
                             canonical_shown = canonicalize_shown_symbols(
                                 shown_symbols,
                                 tool_input_signatures,
+                                workflow_input_dims,
+                                tool_output_dims,
                             )
                             canonicalization_sec += perf_counter() - canonical_start
-                            stored_unique_keys.add(workflow_key)
+                            stored_unique_keys.add(workflow_storage_key)
                             stored_tool_sequence_keys.add(tool_sequence_key)
                             unique_collected.append(canonical_shown)
                             unique_workflows_stored += 1
@@ -671,19 +708,29 @@ def _solve_on_control(
                         tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                             shown_symbols,
                             tool_input_signatures,
+                            workflow_input_dims,
+                            tool_output_dims,
+                            ontology,
+                            use_binding_target_abstraction=(
+                                not config.tool_seq_repeat
+                            ),
                         )
                         workflow_signature_key_sec += perf_counter() - key_start
-                        workflow_length = workflow_signature_length(workflow_key)
+                        workflow_storage_key = _stored_workflow_key(
+                            config=config,
+                            tool_sequence_key=tool_sequence_key,
+                            workflow_key=workflow_key,
+                        )
                         in_length_window = (
                             config.solution_length_min
-                            <= workflow_length
+                            <= horizon
                             <= config.solution_length_max
                         )
                         if diagnostic_counts_enabled:
                             if tool_sequence_key not in seen_tool_sequence_keys:
                                 seen_tool_sequence_keys.add(tool_sequence_key)
-                            if workflow_key not in seen_unique_keys:
-                                seen_unique_keys.add(workflow_key)
+                            if workflow_storage_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_storage_key)
                                 unique_workflows_seen += 1
                         store_raw = (
                             in_length_window
@@ -692,7 +739,7 @@ def _solve_on_control(
                         )
                         store_unique = (
                             in_length_window
-                            and workflow_key not in stored_unique_keys
+                            and workflow_storage_key not in stored_unique_keys
                             and len(unique_collected) < config.solutions
                         )
                         if store_raw:
@@ -703,9 +750,11 @@ def _solve_on_control(
                             canonical_shown = canonicalize_shown_symbols(
                                 shown_symbols,
                                 tool_input_signatures,
+                                workflow_input_dims,
+                                tool_output_dims,
                             )
                             canonicalization_sec += perf_counter() - canonical_start
-                            stored_unique_keys.add(workflow_key)
+                            stored_unique_keys.add(workflow_storage_key)
                             stored_tool_sequence_keys.add(tool_sequence_key)
                             unique_collected.append(canonical_shown)
                             unique_workflows_stored += 1
@@ -1043,6 +1092,9 @@ def _solve_multi_shot_with_programs(
     program_paths: tuple[Path, ...],
     mode: str,
     *,
+    ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -1363,119 +1415,89 @@ def _solve_multi_shot_with_programs(
                     if _smart_expansion_enabled(facts)
                     else None
                 )
+                query_external_symbol = (
+                    None
+                    if _smart_expansion_enabled(facts)
+                    else clingo.Function("query", [clingo.Number(horizon)])
+                )
 
-                if optimized_two_phase and full_ground_parts:
-                    certificate_ground_elapsed, certificate_grounding_parts = _ground_program_parts(
-                        control,
-                        _optimized_certificate_horizon_parts(horizon),
-                        is_interrupted=is_interrupted,
-                        progress_callback=progress_callback,
-                        horizon=horizon,
-                    )
-                    full_ground_elapsed += certificate_ground_elapsed
-                    ground_elapsed += certificate_ground_elapsed
-                    total_grounding += certificate_ground_elapsed
-                    grounding_parts.extend(
-                        tuple((f"exact_{name}", elapsed) for name, elapsed in certificate_grounding_parts)
-                    )
-                    _report(progress_callback, f"Certificate: horizon {horizon}...")
-                    certificate_ok, certificate_sec = _run_optimized_exact_certificate(
-                        control,
-                        horizon=horizon,
-                        grounded_horizon=horizon,
-                        is_interrupted=is_interrupted,
-                    )
-                    _report(
-                        progress_callback,
-                        f"Certificate progress: horizon {horizon} finished after {certificate_sec:.3f}s, "
-                        f"possible={'yes' if certificate_ok else 'no'}.",
-                    )
-                    if not certificate_ok:
-                        full_solve_performed = False
-                        solve_skipped_reason = "exact_certificate"
-                        record = HorizonRecord(
+                if query_external_symbol is not None:
+                    control.assign_external(query_external_symbol, True)
+                try:
+                    if optimized_two_phase and full_ground_parts:
+                        certificate_ground_elapsed, certificate_grounding_parts = _ground_program_parts(
+                            control,
+                            _optimized_certificate_horizon_parts(horizon),
+                            is_interrupted=is_interrupted,
+                            progress_callback=progress_callback,
                             horizon=horizon,
-                            grounding_sec=ground_elapsed,
-                            solving_sec=0.0,
-                            peak_rss_mb=current_peak_rss_mb(),
-                            satisfiable=False,
-                            models_seen=0,
-                            models_stored=0,
-                            unique_workflows_seen=0,
-                            unique_workflows_stored=0,
-                            diagnostic_counts_enabled=diagnostic_counts_enabled,
-                            available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
-                            eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
-                            eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
-                            eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
-                            bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
-                            feasibility_checked=feasibility_checked,
-                            feasibility_possible=feasibility_possible,
-                            feasibility_sec=feasibility_sec,
-                            feasibility_stage_timings=feasibility_stage_timings,
-                            feasibility_failure_category=feasibility_failure_category,
-                            feasibility_failure_details=feasibility_failure_details,
-                            feasibility_grounding_sec=feasibility_ground_elapsed,
-                            certificate_grounding_sec=certificate_ground_elapsed,
-                            certificate_solving_sec=certificate_sec,
-                            full_grounding_sec=full_ground_elapsed,
-                            full_solve_performed=full_solve_performed,
-                            structural_skip_only=False,
-                            solve_skipped_reason=solve_skipped_reason,
-                            grounding_parts=tuple(grounding_parts),
                         )
-                        horizon_records.append(record)
-                        if horizon_record_callback is not None:
-                            horizon_record_callback(record)
-                        if progress_callback is not None:
-                            progress_callback(
-                                {
-                                    "event": "horizon_complete",
-                                    "horizon": horizon,
-                                    "timestamp_ns": perf_counter_ns(),
-                                }
+                        full_ground_elapsed += certificate_ground_elapsed
+                        ground_elapsed += certificate_ground_elapsed
+                        total_grounding += certificate_ground_elapsed
+                        grounding_parts.extend(
+                            tuple((f"exact_{name}", elapsed) for name, elapsed in certificate_grounding_parts)
+                        )
+                        _report(progress_callback, f"Certificate: horizon {horizon}...")
+                        certificate_ok, certificate_sec = _run_optimized_exact_certificate(
+                            control,
+                            horizon=horizon,
+                            grounded_horizon=horizon,
+                            is_interrupted=is_interrupted,
+                        )
+                        _report(
+                            progress_callback,
+                            f"Certificate progress: horizon {horizon} finished after {certificate_sec:.3f}s, "
+                            f"possible={'yes' if certificate_ok else 'no'}.",
+                        )
+                        if not certificate_ok:
+                            full_solve_performed = False
+                            solve_skipped_reason = "exact_certificate"
+                            record = HorizonRecord(
+                                horizon=horizon,
+                                grounding_sec=ground_elapsed,
+                                solving_sec=0.0,
+                                peak_rss_mb=current_peak_rss_mb(),
+                                satisfiable=False,
+                                models_seen=0,
+                                models_stored=0,
+                                unique_workflows_seen=0,
+                                unique_workflows_stored=0,
+                                diagnostic_counts_enabled=diagnostic_counts_enabled,
+                                available_artifacts_at_step=horizon_metrics.get("available_artifacts_at_step"),
+                                eligible_artifacts_at_step=horizon_metrics.get("eligible_artifacts_at_step"),
+                                eligible_workflow_inputs_at_step=horizon_metrics.get("eligible_workflow_inputs_at_step"),
+                                eligible_produced_outputs_at_step=horizon_metrics.get("eligible_produced_outputs_at_step"),
+                                bind_choice_domain_size_at_step=horizon_metrics.get("bind_choice_domain_size_at_step"),
+                                feasibility_checked=feasibility_checked,
+                                feasibility_possible=feasibility_possible,
+                                feasibility_sec=feasibility_sec,
+                                feasibility_stage_timings=feasibility_stage_timings,
+                                feasibility_failure_category=feasibility_failure_category,
+                                feasibility_failure_details=feasibility_failure_details,
+                                feasibility_grounding_sec=feasibility_ground_elapsed,
+                                certificate_grounding_sec=certificate_ground_elapsed,
+                                certificate_solving_sec=certificate_sec,
+                                full_grounding_sec=full_ground_elapsed,
+                                full_solve_performed=full_solve_performed,
+                                structural_skip_only=False,
+                                solve_skipped_reason=solve_skipped_reason,
+                                grounding_parts=tuple(grounding_parts),
                             )
-                        horizon += 1
-                        continue
-                    _report(progress_callback, f"Grounding: horizon {horizon} exact_query...")
-                    deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
-                        control,
-                        full_ground_parts,
-                        is_interrupted=is_interrupted,
-                        progress_callback=progress_callback,
-                        horizon=horizon,
-                    )
-                    full_ground_elapsed += deferred_ground_elapsed
-                    ground_elapsed += deferred_ground_elapsed
-                    total_grounding += deferred_ground_elapsed
-                    grounding_parts.extend(
-                        tuple((f"exact_{name}", elapsed) for name, elapsed in deferred_grounding_parts)
-                    )
-                    _report(
-                        progress_callback,
-                        f"Grounding progress: horizon {horizon} deferred solve parts finished after "
-                        f"{deferred_ground_elapsed:.3f}s.",
-                    )
-
-                    _report(progress_callback, f"Solving: horizon {horizon}...")
-                    solve_metrics = _solve_on_control(
-                        control,
-                        config=config,
-                        tool_input_signatures=tool_input_signatures,
-                        horizon=horizon,
-                        assumptions=assumptions,
-                        clause_blocking_mode=clause_blocking_mode,
-                        capture_raw_models=capture_raw_models,
-                        diagnostic_counts_enabled=diagnostic_counts_enabled,
-                        solve_all_horizons=solve_all_horizons,
-                        raw_collected=raw_collected,
-                        unique_collected=unique_collected,
-                        stored_unique_keys=stored_unique_keys,
-                        progress_callback=progress_callback,
-                        is_interrupted=is_interrupted,
-                    )
-                else:
-                    if full_ground_parts:
+                            horizon_records.append(record)
+                            if horizon_record_callback is not None:
+                                horizon_record_callback(record)
+                            if progress_callback is not None:
+                                progress_callback(
+                                    {
+                                        "event": "horizon_complete",
+                                        "horizon": horizon,
+                                        "timestamp_ns": perf_counter_ns(),
+                                    }
+                                )
+                            horizon += 1
+                            continue
+                        _report(progress_callback, f"Grounding: horizon {horizon} exact_query...")
                         deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
                             control,
                             full_ground_parts,
@@ -1486,30 +1508,77 @@ def _solve_multi_shot_with_programs(
                         full_ground_elapsed += deferred_ground_elapsed
                         ground_elapsed += deferred_ground_elapsed
                         total_grounding += deferred_ground_elapsed
-                        grounding_parts.extend(deferred_grounding_parts)
+                        grounding_parts.extend(
+                            tuple((f"exact_{name}", elapsed) for name, elapsed in deferred_grounding_parts)
+                        )
                         _report(
                             progress_callback,
                             f"Grounding progress: horizon {horizon} deferred solve parts finished after "
                             f"{deferred_ground_elapsed:.3f}s.",
                         )
 
-                    _report(progress_callback, f"Solving: horizon {horizon}...")
-                    solve_metrics = _solve_on_control(
-                        control,
-                        config=config,
-                        tool_input_signatures=tool_input_signatures,
-                        horizon=horizon,
-                        assumptions=assumptions,
-                        clause_blocking_mode=clause_blocking_mode,
-                        capture_raw_models=capture_raw_models,
-                        diagnostic_counts_enabled=diagnostic_counts_enabled,
-                        solve_all_horizons=solve_all_horizons,
-                        raw_collected=raw_collected,
-                        unique_collected=unique_collected,
-                        stored_unique_keys=stored_unique_keys,
-                        progress_callback=progress_callback,
-                        is_interrupted=is_interrupted,
-                    )
+                        _report(progress_callback, f"Solving: horizon {horizon}...")
+                        solve_metrics = _solve_on_control(
+                            control,
+                            config=config,
+                            ontology=ontology,
+                            tool_input_signatures=tool_input_signatures,
+                            workflow_input_dims=workflow_input_dims,
+                            tool_output_dims=tool_output_dims,
+                            horizon=horizon,
+                            assumptions=assumptions,
+                            clause_blocking_mode=clause_blocking_mode,
+                            capture_raw_models=capture_raw_models,
+                            diagnostic_counts_enabled=diagnostic_counts_enabled,
+                            solve_all_horizons=solve_all_horizons,
+                            raw_collected=raw_collected,
+                            unique_collected=unique_collected,
+                            stored_unique_keys=stored_unique_keys,
+                            progress_callback=progress_callback,
+                            is_interrupted=is_interrupted,
+                        )
+                    else:
+                        if full_ground_parts:
+                            deferred_ground_elapsed, deferred_grounding_parts = _ground_program_parts(
+                                control,
+                                full_ground_parts,
+                                is_interrupted=is_interrupted,
+                                progress_callback=progress_callback,
+                                horizon=horizon,
+                            )
+                            full_ground_elapsed += deferred_ground_elapsed
+                            ground_elapsed += deferred_ground_elapsed
+                            total_grounding += deferred_ground_elapsed
+                            grounding_parts.extend(deferred_grounding_parts)
+                            _report(
+                                progress_callback,
+                                f"Grounding progress: horizon {horizon} deferred solve parts finished after "
+                                f"{deferred_ground_elapsed:.3f}s.",
+                            )
+
+                        _report(progress_callback, f"Solving: horizon {horizon}...")
+                        solve_metrics = _solve_on_control(
+                            control,
+                            config=config,
+                            ontology=ontology,
+                            tool_input_signatures=tool_input_signatures,
+                            workflow_input_dims=workflow_input_dims,
+                            tool_output_dims=tool_output_dims,
+                            horizon=horizon,
+                            assumptions=assumptions,
+                            clause_blocking_mode=clause_blocking_mode,
+                            capture_raw_models=capture_raw_models,
+                            diagnostic_counts_enabled=diagnostic_counts_enabled,
+                            solve_all_horizons=solve_all_horizons,
+                            raw_collected=raw_collected,
+                            unique_collected=unique_collected,
+                            stored_unique_keys=stored_unique_keys,
+                            progress_callback=progress_callback,
+                            is_interrupted=is_interrupted,
+                        )
+                finally:
+                    if query_external_symbol is not None:
+                        control.release_external(query_external_symbol)
 
                 solve_elapsed = solve_metrics.solve_elapsed
                 total_solving += solve_elapsed
@@ -1618,6 +1687,7 @@ def _solve_single_shot_with_programs(
     facts: FactBundle,
     program_paths: tuple[Path, ...],
     *,
+    ontology: Ontology | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -1734,8 +1804,17 @@ def _solve_single_shot_with_programs(
                             tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                                 shown_symbols,
                                 tool_input_signatures,
+                                ontology=ontology,
+                                use_binding_target_abstraction=(
+                                    not config.tool_seq_repeat
+                                ),
                             )
                             workflow_signature_key_sec += perf_counter() - sample_start
+                            workflow_storage_key = _stored_workflow_key(
+                                config=config,
+                                tool_sequence_key=tool_sequence_key,
+                                workflow_key=workflow_key,
+                            )
                             workflow_length = workflow_signature_length(workflow_key)
                             in_length_window = (
                                 config.solution_length_min
@@ -1745,8 +1824,8 @@ def _solve_single_shot_with_programs(
                             if diagnostic_counts_enabled:
                                 if tool_sequence_key not in seen_tool_sequence_keys:
                                     seen_tool_sequence_keys.add(tool_sequence_key)
-                                if workflow_key not in seen_unique_keys:
-                                    seen_unique_keys.add(workflow_key)
+                                if workflow_storage_key not in seen_unique_keys:
+                                    seen_unique_keys.add(workflow_storage_key)
                                     unique_workflows_seen += 1
                             store_raw = (
                                 in_length_window
@@ -1757,7 +1836,7 @@ def _solve_single_shot_with_programs(
                             store_unique = (
                                 in_length_window
                                 and
-                                workflow_key not in stored_unique_keys
+                                workflow_storage_key not in stored_unique_keys
                                 and len(unique_solutions) < config.solutions
                             )
                             if store_raw:
@@ -1770,7 +1849,7 @@ def _solve_single_shot_with_programs(
                                     tool_input_signatures,
                                 )
                                 canonicalization_sec += perf_counter() - sample_start
-                                stored_unique_keys.add(workflow_key)
+                                stored_unique_keys.add(workflow_storage_key)
                                 stored_tool_sequence_keys.add(tool_sequence_key)
                                 unique_solutions.append(canonical_shown)
                                 unique_workflows_stored += 1
@@ -1871,6 +1950,7 @@ def _solve_single_shot_once(
     facts: FactBundle,
     program_paths: tuple[Path, ...],
     *,
+    ontology: Ontology | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -1993,8 +2073,17 @@ def _solve_single_shot_once(
                         tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                             shown_symbols,
                             tool_input_signatures,
+                            ontology=ontology,
+                            use_binding_target_abstraction=(
+                                not config.tool_seq_repeat
+                            ),
                         )
                         workflow_signature_key_sec += perf_counter() - sample_start
+                        workflow_storage_key = _stored_workflow_key(
+                            config=config,
+                            tool_sequence_key=tool_sequence_key,
+                            workflow_key=workflow_key,
+                        )
                         workflow_length = workflow_signature_length(workflow_key)
                         in_length_window = (
                             config.solution_length_min
@@ -2004,8 +2093,8 @@ def _solve_single_shot_once(
                         if diagnostic_counts_enabled:
                             if tool_sequence_key not in seen_tool_sequence_keys:
                                 seen_tool_sequence_keys.add(tool_sequence_key)
-                            if workflow_key not in seen_unique_keys:
-                                seen_unique_keys.add(workflow_key)
+                            if workflow_storage_key not in seen_unique_keys:
+                                seen_unique_keys.add(workflow_storage_key)
                                 unique_workflows_seen += 1
 
                         store_raw = (
@@ -2015,7 +2104,7 @@ def _solve_single_shot_once(
                         )
                         store_unique = (
                             in_length_window
-                            and workflow_key not in stored_unique_keys
+                            and workflow_storage_key not in stored_unique_keys
                             and len(unique_solutions) < config.solutions
                         )
                         if store_raw:
@@ -2029,7 +2118,7 @@ def _solve_single_shot_once(
                             )
                             canonicalization_sec += perf_counter() - sample_start
                             unique_workflows_stored += 1
-                            stored_unique_keys.add(workflow_key)
+                            stored_unique_keys.add(workflow_storage_key)
                             stored_tool_sequence_keys.add(tool_sequence_key)
                             unique_solutions.append(canonical_shown)
 
@@ -2134,6 +2223,7 @@ def solve_single_shot(
     config: SnakeConfig,
     facts: FactBundle,
     *,
+    ontology: Ontology | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2148,6 +2238,7 @@ def solve_single_shot(
         config,
         facts,
         _single_shot_program_paths(optimized=facts.python_precompute_enabled),
+        ontology=ontology,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -2162,6 +2253,7 @@ def solve_single_shot_sliding_window(
     config: SnakeConfig,
     facts: FactBundle,
     *,
+    ontology: Ontology | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2176,6 +2268,7 @@ def solve_single_shot_sliding_window(
         config,
         facts,
         _single_shot_program_paths(optimized=facts.python_precompute_enabled),
+        ontology=ontology,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -2387,6 +2480,9 @@ def solve_multi_shot(
     config: SnakeConfig,
     facts: FactBundle,
     *,
+    ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2401,6 +2497,9 @@ def solve_multi_shot(
         facts,
         _multi_shot_program_paths(),
         mode="multi-shot",
+        ontology=ontology,
+        workflow_input_dims=workflow_input_dims,
+        tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -2448,6 +2547,9 @@ def solve_multi_shot_optimized_candidate(
     config: SnakeConfig,
     facts: FactBundle,
     *,
+    ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2463,6 +2565,9 @@ def solve_multi_shot_optimized_candidate(
         facts,
         _multi_shot_optimized_candidate_program_paths(),
         mode="multi-shot-optimized-candidate",
+        ontology=ontology,
+        workflow_input_dims=workflow_input_dims,
+        tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -2486,6 +2591,9 @@ def solve_multi_shot_compressed_candidate(
     config: SnakeConfig,
     facts: FactBundle,
     *,
+    ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2499,6 +2607,9 @@ def solve_multi_shot_compressed_candidate(
     return solve_multi_shot_optimized_candidate(
         config,
         facts,
+        ontology=ontology,
+        workflow_input_dims=workflow_input_dims,
+        tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,

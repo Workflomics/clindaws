@@ -113,19 +113,30 @@ query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category) :-
     not query_output_filter_active(t),
     dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
-% FastFound-style decoupling: keep the exact solve monolithic, but separate
-% port/value existence from profile demand so the grounder does not need to
-% carry producer identity through the profile-support join lattice.
-output_port_value(t, TProd, ToolProd, Port, V, Category) :-
+check_relevant_output_category(t, TProd, ToolProd, Port, Category) :-
     query(t),
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
-    query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
+    dynamic_check_relevant_output_category_at_horizon(ProducerCandidate, Port, Category, t).
+
+required_output_profile_class(t, TProd, ToolProd, Port, Category, ProfileClassId) :-
+    query(t),
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    dynamic_check_required_profile_class_at_horizon(ProducerCandidate, Port, Category, ProfileClassId, t).
 
 required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
-    used_output_category_profile(t, TProd, ToolProd, Port, Category, ProfileId).
+    required_output_profile_class(t, TProd, ToolProd, Port, Category, ProfileClassId),
+    dynamic_check_profile_class_member(ProfileClassId, ProfileId).
 
 required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
     chosen_output_goal_requirement_profile(t, TProd, ToolProd, Port, _, _, Category, ProfileId).
+
+% Keep exact support selection, but only materialize values for output
+% categories that can matter at the current horizon.
+output_port_value(t, TProd, ToolProd, Port, V, Category) :-
+    query(t),
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    check_relevant_output_category(t, TProd, ToolProd, Port, Category),
+    query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
 
 output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
     output_port_value(t, TProd, ToolProd, Port, V, Category),
