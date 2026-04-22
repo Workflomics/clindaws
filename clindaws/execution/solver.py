@@ -315,6 +315,15 @@ def _stored_workflow_key(
 
     if not config.tool_seq_repeat and config.use_all_generated_data == "ALL":
         return tool_sequence_key
+    if (
+        not config.tool_seq_repeat
+        and config.use_all_generated_data == "ONE"
+        and (
+            config.constraints_path is None
+            or config.constraints_path.name == "constraints_empty.json"
+        )
+    ):
+        return tool_sequence_key
     return workflow_key
 
 

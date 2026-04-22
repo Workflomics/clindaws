@@ -82,3 +82,11 @@ No3,multi-shot,3,true,"6,compete",true,737,392,126,88.88,2,true,false
 No3,multi-shot,4,true,"6,compete",true,737,977,597,88.88,46,true,false
 No3,multi-shot,5,true,"6,compete",true,737,1883,3193,88.88,950,true,false
 No3,multi-shot,6,true,"6,compete",true,737,2817,1519,88.88,1000,true,false
+No3,multi-shot,timeout,false,,false,270,899839,,71.97,0,true,true
+No3,multi-shot,1,false,"6,compete",false,260,1886,63,72.23,0,true,false
+No3,multi-shot,2,false,"6,compete",false,260,285,78,72.23,0,true,false
+No3,multi-shot,3,false,"6,compete",false,260,475,280,72.28,2,true,false
+No3,multi-shot,4,false,"6,compete",false,260,910,2545,72.34,46,true,false
+No3,multi-shot,5,false,"6,compete",false,260,1398,259487,72.45,950,true,false
+No3,multi-shot,6,false,"6,compete",false,260,2079,15944,72.45,1000,true,false
+No3,multi-shot,timeout,false,,false,240,899861,,72.09,0,true,true
