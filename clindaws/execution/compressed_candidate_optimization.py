@@ -1369,7 +1369,6 @@ def optimize_compressed_candidates(
         min_step_by_candidate=min_step_by_candidate,
         max_step_by_candidate=max_step_by_candidate,
     )
-
     # Still intentionally empty; canonical producers remain a solve-time notion.
     canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
 
@@ -1558,6 +1557,8 @@ def optimize_compressed_candidates(
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
         signature_support_class_by_id=signature_support_class_by_id,
         support_class_bindable_ports=support_class_bindable_ports,
+        association_class_by_input=association_class_by_input,
+        association_class_bindable_ports=association_class_bindable_ports,
         canonical_producers=canonical_producers,
         cache_stats={
             **resolver.stats(),
@@ -1610,8 +1611,6 @@ def optimize_compressed_candidates(
         must_run_candidates_by_step=must_run_candidates_by_step,
         forced_associations_global=forced_associations_global,
         forced_associations_by_step=forced_associations_by_step,
-        association_class_by_input=association_class_by_input,
-        association_class_bindable_ports=association_class_bindable_ports,
         fixpoint_rounds=fixpoint_rounds,
         structural_probe_horizons=structural_probe_horizons,
         structural_horizon_skip_count=structural_horizon_skip_count,

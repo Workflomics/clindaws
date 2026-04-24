@@ -134,39 +134,6 @@ dynamic_initial_goal_output_value(Candidate, Port, V, Category) :-
     dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
     not goal_output(_, _, Category).
 
-dynamic_query_output_has_goal_value(Candidate, Port, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV).
-
-dynamic_query_output_preferred_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_query_output_has_goal_value(Candidate, Port, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV),
-    not dynamic_query_output_smaller_goal_value(Candidate, Port, V, Category).
-
-dynamic_query_output_smaller_goal_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_candidate_output_choice_value(Candidate, Port, V2, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV),
-    compatible(V2, GoalV),
-    V2 < V.
-
-dynamic_query_output_preferred_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    not dynamic_query_output_has_goal_value(Candidate, Port, Category),
-    not dynamic_query_output_smaller_value(Candidate, Port, V, Category).
-
-dynamic_query_output_smaller_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_candidate_output_choice_value(Candidate, Port, V2, Category),
-    V2 < V.
-
-dynamic_query_output_value(Candidate, Port, V, Category) :-
-    dynamic_query_output_preferred_value(Candidate, Port, V, Category).
-
 initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
     available(WF),

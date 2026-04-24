@@ -261,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         if run_result.workflow_signature_path is not None:
             print(f"Workflow signatures written to: {run_result.workflow_signature_path}")
         show_raw_models = run_result.diagnostic_counts_enabled and (
-            args.debug or args.mode not in {"single-shot", "single-shot-sliding-window"}
+            args.debug or args.mode == "multi-shot"
         )
         print(
             f"Run complete: mode={run_result.mode} strategy={run_result.grounding_strategy} "

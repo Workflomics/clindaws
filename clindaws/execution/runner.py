@@ -1319,23 +1319,18 @@ def _effective_project_models(mode: str, project_models: bool | None) -> bool:
 def _effective_parallel_mode(
     mode: str,
     parallel_mode: str | None,
-    fact_bundle,
+    optimized_enabled: bool,
 ) -> str | None:
     """Resolve the effective solve parallel mode for one run."""
 
     if parallel_mode is not None:
         return parallel_mode
-    if mode != "multi-shot" or fact_bundle.internal_schema not in {
-        "direct_precompute_legacy",
-        "optimized_candidate",
-        "compressed_candidate_optimized",
-    }:
-        return None
-    cpu_count = os.cpu_count() or 1
-    if cpu_count < 2 or len(fact_bundle.tool_labels) < 200:
-        return None
-    workers = min(cpu_count, 6)
-    return f"{workers},compete"
+
+    # Optimized mode should by default run using parallel-mode 10,split
+    if optimized_enabled:
+        return "10,split"
+
+    return None
 
 
 def _ape_multi_shot_direct_bundle(
@@ -1737,7 +1732,7 @@ def run_once(
         translation_peak_rss_mb = ctx.translation_peak_combined_rss_mb
         run_metadata = ctx.run_metadata
         _translation_builder = ctx.resolved_translation_builder
-        effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, fact_bundle)
+        effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, optimized)
         internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
         csv_writers = _RunCsvWriters(
             csv_dir=config.solutions_dir_path,
@@ -1757,7 +1752,7 @@ def run_once(
         )
 
         effective_project_models = _effective_project_models(mode, project_models)
-        diagnostic_counts_enabled = bool(debug or write_raw_answer_sets)
+        diagnostic_counts_enabled = bool(debug or write_raw_answer_sets or mode == "multi-shot")
         capture_raw_models = bool(write_raw_answer_sets)
         if effective_parallel_mode:
             _report(progress_callback, f"Step 3a: effective solve parallel mode is {effective_parallel_mode}.")
