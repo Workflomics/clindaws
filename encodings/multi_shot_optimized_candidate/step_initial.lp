@@ -81,8 +81,6 @@ occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
     occurs(t, use_dynamic_candidate(Tool, Candidate)),
    dynamic_candidate_input_port(Candidate, Port).
 
-% Carry workflow-input lineage only; input-usage checks do not need full
-% produced-artifact transitive ancestry in the optimized backend.
 workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),

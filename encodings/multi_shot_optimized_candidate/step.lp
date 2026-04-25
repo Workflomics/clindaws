@@ -119,46 +119,6 @@ produced_bind_option(
     occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
     TPrev < t.
 
-chosen_produced_bind(
-    t,
-    Tool,
-    Candidate,
-    Port,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort
-) :-
-    selected_dynamic_candidate(t, Tool, Candidate),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
-    produced_bind_option(
-        t,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ).
-
-forced_produced_bind_satisfied(
-    t,
-    Tool,
-    Candidate,
-    Port
-) :-
-    chosen_produced_bind(
-        t,
-        Tool,
-        Candidate,
-        Port,
-        _,
-        _,
-        ProducerCandidate,
-        ProducerPort
-    ),
-    dynamic_forced_produced_bind(Candidate, Port, ProducerCandidate, ProducerPort).
-
 bound_produced_artifact(t, Candidate, Port, out(TPrev, ToolPrev, ProducerPort)) :-
     selected_dynamic_candidate(t, Tool, Candidate),
     occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))).
@@ -172,8 +132,6 @@ bound_produced_satisfies_profile(t, Candidate, Port, Category) :-
    dynamic_candidate_input_category(Candidate, Port, Category),
    not bound_produced_satisfies_profile(t, Candidate, Port, Category).
 
-% Carry workflow-input lineage only; input-usage checks do not need full
-% produced-artifact transitive ancestry in the optimized backend.
 workflow_input_lineage(t, Artifact, WF) :-
     workflow_input_lineage(t-1, Artifact, WF).
 
