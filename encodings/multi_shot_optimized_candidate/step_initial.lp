@@ -17,7 +17,9 @@ initial_goal_filter_active(t) :-
 exact_initial_support_filter_active(t, H) :-
     exact_horizon_mode,
     exact_target_horizon(H),
-    not initial_goal_filter_active(t).
+    not initial_goal_filter_active(t),
+    not enable_all_inputs_used,
+    not enable_all_outputs_consumed.
 
 exact_initial_support_filter_present(t) :-
     exact_initial_support_filter_active(t, _).

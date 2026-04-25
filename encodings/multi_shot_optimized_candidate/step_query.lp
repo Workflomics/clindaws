@@ -6,7 +6,9 @@
 
 query_output_filter_active(t) :-
     query(t),
-    exact_horizon_mode.
+    exact_horizon_mode,
+    not enable_all_inputs_used,
+    not enable_all_outputs_consumed.
 
 exact_query_support_horizon(t, H) :-
     query_output_filter_active(t),

@@ -12,7 +12,9 @@ time(t).
 
 exact_support_filter_active(t, H) :-
     exact_horizon_mode,
-    exact_target_horizon(H).
+    exact_target_horizon(H),
+    not enable_all_inputs_used,
+    not enable_all_outputs_consumed.
 
 exact_support_filter_present(t) :-
     exact_support_filter_active(t, _).

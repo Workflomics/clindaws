@@ -1094,13 +1094,11 @@ def optimize_compressed_candidates(
         reverse_edges=reverse_edges,
         direct_goal_candidates=direct_goal_candidates,
     )
-    if config.use_all_generated_data == "ALL":
-        relevant_candidates &= backward_relevant_candidates
-    else:
-        # Positive temporal/tool constraints can still require candidates that do
-        # not sit on the strict goal-only backward closure. Keep that surface
-        # available so exact solve is not starved before check runs.
-        relevant_candidates |= backward_relevant_candidates
+    # Keep the strict backward goal closure available, but do not prune away
+    # forward-feasible tail consumers here. With use_all_generated_data=ALL the
+    # final workflow can still need sink steps after the goal is already
+    # reachable so that intermediate outputs are consumed.
+    relevant_candidates |= backward_relevant_candidates
 
     relevant_records = [
         record
@@ -1303,6 +1301,12 @@ def optimize_compressed_candidates(
     compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
 
     closure_goal_candidates = set(query_goal_candidates) | set(backward_relevant_candidates)
+    if config.use_all_generated_data == "ALL":
+        closure_goal_candidates |= {
+            candidate_id
+            for candidate_id, record in candidate_records_by_id.items()
+            if not tuple(record["output_ports"])
+        }
     brave_closed_candidates = _close_relevant_candidates(
         candidate_records_by_id=candidate_records_by_id,
         workflow_bindable_ports=workflow_bindable_ports,
