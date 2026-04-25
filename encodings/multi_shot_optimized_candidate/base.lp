@@ -232,28 +232,3 @@ smaller_equivalent_eligible_input(Candidate, Port, WF, SmallerWF) :-
     eligible(Candidate, Port, SmallerWF),
     equivalent_workflow_inputs(SmallerWF, WF).
 
-% Pre-computed helpers for paired_symmetric_producers to reduce per-step join cost.
-symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
-    candidate_single_input(Candidate1),
-    candidate_single_input(Candidate2),
-    same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2).
-
-dynamic_candidate_bindable_producer(ConsumerCandidate, ConsumerPort, ProducerCandidate) :-
-    dynamic_candidate_input_signature_id(ConsumerCandidate, ConsumerPort, SignatureId),
-    dynamic_signature_support_class(SignatureId, SupportClassId),
-    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, _).
-
-join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
-    JoinPort2 < JoinPort1,
-    same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
-
-paired_symmetric_producer_candidate_pair(Candidate1, Candidate2) :-
-    symmetric_candidate_input_pair(Candidate1, _, Candidate2, _),
-    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPort1, Candidate1),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPort2, Candidate2).
-
-repeated_same_candidate_join_guard(Candidate) :-
-    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPortHigh, Candidate),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPortLow, Candidate).

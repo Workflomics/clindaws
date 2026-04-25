@@ -113,7 +113,10 @@ def build_compressed_candidate_fact_bundle(
         writer.emit_fact("dynamic_candidate_min_step", _quote(candidate_id), str(min_step))
     for candidate_id, max_step in sorted(optimization.max_step_by_candidate.items()):
         writer.emit_fact("dynamic_candidate_max_step", _quote(candidate_id), str(max_step))
+    earliest_solve_horizon = optimization.earliest_solution_step
     for horizon, candidate_ids in sorted(optimization.goal_support_candidates_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id in candidate_ids:
             writer.emit_fact(
                 "dynamic_goal_support_candidate_at_horizon",
@@ -121,6 +124,8 @@ def build_compressed_candidate_fact_bundle(
                 str(horizon),
             )
     for horizon, tool_ids in sorted(optimization.goal_support_tools_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for tool_id in tool_ids:
             writer.emit_fact(
                 "dynamic_goal_support_tool_at_horizon",
@@ -128,6 +133,8 @@ def build_compressed_candidate_fact_bundle(
                 str(horizon),
             )
     for horizon, input_ports in sorted(optimization.goal_support_inputs_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id, port_idx in input_ports:
             writer.emit_fact(
                 "dynamic_goal_support_input_at_horizon",
@@ -136,6 +143,8 @@ def build_compressed_candidate_fact_bundle(
                 str(horizon),
             )
     for horizon, candidate_ids in sorted(optimization.structurally_supportable_candidates_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id in candidate_ids:
             writer.emit_fact(
                 "dynamic_structurally_supportable_candidate_at_horizon",
@@ -143,6 +152,8 @@ def build_compressed_candidate_fact_bundle(
                 str(horizon),
             )
     for horizon, input_ports in sorted(optimization.structurally_unsupported_inputs_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id, port_idx in input_ports:
             writer.emit_fact(
                 "dynamic_structurally_unsupported_input_at_horizon",
@@ -365,6 +376,8 @@ def build_compressed_candidate_fact_bundle(
                 str(profile_id),
             )
     for horizon, output_categories in sorted(optimization.check_relevant_output_categories_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id, port_idx, category in output_categories:
             writer.emit_fact(
                 "dynamic_check_relevant_output_category_at_horizon",
@@ -374,6 +387,8 @@ def build_compressed_candidate_fact_bundle(
                 str(horizon),
             )
     for horizon, output_profile_classes in sorted(optimization.check_required_profile_classes_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
         for candidate_id, port_idx, category, profile_class_id in output_profile_classes:
             writer.emit_fact(
                 "dynamic_check_required_profile_class_at_horizon",

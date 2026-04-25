@@ -80,17 +80,6 @@ selected_candidate_bindable_producer_port(
     selected_candidate_support_class(t, Candidate, Port, SupportClassId),
     dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort).
 
-active_producer_output(
-    t,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort
-) :-
-    occurs(TPrev, use_dynamic_candidate(ToolPrev, ProducerCandidate)),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
-    TPrev < t.
-
 input_profile_requirement(Candidate, Port, Category, ProfileId) :-
     dynamic_candidate_input_signature_id(Candidate, Port, SignatureId),
     dynamic_signature_profile(SignatureId, Category, ProfileId).
@@ -127,13 +116,8 @@ produced_bind_option(
         ProducerCandidate,
         ProducerPort
     ),
-    active_producer_output(
-        t,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ).
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t.
 
 chosen_produced_bind(
     t,
@@ -175,64 +159,18 @@ forced_produced_bind_satisfied(
     ),
     dynamic_forced_produced_bind(Candidate, Port, ProducerCandidate, ProducerPort).
 
-bound_output_profile_match(
-    t,
-    Candidate,
-    Port,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort,
-    Category,
-    ProfileId
-) :-
-    chosen_produced_bind(
-        t,
-        _,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ),
+bound_produced_artifact(t, Candidate, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    selected_dynamic_candidate(t, Tool, Candidate),
+    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))).
+
+bound_produced_satisfies_profile(t, Candidate, Port, Category) :-
+    bound_produced_artifact(t, Candidate, Port, Artifact),
     input_profile_requirement(Candidate, Port, Category, ProfileId),
-    artifact_profile_member(out(TPrev, ToolPrev, ProducerPort), Category, ProfileId).
+    artifact_profile_member(Artifact, Category, ProfileId).
 
-bound_output_category_match(
-    t,
-    Tool,
-    Candidate,
-    Port,
-    out(TPrev, ToolPrev, ProducerPort),
-    Category
-) :-
-    chosen_produced_bind(
-        t,
-        Tool,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ),
-    bound_output_profile_match(
-        t,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort,
-        Category,
-        _
-    ).
-
-:- occurs(t, use_dynamic_candidate(Tool, Candidate)),
-   occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+:- bound_produced_artifact(t, Candidate, Port, _),
    dynamic_candidate_input_category(Candidate, Port, Category),
-   not bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category).
+   not bound_produced_satisfies_profile(t, Candidate, Port, Category).
 
 % Carry workflow-input lineage only; input-usage checks do not need full
 % produced-artifact transitive ancestry in the optimized backend.

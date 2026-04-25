@@ -655,7 +655,8 @@ def _compute_global_must_run_candidates(
         for record in relevant_records
     }
     active_candidates = tuple(sorted(candidate_records_by_id))
-    if len(active_candidates) > MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS:
+    adaptive_cap = min(MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS, max(64, len(active_candidates) // 4))
+    if len(active_candidates) > adaptive_cap:
         return (), ()
     must_run_candidates: list[str] = []
 
@@ -1020,20 +1021,41 @@ def optimize_compressed_candidates(
 
     t1 = perf_counter()
 
+    output_index: dict[frozenset[tuple[str, frozenset[str]]], list[tuple[str, int]]] = defaultdict(list)
+    output_sample: dict[frozenset[tuple[str, frozenset[str]]], Mapping[str, frozenset[str]]] = {}
     for producer_record in candidate_records:
         producer_candidate = str(producer_record["candidate_id"])
         for output_port in tuple(producer_record["output_ports"]):
             producer_port = int(output_port["port_idx"])
             output_fset = output_port["port_values_fset"]
-            for consumer_record in candidate_records:
-                consumer_candidate = str(consumer_record["candidate_id"])
-                for input_port in tuple(consumer_record["input_ports"]):
-                    consumer_port = int(input_port["port_idx"])
-                    if _dynamic_output_matches_dynamic_input_fset(output_fset, input_port["port_values_fset"]):
-                        bindable_pairs.add(
-                            (producer_candidate, producer_port, consumer_candidate, consumer_port)
-                        )
-                        reverse_edges[consumer_candidate].add(producer_candidate)
+            out_key = frozenset(output_fset.items())
+            output_index[out_key].append((producer_candidate, producer_port))
+            if out_key not in output_sample:
+                output_sample[out_key] = output_fset
+
+    input_index: dict[frozenset[tuple[str, frozenset[str]]], list[tuple[str, int]]] = defaultdict(list)
+    input_sample: dict[frozenset[tuple[str, frozenset[str]]], Mapping[str, frozenset[str]]] = {}
+    for consumer_record in candidate_records:
+        consumer_candidate = str(consumer_record["candidate_id"])
+        for input_port in tuple(consumer_record["input_ports"]):
+            consumer_port = int(input_port["port_idx"])
+            input_fset = input_port["port_values_fset"]
+            in_key = frozenset(input_fset.items())
+            input_index[in_key].append((consumer_candidate, consumer_port))
+            if in_key not in input_sample:
+                input_sample[in_key] = input_fset
+
+    for out_key, producers in output_index.items():
+        output_fset = output_sample[out_key]
+        for in_key, consumers in input_index.items():
+            if not _dynamic_output_matches_dynamic_input_fset(output_fset, input_sample[in_key]):
+                continue
+            for producer_candidate, producer_port in producers:
+                for consumer_candidate, consumer_port in consumers:
+                    bindable_pairs.add(
+                        (producer_candidate, producer_port, consumer_candidate, consumer_port)
+                    )
+                    reverse_edges[consumer_candidate].add(producer_candidate)
 
     t2 = perf_counter()
 
