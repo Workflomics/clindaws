@@ -1697,6 +1697,8 @@ def _solve_single_shot_with_programs(
     program_paths: tuple[Path, ...],
     *,
     ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -1813,6 +1815,8 @@ def _solve_single_shot_with_programs(
                             tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                                 shown_symbols,
                                 tool_input_signatures,
+                                workflow_input_dims,
+                                tool_output_dims,
                                 ontology=ontology,
                                 use_binding_target_abstraction=(
                                     not config.tool_seq_repeat
@@ -1856,6 +1860,8 @@ def _solve_single_shot_with_programs(
                                 canonical_shown = canonicalize_shown_symbols(
                                     shown_symbols,
                                     tool_input_signatures,
+                                    workflow_input_dims,
+                                    tool_output_dims,
                                 )
                                 canonicalization_sec += perf_counter() - sample_start
                                 stored_unique_keys.add(workflow_storage_key)
@@ -1960,6 +1966,8 @@ def _solve_single_shot_once(
     program_paths: tuple[Path, ...],
     *,
     ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2082,6 +2090,8 @@ def _solve_single_shot_once(
                         tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
                             shown_symbols,
                             tool_input_signatures,
+                            workflow_input_dims,
+                            tool_output_dims,
                             ontology=ontology,
                             use_binding_target_abstraction=(
                                 not config.tool_seq_repeat
@@ -2124,6 +2134,8 @@ def _solve_single_shot_once(
                             canonical_shown = canonicalize_shown_symbols(
                                 shown_symbols,
                                 tool_input_signatures,
+                                workflow_input_dims,
+                                tool_output_dims,
                             )
                             canonicalization_sec += perf_counter() - sample_start
                             unique_workflows_stored += 1
@@ -2233,6 +2245,8 @@ def solve_single_shot(
     facts: FactBundle,
     *,
     ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2248,6 +2262,8 @@ def solve_single_shot(
         facts,
         _single_shot_program_paths(optimized=facts.python_precompute_enabled),
         ontology=ontology,
+        workflow_input_dims=workflow_input_dims,
+        tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
@@ -2263,6 +2279,8 @@ def solve_single_shot_sliding_window(
     facts: FactBundle,
     *,
     ontology: Ontology | None = None,
+    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
     progress_callback: ProgressCallback = None,
     base_grounding_callback: BaseGroundingCallback = None,
     horizon_record_callback: HorizonRecordCallback = None,
@@ -2278,6 +2296,8 @@ def solve_single_shot_sliding_window(
         facts,
         _single_shot_program_paths(optimized=facts.python_precompute_enabled),
         ontology=ontology,
+        workflow_input_dims=workflow_input_dims,
+        tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
