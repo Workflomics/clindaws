@@ -81,10 +81,10 @@ occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
     occurs(t, use_dynamic_candidate(Tool, Candidate)),
    dynamic_candidate_input_port(Candidate, Port).
 
-workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
+workflow_input_lineage(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),
-    workflow_input_lineage(0, Artifact, WF).
+    workflow_input_lineage(Artifact, WF).
 
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),

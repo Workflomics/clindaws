@@ -12,7 +12,7 @@ workflow_input_reference_check(t, Artifact, WF) :-
 workflow_input_reference_check(t, Artifact, WF) :-
    query(t),
    holds(0, avail(WF)),
-   workflow_input_lineage(t, Artifact, WF).
+   workflow_input_lineage(Artifact, WF).
 
 workflow_input_used_check(t, WF) :-
    query(t),

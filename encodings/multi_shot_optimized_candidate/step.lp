@@ -132,13 +132,14 @@ bound_produced_satisfies_profile(t, Candidate, Port, Category) :-
    dynamic_candidate_input_category(Candidate, Port, Category),
    not bound_produced_satisfies_profile(t, Candidate, Port, Category).
 
-workflow_input_lineage(t, Artifact, WF) :-
-    workflow_input_lineage(t-1, Artifact, WF).
-
-workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
+% Lineage atoms are t-less: the artifact term `out(t, Tool, P)` already
+% embeds the producing step, so each step emits unique fresh ground atoms
+% and clingo's monotonicity carries them forward without an explicit
+% carry-forward rule (which previously duplicated O(steps × |lineage|)).
+workflow_input_lineage(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),
-    workflow_input_lineage(t-1, Artifact, WF).
+    workflow_input_lineage(Artifact, WF).
 
 % Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),

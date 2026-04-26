@@ -1326,9 +1326,8 @@ def _effective_parallel_mode(
     if parallel_mode is not None:
         return parallel_mode
 
-    # Optimized mode should by default run using parallel-mode 10,split
     if optimized_enabled:
-        return "10,split"
+        return "2,split"
 
     return None
 

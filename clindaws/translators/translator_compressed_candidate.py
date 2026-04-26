@@ -375,8 +375,17 @@ def build_compressed_candidate_fact_bundle(
                 _quote(category),
                 str(profile_id),
             )
+    # Solver skips any horizon not in structural_probe_horizons (solver.py:1214),
+    # so check-surface emissions above the max probe horizon are dead weight.
+    max_probe_horizon = (
+        max(optimization.structural_probe_horizons)
+        if optimization.structural_probe_horizons
+        else None
+    )
     for horizon, output_categories in sorted(optimization.check_relevant_output_categories_by_horizon.items()):
         if horizon < earliest_solve_horizon:
+            continue
+        if max_probe_horizon is not None and horizon > max_probe_horizon:
             continue
         for candidate_id, port_idx, category in output_categories:
             writer.emit_fact(
@@ -388,6 +397,8 @@ def build_compressed_candidate_fact_bundle(
             )
     for horizon, output_profile_classes in sorted(optimization.check_required_profile_classes_by_horizon.items()):
         if horizon < earliest_solve_horizon:
+            continue
+        if max_probe_horizon is not None and horizon > max_probe_horizon:
             continue
         for candidate_id, port_idx, category, profile_class_id in output_profile_classes:
             writer.emit_fact(

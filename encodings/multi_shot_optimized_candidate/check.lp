@@ -156,10 +156,12 @@ output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category).
 
+% Replaces a pairwise V₂ < V self-join: comparing each supported V to the
+% minimum supported V in its (TProd, ToolProd, Port, Category) group is O(V)
+% per group instead of O(V²).
 output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category) :-
     output_dim_supported(t, TProd, ToolProd, Port, V, Category),
-    output_dim_supported(t, TProd, ToolProd, Port, V2, Category),
-    V2 < V.
+    V > #min { V2 : output_dim_supported(t, TProd, ToolProd, Port, V2, Category) }.
 
 :- query(t),
    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),

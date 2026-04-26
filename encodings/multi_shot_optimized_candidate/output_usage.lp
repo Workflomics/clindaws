@@ -9,18 +9,19 @@ goal_root_tool_check(t, T, Tool) :-
    query(t),
    chosen_goal_output(t, _, out(T, Tool, _)).
 
-tool_dependency_edge_check(t, T1, Tool1, T2, Tool2) :-
-   query(t),
-   output_used_by(T1, Tool1, _, T2, Tool2, _),
-   T2 > T1.
+% The intermediate predicate tool_dependency_edge_check/5 was removed: its body
+% is t-invariant (output_used_by/6 is cumulative) but its head was t-keyed,
+% which produced one full edge-set copy per query horizon and overflowed the
+% clasp 32-bit atom-id ceiling at h5. Inlining the body into useful_check below
+% keeps the same recursion but avoids the intermediate atom blow-up.
 
 useful_check(t, T, Tool) :-
    goal_root_tool_check(t, T, Tool).
 
 useful_check(t, T1, Tool1) :-
-   tool_dependency_edge_check(t, T1, Tool1, T2, Tool2),
-   useful_check(t, T2, Tool2),
-   T2 > T1.
+   output_used_by(T1, Tool1, _, T2, Tool2, _),
+   T2 > T1,
+   useful_check(t, T2, Tool2).
 
 useful_check(t, T, Tool) :-
    query(t),
@@ -38,15 +39,17 @@ goal_selected_output_check(t, T, Tool, Port) :-
    query(t),
    chosen_goal_output(t, _, out(T, Tool, Port)).
 
-output_has_bind_consumer_check(t, T, Tool, Port) :-
-   query(t),
-   occurs(T2, bind(Tool2, Port2, out(T, Tool, Port))).
+% The intermediate predicate output_has_bind_consumer_check/4 was removed for
+% the same reason as tool_dependency_edge_check above: t-invariant body,
+% t-keyed head, multiplied per query horizon. Inlining the body directly into
+% output_used_any_check keeps semantics and removes the duplicate atoms.
 
 output_used_any_check(t, T, Tool, Port) :-
    goal_selected_output_check(t, T, Tool, Port).
 
 output_used_any_check(t, T, Tool, Port) :-
-   output_has_bind_consumer_check(t, T, Tool, Port).
+   query(t),
+   occurs(_, bind(_, _, out(T, Tool, Port))).
 
 :- query(t),
    enable_all_outputs_consumed,
