@@ -181,17 +181,6 @@ def _workflow_input_matches_dynamic_port(
         ):
             return False
     return True
-def _dynamic_output_matches_dynamic_input(
-    output_values_by_dimension: Mapping[str, tuple[str, ...]],
-    input_values_by_dimension: Mapping[str, tuple[str, ...]],
-) -> bool:
-    for dim, required_values in input_values_by_dimension.items():
-        produced_values = output_values_by_dimension.get(dim, ())
-        if not produced_values:
-            return False
-        if not set(required_values).intersection(produced_values):
-            return False
-    return True
 def _dynamic_output_matches_dynamic_input_fset(
     output_fsets: Mapping[str, frozenset[str]],
     input_fsets: Mapping[str, frozenset[str]],

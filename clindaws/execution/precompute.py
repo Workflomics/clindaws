@@ -1281,20 +1281,3 @@ def apply_precompute(
     )
 
 
-def apply_direct_python_precompute(
-    mode: str,
-    config: SnakeConfig,
-    ontology: Ontology,
-    tools: tuple[ToolMode, ...],
-    fact_bundle: FactBundle,
-) -> FactBundle:
-    """Backward-compatible alias for optimized direct precompute."""
-
-    return apply_precompute(
-        mode,
-        config,
-        ontology,
-        tools,
-        fact_bundle,
-        optimized_programs=True,
-    )

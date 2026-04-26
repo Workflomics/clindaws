@@ -380,27 +380,6 @@ def extract_canonical_workflow_keys(
     return keys.tool_sequence_key, keys.parity_workflow_key
 
 
-def extract_structural_workflow_keys(
-    symbols: Iterable[clingo.Symbol],
-    tool_input_signatures: dict[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]],
-    workflow_input_dims: Mapping[str, Mapping[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: Mapping[tuple[str, int], Mapping[str, tuple[str, ...]]] | None = None,
-    ontology: Ontology | None = None,
-    use_binding_target_abstraction: bool = False,
-) -> tuple[tuple[object, ...], tuple[object, ...]]:
-    """Extract exact structural tool-sequence and workflow-candidate keys."""
-
-    keys = extract_workflow_key_bundle(
-        symbols,
-        tool_input_signatures,
-        workflow_input_dims,
-        tool_output_dims,
-        ontology,
-        use_binding_target_abstraction=use_binding_target_abstraction,
-    )
-    return keys.tool_sequence_key, keys.structural_workflow_key
-
-
 def _workflow_candidate_key(
     *,
     step_tools: Mapping[int, str],
@@ -680,99 +659,6 @@ def _workflow_signature_key(
     steps: tuple[WorkflowStep, ...],
 ) -> tuple[object, ...]:
     return ("steps", tuple(step.tool_id for step in steps))
-
-
-def extract_tool_sequence_key(
-    symbols: Iterable[clingo.Symbol],
-) -> tuple[object, ...]:
-    """Extract the ordered tool sequence from shown atoms."""
-
-    step_tools: list[tuple[int, str]] = []
-    for symbol in symbols:
-        if symbol.type != clingo.SymbolType.Function or symbol.name != "tool_at_time":
-            continue
-        time = int(str(symbol.arguments[0]))
-        tool_id = _symbol_text(symbol.arguments[1])
-        step_tools.append((time, tool_id))
-    step_tools.sort()
-    return ("steps", tuple(tool_id for _, tool_id in step_tools))
-
-
-def extract_workflow_signature_key(
-    symbols: Iterable[clingo.Symbol],
-    tool_input_signatures: Mapping[str, tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]] | None = None,
-    workflow_input_dims: Mapping[str, Mapping[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: Mapping[tuple[str, int], Mapping[str, tuple[str, ...]]] | None = None,
-    ontology: Ontology | None = None,
-) -> tuple[object, ...]:
-    """Extract a workflow-candidate key directly from shown atoms.
-
-    The key is intentionally richer than the plain tool sequence: it includes
-    bindings and produced outputs so solver-side deduplication matches the
-    APE-style workflow support set rather than only sequence-level support.
-    """
-
-    step_tools: list[tuple[int, str]] = []
-    bindings_by_step: dict[int, dict[str, str]] = defaultdict(dict)
-    output_signatures: set[str] = set()
-    output_artifact_ids: set[str] = set()
-    artifact_dims: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-    for symbol in symbols:
-        if symbol.type != clingo.SymbolType.Function:
-            continue
-        if symbol.name == "tool_at_time":
-            time = int(str(symbol.arguments[0]))
-            tool_id = _symbol_text(symbol.arguments[1])
-            step_tools.append((time, tool_id))
-            continue
-        if symbol.name == "ape_bind":
-            bindings_by_step[int(str(symbol.arguments[0]))][_symbol_text(symbol.arguments[1])] = _workflow_key(
-                symbol.arguments[2]
-            )
-            continue
-        if symbol.name == "ape_holds_dim":
-            artifact_id = _workflow_key(symbol.arguments[0])
-            artifact_dims[artifact_id][_symbol_text(symbol.arguments[2])].add(_symbol_text(symbol.arguments[1]))
-            if artifact_id.startswith("out(") and artifact_id.endswith(")"):
-                output_artifact_ids.add(artifact_id)
-                output_signatures.add(_normalize_artifact_ref(artifact_id))
-            continue
-        if symbol.name == "ape_output":
-            artifact_id = _workflow_key(symbol.arguments[0])
-            output_artifact_ids.add(artifact_id)
-            output_signatures.add(_normalize_artifact_ref(artifact_id))
-            continue
-    _merge_metadata_artifact_dims(
-        artifact_dims,
-        artifact_refs={
-            artifact_id
-            for bindings in bindings_by_step.values()
-            for artifact_id in bindings.values()
-        }
-        | output_artifact_ids,
-        workflow_input_dims=workflow_input_dims or {},
-        tool_output_dims=tool_output_dims or {},
-    )
-    binding_signatures = tuple(
-        sorted(
-            _binding_signature_with_target(
-                time,
-                port_id,
-                _normalize_artifact_ref(artifact_id),
-            )
-            for time in sorted(bindings_by_step)
-            for port_id, artifact_id in sorted(bindings_by_step[time].items(), key=lambda item: _port_sort_key(item[0]))
-        )
-    )
-    step_tools.sort()
-    return (
-        "steps",
-        tuple(tool_id for _, tool_id in step_tools),
-        "bindings",
-        binding_signatures,
-        "outputs",
-        tuple(sorted(output_signatures)),
-    )
 
 
 def workflow_signature_length(workflow_key: tuple[object, ...]) -> int:
