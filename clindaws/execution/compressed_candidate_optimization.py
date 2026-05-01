@@ -29,6 +29,60 @@ from clindaws.core.ontology import Ontology
 MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS = 512
 
 
+def _output_port_consumers_diverge_check(
+    output_port: Mapping[str, object],
+    *,
+    candidate_id: str,
+    bindable_pairs_by_producer: Mapping[tuple[str, int], Iterable[tuple[str, int]]],
+    consumer_input_fset_by_port: Mapping[tuple[str, int], Mapping[str, frozenset[str]]],
+) -> tuple[bool, tuple[str, ...]]:
+    """Decide whether a merged output port must split for consumer-V satisfiability.
+
+    Two source ports merge at line 1115 when their post-value-compression
+    group_keys match, so all sources share an identical port_values_fset and
+    identical consumer attachment set. The encoding's choice rule at
+    step.lp:172-176 picks one V per (Candidate, Port). If the union of
+    attached consumers' fsets has empty intersection with the producer's
+    fset on any dimension, no single V satisfies all consumers, and the
+    workflow APE finds (where source ports stay split) is lost.
+
+    Returns (diverges, divergent_dims).
+    """
+
+    if int(output_port.get("multiplicity", 1)) <= 1:
+        return False, ()
+    sources = tuple(output_port["source_port_indices"])
+    producer_fset = output_port["port_values_fset"]
+    seen_consumers: set[tuple[str, int]] = set()
+    consumer_fsets: list[Mapping[str, frozenset[str]]] = []
+    for src in sources:
+        for cons_cand, cons_port in bindable_pairs_by_producer.get((candidate_id, int(src)), ()):
+            key = (cons_cand, cons_port)
+            if key in seen_consumers:
+                continue
+            seen_consumers.add(key)
+            cons_fset = consumer_input_fset_by_port.get(key)
+            if cons_fset is not None:
+                consumer_fsets.append(cons_fset)
+    if not consumer_fsets:
+        return False, ()
+    divergent_dims: list[str] = []
+    for dim, available in producer_fset.items():
+        if not available:
+            continue
+        intersection: frozenset[str] = available
+        for cons_fset in consumer_fsets:
+            req = cons_fset.get(dim)
+            if req is None:
+                continue
+            intersection = intersection & req
+            if not intersection:
+                break
+        if not intersection:
+            divergent_dims.append(str(dim))
+    return bool(divergent_dims), tuple(divergent_dims)
+
+
 @dataclass(frozen=True)
 class CompressedCandidateOptimizationResult:
     """Optimized-candidate surface ready for fact emission."""
@@ -1122,6 +1176,83 @@ def optimize_compressed_candidates(
             profile_accepts_by_id=profile_accepts_by_id,
         )
     )
+
+    consumer_input_fset_by_port: dict[tuple[str, int], Mapping[str, frozenset[str]]] = {}
+    for record in relevant_records:
+        consumer_cand_id = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            consumer_input_fset_by_port[(consumer_cand_id, int(input_port["port_idx"]))] = (
+                input_port["port_values_fset"]
+            )
+    bindable_pairs_by_producer: dict[tuple[str, int], list[tuple[str, int]]] = defaultdict(list)
+    for prod_cand, prod_port, cons_cand, cons_port in bindable_pairs:
+        bindable_pairs_by_producer[(prod_cand, int(prod_port))].append((cons_cand, int(cons_port)))
+
+    selective_split_stats: dict[str, int] = {
+        "selective_split_ports_examined": 0,
+        "selective_split_ports_diverged": 0,
+        "selective_split_extra_ports_emitted": 0,
+        "selective_split_per_dim_divergence_hits": 0,
+    }
+    new_bindable_pair_entries: list[tuple[str, int, str, int]] = []
+    any_split = False
+
+    for record in relevant_records:
+        cand_id = str(record["candidate_id"])
+        rebuilt_output_ports: list[Mapping[str, object]] = []
+        for output_port in tuple(record["output_ports"]):
+            multiplicity = int(output_port.get("multiplicity", 1))
+            if multiplicity <= 1:
+                rebuilt_output_ports.append(output_port)
+                continue
+            selective_split_stats["selective_split_ports_examined"] += 1
+            diverges, divergent_dims = _output_port_consumers_diverge_check(
+                output_port,
+                candidate_id=cand_id,
+                bindable_pairs_by_producer=bindable_pairs_by_producer,
+                consumer_input_fset_by_port=consumer_input_fset_by_port,
+            )
+            if not diverges:
+                rebuilt_output_ports.append(output_port)
+                continue
+            sources = tuple(int(s) for s in output_port["source_port_indices"])
+            canonical_consumers: list[tuple[str, int]] = []
+            for src in sources:
+                existing = bindable_pairs_by_producer.get((cand_id, src), ())
+                if existing:
+                    canonical_consumers = list(existing)
+                    break
+            for src in sources:
+                split_port = dict(output_port)
+                split_port["port_idx"] = src
+                split_port["multiplicity"] = 1
+                split_port["source_port_indices"] = (src,)
+                rebuilt_output_ports.append(split_port)
+                existing_for_src = set(bindable_pairs_by_producer.get((cand_id, src), ()))
+                for cons_cand, cons_port in canonical_consumers:
+                    if (cons_cand, cons_port) in existing_for_src:
+                        continue
+                    new_bindable_pair_entries.append((cand_id, src, cons_cand, cons_port))
+                    existing_for_src.add((cons_cand, cons_port))
+                bindable_pairs_by_producer[(cand_id, src)] = list(existing_for_src)
+            selective_split_stats["selective_split_ports_diverged"] += 1
+            selective_split_stats["selective_split_extra_ports_emitted"] += len(sources) - 1
+            selective_split_stats["selective_split_per_dim_divergence_hits"] += len(divergent_dims)
+            any_split = True
+        record["output_ports"] = tuple(rebuilt_output_ports)
+
+    if any_split:
+        for entry in new_bindable_pair_entries:
+            bindable_pairs.add(entry)
+        compressed_reverse_edges, compressed_produced_bindable_ports, signature_bindable_ports, bindability_stats = (
+            _collect_compressed_dynamic_bindability_surface(
+                bindable_pairs,
+                relevant_records=relevant_records,
+                signature_profiles_by_id=signature_profiles_by_id,
+                profile_accepts_by_id=profile_accepts_by_id,
+            )
+        )
+
     candidate_records_by_id = {
         str(record["candidate_id"]): record
         for record in relevant_records
@@ -1493,6 +1624,7 @@ def optimize_compressed_candidates(
             **resolver.stats(),
             **dynamic_schema_stats,
             **bindability_stats,
+            **selective_split_stats,
             **support_class_stats,
             **association_class_stats,
             **goal_profile_stats,
