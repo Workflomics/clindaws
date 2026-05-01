@@ -62,6 +62,10 @@ dynamic_candidate_input_category(Candidate, Port, Category) :-
 dynamic_candidate_output_category(Candidate, Port, Category) :-
     dynamic_candidate_output_singleton(Candidate, Port, _, Category).
 
+dynamic_candidate_output_choice_value(Candidate, Port, V, Category) :-
+    dynamic_candidate_output_value_class(Candidate, Port, Class),
+    dynamic_output_value_class_choice_value(Class, V, Category).
+
 dynamic_candidate_output_category(Candidate, Port, Category) :-
     dynamic_candidate_output_choice_value(Candidate, Port, _, Category).
 
@@ -231,4 +235,3 @@ smaller_equivalent_eligible_input(Candidate, Port, WF, SmallerWF) :-
     eligible(Candidate, Port, WF),
     eligible(Candidate, Port, SmallerWF),
     equivalent_workflow_inputs(SmallerWF, WF).
-

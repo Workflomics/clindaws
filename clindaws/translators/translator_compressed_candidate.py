@@ -223,6 +223,9 @@ def build_compressed_candidate_fact_bundle(
     # serialization cost.
     emit_start = perf_counter()
 
+    output_value_class_by_key: dict[tuple[tuple[str, tuple[str, ...]], ...], int] = {}
+    emitted_output_value_classes: set[int] = set()
+
     for record in optimization.relevant_records:
         tool = record["tool"]
         candidate_id = str(record["candidate_id"])
@@ -305,6 +308,38 @@ def build_compressed_candidate_fact_bundle(
                     str(port_idx),
                     str(multiplicity),
                 )
+            choice_values_by_dimension = {
+                str(dim): tuple(str(value) for value in values)
+                for dim, values in sorted(output_port["port_values_by_dimension"].items())
+                if len(values) > 1
+            }
+            if choice_values_by_dimension:
+                value_class_key = tuple(
+                    sorted(
+                        (dim, tuple(values))
+                        for dim, values in choice_values_by_dimension.items()
+                    )
+                )
+                value_class_id = output_value_class_by_key.setdefault(
+                    value_class_key,
+                    len(output_value_class_by_key),
+                )
+                writer.emit_fact(
+                    "dynamic_candidate_output_value_class",
+                    _quote(candidate_id),
+                    str(port_idx),
+                    str(value_class_id),
+                )
+                if value_class_id not in emitted_output_value_classes:
+                    emitted_output_value_classes.add(value_class_id)
+                    for dim, values in value_class_key:
+                        for value in values:
+                            writer.emit_fact(
+                                "dynamic_output_value_class_choice_value",
+                                str(value_class_id),
+                                _quote(value),
+                                _quote(dim),
+                            )
             for dim, values in sorted(output_port["port_values_by_dimension"].items()):
                 if len(values) == 1:
                     writer.emit_fact(
@@ -314,15 +349,6 @@ def build_compressed_candidate_fact_bundle(
                         _quote(values[0]),
                         _quote(dim),
                     )
-                else:
-                    for value in values:
-                        writer.emit_fact(
-                            "dynamic_candidate_output_choice_value",
-                            _quote(candidate_id),
-                            str(port_idx),
-                            _quote(value),
-                            _quote(dim),
-                        )
         writer.emit_fact(
             "dynamic_candidate_total_output_multiplicity",
             _quote(candidate_id),

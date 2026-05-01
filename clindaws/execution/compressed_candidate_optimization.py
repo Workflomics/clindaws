@@ -35,6 +35,7 @@ def _output_port_consumers_diverge_check(
     candidate_id: str,
     bindable_pairs_by_producer: Mapping[tuple[str, int], Iterable[tuple[str, int]]],
     consumer_input_fset_by_port: Mapping[tuple[str, int], Mapping[str, frozenset[str]]],
+    relevant_consumer_inputs: set[tuple[str, int]] | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
     """Decide whether a merged output port must split for consumer-V satisfiability.
 
@@ -58,6 +59,8 @@ def _output_port_consumers_diverge_check(
     for src in sources:
         for cons_cand, cons_port in bindable_pairs_by_producer.get((candidate_id, int(src)), ()):
             key = (cons_cand, cons_port)
+            if relevant_consumer_inputs is not None and key not in relevant_consumer_inputs:
+                continue
             if key in seen_consumers:
                 continue
             seen_consumers.add(key)
@@ -81,6 +84,90 @@ def _output_port_consumers_diverge_check(
         if not intersection:
             divergent_dims.append(str(dim))
     return bool(divergent_dims), tuple(divergent_dims)
+
+
+def _split_output_ports_for_consumer_divergence(
+    *,
+    relevant_records: Iterable[dict[str, object]],
+    bindable_pairs: set[tuple[str, int, str, int]],
+    relevant_consumer_inputs: set[tuple[str, int]] | None,
+) -> dict[str, int]:
+    """Split merged output ports only when relevant consumers need distinct Vs."""
+
+    consumer_input_fset_by_port: dict[tuple[str, int], Mapping[str, frozenset[str]]] = {}
+    for record in relevant_records:
+        consumer_cand_id = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            consumer_input_fset_by_port[(consumer_cand_id, int(input_port["port_idx"]))] = (
+                input_port["port_values_fset"]
+            )
+    bindable_pairs_by_producer: dict[tuple[str, int], list[tuple[str, int]]] = defaultdict(list)
+    for prod_cand, prod_port, cons_cand, cons_port in bindable_pairs:
+        bindable_pairs_by_producer[(prod_cand, int(prod_port))].append((cons_cand, int(cons_port)))
+
+    selective_split_stats: dict[str, int] = {
+        "selective_split_ports_examined": 0,
+        "selective_split_ports_diverged": 0,
+        "selective_split_extra_ports_emitted": 0,
+        "selective_split_per_dim_divergence_hits": 0,
+        "selective_split_relevant_consumer_inputs": (
+            len(relevant_consumer_inputs) if relevant_consumer_inputs is not None else 0
+        ),
+    }
+    new_bindable_pair_entries: list[tuple[str, int, str, int]] = []
+
+    for record in relevant_records:
+        cand_id = str(record["candidate_id"])
+        rebuilt_output_ports: list[Mapping[str, object]] = []
+        for output_port in tuple(record["output_ports"]):
+            multiplicity = int(output_port.get("multiplicity", 1))
+            if multiplicity <= 1:
+                rebuilt_output_ports.append(output_port)
+                continue
+            selective_split_stats["selective_split_ports_examined"] += 1
+            diverges, divergent_dims = _output_port_consumers_diverge_check(
+                output_port,
+                candidate_id=cand_id,
+                bindable_pairs_by_producer=bindable_pairs_by_producer,
+                consumer_input_fset_by_port=consumer_input_fset_by_port,
+                relevant_consumer_inputs=relevant_consumer_inputs,
+            )
+            if not diverges:
+                rebuilt_output_ports.append(output_port)
+                continue
+            sources = tuple(int(s) for s in output_port["source_port_indices"])
+            canonical_consumers: list[tuple[str, int]] = []
+            for src in sources:
+                existing = tuple(
+                    consumer_key
+                    for consumer_key in bindable_pairs_by_producer.get((cand_id, src), ())
+                    if relevant_consumer_inputs is None or consumer_key in relevant_consumer_inputs
+                )
+                if existing:
+                    canonical_consumers = list(existing)
+                    break
+            for src in sources:
+                split_port = dict(output_port)
+                split_port["port_idx"] = src
+                split_port["multiplicity"] = 1
+                split_port["source_port_indices"] = (src,)
+                rebuilt_output_ports.append(split_port)
+                existing_for_src = set(bindable_pairs_by_producer.get((cand_id, src), ()))
+                for cons_cand, cons_port in canonical_consumers:
+                    if (cons_cand, cons_port) in existing_for_src:
+                        continue
+                    new_bindable_pair_entries.append((cand_id, src, cons_cand, cons_port))
+                    existing_for_src.add((cons_cand, cons_port))
+                bindable_pairs_by_producer[(cand_id, src)] = list(existing_for_src)
+            selective_split_stats["selective_split_ports_diverged"] += 1
+            selective_split_stats["selective_split_extra_ports_emitted"] += len(sources) - 1
+            selective_split_stats["selective_split_per_dim_divergence_hits"] += len(divergent_dims)
+        record["output_ports"] = tuple(rebuilt_output_ports)
+
+    for entry in new_bindable_pair_entries:
+        bindable_pairs.add(entry)
+
+    return selective_split_stats
 
 
 @dataclass(frozen=True)
@@ -1177,81 +1264,13 @@ def optimize_compressed_candidates(
         )
     )
 
-    consumer_input_fset_by_port: dict[tuple[str, int], Mapping[str, frozenset[str]]] = {}
-    for record in relevant_records:
-        consumer_cand_id = str(record["candidate_id"])
-        for input_port in tuple(record["input_ports"]):
-            consumer_input_fset_by_port[(consumer_cand_id, int(input_port["port_idx"]))] = (
-                input_port["port_values_fset"]
-            )
-    bindable_pairs_by_producer: dict[tuple[str, int], list[tuple[str, int]]] = defaultdict(list)
-    for prod_cand, prod_port, cons_cand, cons_port in bindable_pairs:
-        bindable_pairs_by_producer[(prod_cand, int(prod_port))].append((cons_cand, int(cons_port)))
-
     selective_split_stats: dict[str, int] = {
         "selective_split_ports_examined": 0,
         "selective_split_ports_diverged": 0,
         "selective_split_extra_ports_emitted": 0,
         "selective_split_per_dim_divergence_hits": 0,
+        "selective_split_relevant_consumer_inputs": 0,
     }
-    new_bindable_pair_entries: list[tuple[str, int, str, int]] = []
-    any_split = False
-
-    for record in relevant_records:
-        cand_id = str(record["candidate_id"])
-        rebuilt_output_ports: list[Mapping[str, object]] = []
-        for output_port in tuple(record["output_ports"]):
-            multiplicity = int(output_port.get("multiplicity", 1))
-            if multiplicity <= 1:
-                rebuilt_output_ports.append(output_port)
-                continue
-            selective_split_stats["selective_split_ports_examined"] += 1
-            diverges, divergent_dims = _output_port_consumers_diverge_check(
-                output_port,
-                candidate_id=cand_id,
-                bindable_pairs_by_producer=bindable_pairs_by_producer,
-                consumer_input_fset_by_port=consumer_input_fset_by_port,
-            )
-            if not diverges:
-                rebuilt_output_ports.append(output_port)
-                continue
-            sources = tuple(int(s) for s in output_port["source_port_indices"])
-            canonical_consumers: list[tuple[str, int]] = []
-            for src in sources:
-                existing = bindable_pairs_by_producer.get((cand_id, src), ())
-                if existing:
-                    canonical_consumers = list(existing)
-                    break
-            for src in sources:
-                split_port = dict(output_port)
-                split_port["port_idx"] = src
-                split_port["multiplicity"] = 1
-                split_port["source_port_indices"] = (src,)
-                rebuilt_output_ports.append(split_port)
-                existing_for_src = set(bindable_pairs_by_producer.get((cand_id, src), ()))
-                for cons_cand, cons_port in canonical_consumers:
-                    if (cons_cand, cons_port) in existing_for_src:
-                        continue
-                    new_bindable_pair_entries.append((cand_id, src, cons_cand, cons_port))
-                    existing_for_src.add((cons_cand, cons_port))
-                bindable_pairs_by_producer[(cand_id, src)] = list(existing_for_src)
-            selective_split_stats["selective_split_ports_diverged"] += 1
-            selective_split_stats["selective_split_extra_ports_emitted"] += len(sources) - 1
-            selective_split_stats["selective_split_per_dim_divergence_hits"] += len(divergent_dims)
-            any_split = True
-        record["output_ports"] = tuple(rebuilt_output_ports)
-
-    if any_split:
-        for entry in new_bindable_pair_entries:
-            bindable_pairs.add(entry)
-        compressed_reverse_edges, compressed_produced_bindable_ports, signature_bindable_ports, bindability_stats = (
-            _collect_compressed_dynamic_bindability_surface(
-                bindable_pairs,
-                relevant_records=relevant_records,
-                signature_profiles_by_id=signature_profiles_by_id,
-                profile_accepts_by_id=profile_accepts_by_id,
-            )
-        )
 
     candidate_records_by_id = {
         str(record["candidate_id"]): record
@@ -1584,6 +1603,161 @@ def optimize_compressed_candidates(
             if step_index not in set(structural_probe_horizons)
         )
     )
+
+    split_consumer_horizons = structural_probe_horizons or tuple(sorted(goal_support_inputs_by_horizon))
+    split_relevant_consumer_inputs = {
+        input_key
+        for horizon in split_consumer_horizons
+        for input_key in goal_support_inputs_by_horizon.get(horizon, ())
+    }
+    selective_split_stats = _split_output_ports_for_consumer_divergence(
+        relevant_records=relevant_records,
+        bindable_pairs=bindable_pairs,
+        relevant_consumer_inputs=split_relevant_consumer_inputs,
+    )
+
+    if selective_split_stats["selective_split_ports_diverged"]:
+        (
+            compressed_reverse_edges,
+            compressed_produced_bindable_ports,
+            signature_bindable_ports,
+            bindability_stats,
+        ) = _collect_compressed_dynamic_bindability_surface(
+            bindable_pairs,
+            relevant_records=relevant_records,
+            signature_profiles_by_id=signature_profiles_by_id,
+            profile_accepts_by_id=profile_accepts_by_id,
+        )
+        compressed_produced_bindable_ports, temporally_dropped_associations = _filter_bindability_by_temporal_overlap(
+            produced_bindable_ports=compressed_produced_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+        compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+        signature_bindable_ports = _filter_signature_bindable_ports(
+            signature_bindable_ports,
+            active_candidates=brave_closed_candidates,
+        )
+        (
+            signature_support_class_by_id,
+            support_class_bindable_ports,
+            support_class_stats,
+        ) = _factor_signature_support_classes(signature_bindable_ports)
+        (
+            association_class_by_input,
+            association_class_bindable_ports,
+            feasible_associations_by_input,
+            association_class_stats,
+        ) = _factor_input_association_classes(
+            relevant_records=relevant_records,
+            workflow_bindable_ports=workflow_bindable_ports,
+            signature_bindable_ports=signature_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+
+        min_goal_distance_by_candidate = {}
+        frontier = deque(sorted(query_goal_candidates))
+        for candidate_id in frontier:
+            min_goal_distance_by_candidate[candidate_id] = 0
+        while frontier:
+            consumer_candidate = frontier.popleft()
+            next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
+            for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
+                if producer_candidate in min_goal_distance_by_candidate:
+                    continue
+                if producer_candidate not in candidate_records_by_id:
+                    continue
+                min_goal_distance_by_candidate[producer_candidate] = next_distance
+                frontier.append(producer_candidate)
+
+        must_run_candidates_global, must_run_tools_global = _compute_global_must_run_candidates(
+            relevant_records=relevant_records,
+            workflow_bindable_ports=workflow_bindable_ports,
+            produced_bindable_ports=compressed_produced_bindable_ports,
+            query_goal_candidates=query_goal_candidates,
+        )
+        (
+            propagated_required_candidates,
+            forced_associations_global,
+            fixpoint_rounds,
+        ) = _propagate_forced_associations(
+            candidate_records_by_id=candidate_records_by_id,
+            workflow_bindable_ports=workflow_bindable_ports,
+            feasible_associations_by_input=feasible_associations_by_input,
+            seed_required_candidates=must_run_candidates_global,
+        )
+        must_run_candidates_global = propagated_required_candidates
+        must_run_tools_global = tuple(
+            sorted(
+                {
+                    str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                    for candidate_id in must_run_candidates_global
+                    if candidate_id in candidate_records_by_id
+                }
+            )
+        )
+
+        (
+            goal_support_candidates_by_horizon,
+            goal_support_tools_by_horizon,
+            goal_support_inputs_by_horizon,
+            smart_expansion_rounds_by_horizon,
+        ) = _compute_smart_expansion_by_horizon(
+            config=config,
+            candidate_records_by_id=candidate_records_by_id,
+            query_goal_candidates=query_goal_candidates,
+            feasible_associations_by_input=feasible_associations_by_input,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+            min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        )
+        (
+            structurally_supportable_candidates_by_horizon,
+            structurally_unsupported_inputs_by_horizon,
+            input_support_rounds_by_horizon,
+        ) = _compute_structural_input_support_by_horizon(
+            goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+            goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            association_class_by_input=association_class_by_input,
+            association_class_bindable_ports=association_class_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+        (
+            check_relevant_output_categories_by_horizon,
+            check_required_profile_classes_by_horizon,
+            check_profile_class_members,
+        ) = _compute_check_surface_by_horizon(
+            goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+            goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            feasible_associations_by_input=feasible_associations_by_input,
+            signature_profiles_by_id=signature_profiles_by_id,
+            query_goal_candidates=query_goal_candidates,
+            goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
+            goal_fsets=goal_fsets,
+        )
+
+        must_run_tools_by_step = {}
+        must_run_candidates_by_step = {}
+        forced_associations_by_step = {}
+        for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
+            if len(tool_ids) == 1:
+                must_run_tools_by_step[step_index] = tuple(sorted(tool_ids))
+        for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
+            if len(candidate_ids) == 1:
+                must_run_candidates_by_step[step_index] = tuple(sorted(candidate_ids))
+            step_forced_associations = tuple(
+                sorted(
+                    association
+                    for association in forced_associations_global
+                    if association[0] in candidate_ids
+                )
+            )
+            if step_forced_associations:
+                forced_associations_by_step[step_index] = step_forced_associations
 
     return CompressedCandidateOptimizationResult(
         tool_stats=tuple(tool_stats),
