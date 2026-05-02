@@ -144,3 +144,8 @@ Current count basis:
 - `--debug` — print diagnostic raw-model and workflow-candidate counters during solving
 - `--benchmark-repetitions N` — repeat the grounding benchmark N times
 - `--summary-top-tools N` — include top N expanded tools in translation/grounding summaries
+
+## Benchmarks
+
+Test cases and parity references against APE 2.6.1 are maintained in a separate
+repository: <https://github.com/Workflomics/APEvASP_test_case_bench>.
