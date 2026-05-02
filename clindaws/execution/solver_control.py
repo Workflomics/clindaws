@@ -133,6 +133,6 @@ def program_paths_for_mode(
         if optimized:
             return _multi_shot_optimized_candidate_program_paths()
         return _multi_shot_program_paths()
-    if mode in {"multi-shot-optimized-candidate", "multi-shot-compressed-candidate"}:
+    if mode == "multi-shot-optimized-candidate":
         return _multi_shot_optimized_candidate_program_paths()
     raise ValueError(f"Unsupported mode: {mode}")

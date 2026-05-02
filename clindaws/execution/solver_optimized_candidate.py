@@ -46,10 +46,7 @@ def _optimized_exact_incremental_horizon_parts(
 
 
 def _smart_expansion_enabled(facts: FactBundle) -> bool:
-    return facts.internal_solver_mode in {
-        "multi-shot-optimized-candidate",
-        "multi-shot-compressed-candidate",
-    }
+    return facts.internal_solver_mode == "multi-shot-optimized-candidate"
 
 
 def _optimized_query_assumptions(

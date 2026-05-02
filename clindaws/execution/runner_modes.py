@@ -8,11 +8,9 @@ from typing import Callable
 from clindaws.core.models import TranslationBuilder
 from clindaws.execution.solver import (
     ground_multi_shot,
-    ground_multi_shot_compressed_candidate,
     ground_multi_shot_optimized_candidate,
     ground_single_shot,
     solve_multi_shot,
-    solve_multi_shot_compressed_candidate,
     solve_multi_shot_optimized_candidate,
     solve_single_shot,
     solve_single_shot_sliding_window,
@@ -106,13 +104,6 @@ _MODE_CONFIGS = {
         translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
         supports_ground_only=True,
     ),
-    "multi-shot-compressed-candidate": _ModeConfig(
-        solver_family="multi-shot",
-        solver_approach="optimized_candidate",
-        translation_pathway="optimized_candidate",
-        translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
 }
 
 _SOLVER_DISPATCH = {
@@ -120,14 +111,12 @@ _SOLVER_DISPATCH = {
     "single-shot-sliding-window": solve_single_shot_sliding_window,
     "multi-shot": solve_multi_shot,
     "multi-shot-optimized-candidate": solve_multi_shot_optimized_candidate,
-    "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
 
 _GROUNDER_DISPATCH = {
     "single-shot": ground_single_shot,
     "multi-shot": ground_multi_shot,
     "multi-shot-optimized-candidate": ground_multi_shot_optimized_candidate,
-    "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
 
 

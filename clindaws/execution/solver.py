@@ -332,39 +332,6 @@ def solve_multi_shot_optimized_candidate(
     )
 
 
-def solve_multi_shot_compressed_candidate(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    ontology: Ontology | None = None,
-    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-    capture_raw_models: bool = False,
-    diagnostic_counts_enabled: bool = True,
-    parallel_mode: str | None = None,
-    project_models: bool = False,
-) -> SolveOutput:
-    """Compatibility wrapper for the legacy optimized backend entrypoint."""
-
-    return solve_multi_shot_optimized_candidate(
-        config,
-        facts,
-        ontology=ontology,
-        workflow_input_dims=workflow_input_dims,
-        tool_output_dims=tool_output_dims,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        capture_raw_models=capture_raw_models,
-        diagnostic_counts_enabled=diagnostic_counts_enabled,
-        parallel_mode=parallel_mode,
-        project_models=project_models,
-    )
-
-
 def ground_multi_shot_optimized_candidate(
     config: SnakeConfig,
     facts: FactBundle,
@@ -393,25 +360,4 @@ def ground_multi_shot_optimized_candidate(
             initial_step_program="step_initial",
             initial_seed_program=None,
         ),
-    )
-
-
-def ground_multi_shot_compressed_candidate(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    stage: str = "base",
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> GroundingOutput:
-    """Compatibility wrapper for the legacy optimized grounding entrypoint."""
-
-    return ground_multi_shot_optimized_candidate(
-        config,
-        facts,
-        stage=stage,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
     )

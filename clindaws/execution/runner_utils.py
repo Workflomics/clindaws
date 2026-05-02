@@ -49,10 +49,7 @@ def _records_with_combined_peak_rss(
 
 
 def _compressed_candidate_engaged(fact_bundle) -> bool:
-    return fact_bundle.internal_solver_mode in {
-        "multi-shot-optimized-candidate",
-        "multi-shot-compressed-candidate",
-    }
+    return fact_bundle.internal_solver_mode == "multi-shot-optimized-candidate"
 
 
 def _effective_solve_start_horizon(*, config, fact_bundle) -> int:
