@@ -1,5 +1,4 @@
 #program check_usage(t).
-#external query(t).
 
 % OUTPUT USAGE / USEFULNESS (optimized multi-shot)
 % The optimized backend keeps these checks separate from main goal validation so

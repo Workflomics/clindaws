@@ -22,12 +22,16 @@ available(A)          :- holds(0, avail(A)).
 artifact_dim(A, V, C) :- holds(0, dim(A, V, C)).
 artifact_unit(A, U)   :- holds(0, unit(A, U)).
 
+artifact_profile_member(A, Category, ProfileId) :-
+    artifact_dim(A, ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
+
 is_workflow_input(WF) :- holds(0, avail(WF)).
 
 workflow_input(WF) :-
     is_workflow_input(WF).
 
-workflow_input_lineage(0, WF, WF) :-
+workflow_input_lineage(WF, WF) :-
     holds(0, avail(WF)).
 
 
@@ -134,39 +138,6 @@ dynamic_initial_goal_output_value(Candidate, Port, V, Category) :-
     dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
     not goal_output(_, _, Category).
 
-dynamic_query_output_has_goal_value(Candidate, Port, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV).
-
-dynamic_query_output_preferred_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_query_output_has_goal_value(Candidate, Port, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV),
-    not dynamic_query_output_smaller_goal_value(Candidate, Port, V, Category).
-
-dynamic_query_output_smaller_goal_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_candidate_output_choice_value(Candidate, Port, V2, Category),
-    goal_output(_, GoalV, Category),
-    compatible(V, GoalV),
-    compatible(V2, GoalV),
-    V2 < V.
-
-dynamic_query_output_preferred_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    not dynamic_query_output_has_goal_value(Candidate, Port, Category),
-    not dynamic_query_output_smaller_value(Candidate, Port, V, Category).
-
-dynamic_query_output_smaller_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_choice_value(Candidate, Port, V, Category),
-    dynamic_candidate_output_choice_value(Candidate, Port, V2, Category),
-    V2 < V.
-
-dynamic_query_output_value(Candidate, Port, V, Category) :-
-    dynamic_query_output_preferred_value(Candidate, Port, V, Category).
-
 initial_goal_dim_match(GoalID, WF, GoalV, Category) :-
     goal_output(GoalID, GoalV, Category),
     available(WF),
@@ -264,29 +235,3 @@ smaller_equivalent_eligible_input(Candidate, Port, WF, SmallerWF) :-
     eligible(Candidate, Port, WF),
     eligible(Candidate, Port, SmallerWF),
     equivalent_workflow_inputs(SmallerWF, WF).
-
-% Pre-computed helpers for paired_symmetric_producers to reduce per-step join cost.
-symmetric_candidate_input_pair(Candidate1, Port1, Candidate2, Port2) :-
-    candidate_single_input(Candidate1),
-    candidate_single_input(Candidate2),
-    same_candidate_input_signature(Candidate1, Port1, Candidate2, Port2).
-
-dynamic_candidate_bindable_producer(ConsumerCandidate, ConsumerPort, ProducerCandidate) :-
-    dynamic_candidate_input_signature_id(ConsumerCandidate, ConsumerPort, SignatureId),
-    dynamic_signature_support_class(SignatureId, SupportClassId),
-    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, _).
-
-join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2) :-
-    JoinPort2 < JoinPort1,
-    same_candidate_input_signature(JoinCandidate, JoinPort1, JoinCandidate, JoinPort2).
-
-paired_symmetric_producer_candidate_pair(Candidate1, Candidate2) :-
-    symmetric_candidate_input_pair(Candidate1, _, Candidate2, _),
-    join_candidate_sym_ports(JoinCandidate, JoinPort1, JoinPort2),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPort1, Candidate1),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPort2, Candidate2).
-
-repeated_same_candidate_join_guard(Candidate) :-
-    join_candidate_sym_ports(JoinCandidate, JoinPortHigh, JoinPortLow),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPortHigh, Candidate),
-    dynamic_candidate_bindable_producer(JoinCandidate, JoinPortLow, Candidate).

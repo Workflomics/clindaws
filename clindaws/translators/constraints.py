@@ -105,12 +105,6 @@ _CONSTRAINT_SELECTOR_MODE_BY_TEMPLATE: dict[str, str] = {
     "operationInput": "transitive",
     "operation_input": "transitive",
 }
-_SELECTOR_POLICY_LABELS = {
-    "auto": "tool or class selector",
-    "class_transitive": "abstract class selector",
-    "tool_exact": "concrete tool selector",
-}
-
 # The helpers below normalize prefixed ontology/tool selectors from the config
 # into the compact ids used internally by the translator and encodings.
 def _strip_constraint_value(value: str, prefix: str) -> str:

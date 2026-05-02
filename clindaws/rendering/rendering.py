@@ -138,28 +138,6 @@ def render_solution_graphs(
     return (rendered_path,)
 
 
-def write_solution_summary(output_path: Path, solutions: tuple[WorkflowSolution, ...]) -> Path:
-    """Write a readable solution summary."""
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    if not solutions:
-        output_path.write_text("No solutions found.\n", encoding="utf-8")
-        return output_path
-    lines = []
-    for solution in solutions:
-        tools = " -> ".join(solution.tool_sequence)
-        lines.append(f"Candidate {solution.index}")
-        lines.append(f"Length: {solution.length}")
-        lines.append(f"Tools: {tools}")
-        if solution.signature_bindings:
-            lines.append(f"Bindings: {' | '.join(solution.signature_bindings)}")
-        if solution.goal_bindings:
-            lines.append(f"Goals: {' | '.join(solution.goal_bindings)}")
-        lines.append("")
-    output_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-    return output_path
-
-
 def write_workflow_signatures(output_path: Path, solutions: tuple[WorkflowSolution, ...]) -> Path:
     """Write machine-readable workflow signatures."""
 

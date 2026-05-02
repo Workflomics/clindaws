@@ -14,10 +14,24 @@ initial_goal_filter_active(t) :-
     query(t),
     exact_horizon_mode.
 
+exact_initial_support_filter_active(t, H) :-
+    exact_horizon_mode,
+    exact_target_horizon(H),
+    not initial_goal_filter_active(t),
+    not enable_all_inputs_used,
+    not enable_all_outputs_consumed.
+
+exact_initial_support_filter_present(t) :-
+    exact_initial_support_filter_active(t, _).
+
 1 { occurs(t, run(Tool)) : dynamic_initial_goal_tool(Tool) } 1 :-
     initial_goal_filter_active(t).
 
+1 { occurs(t, run(Tool)) : dynamic_goal_support_tool_at_horizon(Tool, H) } 1 :-
+    exact_initial_support_filter_active(t, H).
+
 1 { occurs(t, run(Tool)) : dynamic_step_allowed_tool(Tool, t) } 1 :-
+    not exact_initial_support_filter_present(t),
     not initial_goal_filter_active(t).
 :- initial_goal_filter_active(t), not occurs(t, run(_)).
 
@@ -35,8 +49,18 @@ initial_goal_filter_active(t) :-
 1 {
     occurs(t, use_dynamic_candidate(Tool, Candidate)) :
         dynamic_tool_candidate(Candidate, Tool),
+        dynamic_candidate_allowed_at_step(Candidate, t),
+        dynamic_structurally_supportable_candidate_at_horizon(Candidate, H)
+} 1 :-
+    exact_initial_support_filter_active(t, H),
+    occurs(t, run(Tool)).
+
+1 {
+    occurs(t, use_dynamic_candidate(Tool, Candidate)) :
+        dynamic_tool_candidate(Candidate, Tool),
         dynamic_candidate_allowed_at_step(Candidate, t)
 } 1 :-
+    not exact_initial_support_filter_present(t),
     not initial_goal_filter_active(t),
     occurs(t, run(Tool)).
 
@@ -55,14 +79,12 @@ occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
 
 1 { occurs(t, bind(Tool, Port, WF)) : dynamic_initial_bindable(Candidate, Port, WF) } 1 :-
     occurs(t, use_dynamic_candidate(Tool, Candidate)),
-    dynamic_candidate_input_port(Candidate, Port).
+   dynamic_candidate_input_port(Candidate, Port).
 
-% Carry workflow-input lineage only; input-usage checks do not need full
-% produced-artifact transitive ancestry in the optimized backend.
-workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
+workflow_input_lineage(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),
-    workflow_input_lineage(0, Artifact, WF).
+    workflow_input_lineage(Artifact, WF).
 
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),
@@ -97,6 +119,10 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     dynamic_candidate_output_singleton(Candidate, Port, V, Category).
+
+artifact_profile_member(out(t, Tool, Port), Category, ProfileId) :-
+    artifact_dim(out(t, Tool, Port), ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).

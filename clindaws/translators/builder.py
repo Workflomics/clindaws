@@ -38,9 +38,19 @@ def _bundle_metadata(
     These structures are not part of the ASP fact text itself, but the runner
     needs them later to reconstruct workflow candidates and report tool labels.
     """
+    tool_labels = {tool.mode_id: tool.label for tool in tools}
+    tool_input_signatures = _tool_input_signatures(tools)
+
+    signatures_by_label: dict[str, set[tuple[tuple[tuple[str, tuple[str, ...]], ...], ...]]] = defaultdict(set)
+    for tool in tools:
+        signatures_by_label[tool.label].add(tool_input_signatures[tool.mode_id])
+    for label, signatures in signatures_by_label.items():
+        if len(signatures) == 1:
+            tool_input_signatures.setdefault(label, next(iter(signatures)))
+
     return (
-        {tool.mode_id: tool.label for tool in tools},
-        _tool_input_signatures(tools),
+        tool_labels,
+        tool_input_signatures,
         tuple(f"wf_input_{i}" for i in range(len(config.inputs))),
     )
 def _finalize_fact_bundle(

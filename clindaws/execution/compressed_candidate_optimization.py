@@ -1,4 +1,4 @@
-"""Compressed-candidate precomputation and optimization pipeline.
+"""Optimized-candidate precomputation and optimization pipeline.
 
 This is the translation-time optimization layer behind ``multi-shot
 --optimized``. It expands tools into candidate records, prunes candidates that
@@ -17,7 +17,7 @@ from clindaws.translators.resolvers import _ExpansionResolver
 from clindaws.translators.builder import _build_roots
 
 from collections import defaultdict, deque
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
@@ -26,9 +26,153 @@ from clindaws.core.models import SnakeConfig, ToolExpansionStat, ToolMode
 from clindaws.core.ontology import Ontology
 
 
+MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS = 512
+
+
+def _output_port_consumers_diverge_check(
+    output_port: Mapping[str, object],
+    *,
+    candidate_id: str,
+    bindable_pairs_by_producer: Mapping[tuple[str, int], Iterable[tuple[str, int]]],
+    consumer_input_fset_by_port: Mapping[tuple[str, int], Mapping[str, frozenset[str]]],
+    relevant_consumer_inputs: set[tuple[str, int]] | None = None,
+) -> tuple[bool, tuple[str, ...]]:
+    """Decide whether a merged output port must split for consumer-V satisfiability.
+
+    Two source ports merge at line 1115 when their post-value-compression
+    group_keys match, so all sources share an identical port_values_fset and
+    identical consumer attachment set. The encoding's choice rule at
+    step.lp:172-176 picks one V per (Candidate, Port). If the union of
+    attached consumers' fsets has empty intersection with the producer's
+    fset on any dimension, no single V satisfies all consumers, and the
+    workflow APE finds (where source ports stay split) is lost.
+
+    Returns (diverges, divergent_dims).
+    """
+
+    if int(output_port.get("multiplicity", 1)) <= 1:
+        return False, ()
+    sources = tuple(output_port["source_port_indices"])
+    producer_fset = output_port["port_values_fset"]
+    seen_consumers: set[tuple[str, int]] = set()
+    consumer_fsets: list[Mapping[str, frozenset[str]]] = []
+    for src in sources:
+        for cons_cand, cons_port in bindable_pairs_by_producer.get((candidate_id, int(src)), ()):
+            key = (cons_cand, cons_port)
+            if relevant_consumer_inputs is not None and key not in relevant_consumer_inputs:
+                continue
+            if key in seen_consumers:
+                continue
+            seen_consumers.add(key)
+            cons_fset = consumer_input_fset_by_port.get(key)
+            if cons_fset is not None:
+                consumer_fsets.append(cons_fset)
+    if not consumer_fsets:
+        return False, ()
+    divergent_dims: list[str] = []
+    for dim, available in producer_fset.items():
+        if not available:
+            continue
+        intersection: frozenset[str] = available
+        for cons_fset in consumer_fsets:
+            req = cons_fset.get(dim)
+            if req is None:
+                continue
+            intersection = intersection & req
+            if not intersection:
+                break
+        if not intersection:
+            divergent_dims.append(str(dim))
+    return bool(divergent_dims), tuple(divergent_dims)
+
+
+def _split_output_ports_for_consumer_divergence(
+    *,
+    relevant_records: Iterable[dict[str, object]],
+    bindable_pairs: set[tuple[str, int, str, int]],
+    relevant_consumer_inputs: set[tuple[str, int]] | None,
+) -> dict[str, int]:
+    """Split merged output ports only when relevant consumers need distinct Vs."""
+
+    consumer_input_fset_by_port: dict[tuple[str, int], Mapping[str, frozenset[str]]] = {}
+    for record in relevant_records:
+        consumer_cand_id = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            consumer_input_fset_by_port[(consumer_cand_id, int(input_port["port_idx"]))] = (
+                input_port["port_values_fset"]
+            )
+    bindable_pairs_by_producer: dict[tuple[str, int], list[tuple[str, int]]] = defaultdict(list)
+    for prod_cand, prod_port, cons_cand, cons_port in bindable_pairs:
+        bindable_pairs_by_producer[(prod_cand, int(prod_port))].append((cons_cand, int(cons_port)))
+
+    selective_split_stats: dict[str, int] = {
+        "selective_split_ports_examined": 0,
+        "selective_split_ports_diverged": 0,
+        "selective_split_extra_ports_emitted": 0,
+        "selective_split_per_dim_divergence_hits": 0,
+        "selective_split_relevant_consumer_inputs": (
+            len(relevant_consumer_inputs) if relevant_consumer_inputs is not None else 0
+        ),
+    }
+    new_bindable_pair_entries: list[tuple[str, int, str, int]] = []
+
+    for record in relevant_records:
+        cand_id = str(record["candidate_id"])
+        rebuilt_output_ports: list[Mapping[str, object]] = []
+        for output_port in tuple(record["output_ports"]):
+            multiplicity = int(output_port.get("multiplicity", 1))
+            if multiplicity <= 1:
+                rebuilt_output_ports.append(output_port)
+                continue
+            selective_split_stats["selective_split_ports_examined"] += 1
+            diverges, divergent_dims = _output_port_consumers_diverge_check(
+                output_port,
+                candidate_id=cand_id,
+                bindable_pairs_by_producer=bindable_pairs_by_producer,
+                consumer_input_fset_by_port=consumer_input_fset_by_port,
+                relevant_consumer_inputs=relevant_consumer_inputs,
+            )
+            if not diverges:
+                rebuilt_output_ports.append(output_port)
+                continue
+            sources = tuple(int(s) for s in output_port["source_port_indices"])
+            canonical_consumers: list[tuple[str, int]] = []
+            for src in sources:
+                existing = tuple(
+                    consumer_key
+                    for consumer_key in bindable_pairs_by_producer.get((cand_id, src), ())
+                    if relevant_consumer_inputs is None or consumer_key in relevant_consumer_inputs
+                )
+                if existing:
+                    canonical_consumers = list(existing)
+                    break
+            for src in sources:
+                split_port = dict(output_port)
+                split_port["port_idx"] = src
+                split_port["multiplicity"] = 1
+                split_port["source_port_indices"] = (src,)
+                rebuilt_output_ports.append(split_port)
+                existing_for_src = set(bindable_pairs_by_producer.get((cand_id, src), ()))
+                for cons_cand, cons_port in canonical_consumers:
+                    if (cons_cand, cons_port) in existing_for_src:
+                        continue
+                    new_bindable_pair_entries.append((cand_id, src, cons_cand, cons_port))
+                    existing_for_src.add((cons_cand, cons_port))
+                bindable_pairs_by_producer[(cand_id, src)] = list(existing_for_src)
+            selective_split_stats["selective_split_ports_diverged"] += 1
+            selective_split_stats["selective_split_extra_ports_emitted"] += len(sources) - 1
+            selective_split_stats["selective_split_per_dim_divergence_hits"] += len(divergent_dims)
+        record["output_ports"] = tuple(rebuilt_output_ports)
+
+    for entry in new_bindable_pair_entries:
+        bindable_pairs.add(entry)
+
+    return selective_split_stats
+
+
 @dataclass(frozen=True)
 class CompressedCandidateOptimizationResult:
-    """Optimized compressed-candidate surface ready for fact emission."""
+    """Optimized-candidate surface ready for fact emission."""
 
     tool_stats: tuple[ToolExpansionStat, ...]
     relevant_records: tuple[dict[str, object], ...]
@@ -36,20 +180,579 @@ class CompressedCandidateOptimizationResult:
     query_goal_candidates: tuple[str, ...]
     query_goal_tools: tuple[str, ...]
     min_goal_distance_by_candidate: dict[str, int]
+    min_step_by_candidate: dict[str, int]
+    max_step_by_candidate: dict[str, int]
+    goal_support_candidates_by_horizon: dict[int, tuple[str, ...]]
+    goal_support_tools_by_horizon: dict[int, tuple[str, ...]]
+    goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
+    smart_expansion_rounds_by_horizon: dict[int, int]
+    structurally_supportable_candidates_by_horizon: dict[int, tuple[str, ...]]
+    structurally_unsupported_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]]
+    input_support_rounds_by_horizon: dict[int, int]
     allowed_candidates_by_step: dict[int, tuple[str, ...]]
     allowed_tools_by_step: dict[int, tuple[str, ...]]
+    check_relevant_output_categories_by_horizon: dict[int, tuple[tuple[str, int, str], ...]]
+    check_required_profile_classes_by_horizon: dict[int, tuple[tuple[str, int, str, int], ...]]
+    check_output_values_by_horizon: dict[int, tuple[tuple[str, int, str, str], ...]]
+    check_profile_class_members: dict[int, tuple[int, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
     profile_accepts_by_id: dict[int, tuple[str, ...]]
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]]
     signature_support_class_by_id: dict[int, int]
     support_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
-    candidate_output_id_map: Mapping[tuple[str, int], int]
+    association_class_by_input: dict[tuple[str, int], int]
+    association_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]]
     canonical_producers: Mapping[tuple[int, int], tuple[int, int]]
     cache_stats: dict[str, int]
-
-
+    must_run_tools_global: tuple[str, ...]
+    must_run_candidates_global: tuple[str, ...]
+    must_run_tools_by_step: dict[int, tuple[str, ...]]
+    must_run_candidates_by_step: dict[int, tuple[str, ...]]
+    forced_associations_global: tuple[tuple[str, int, str, int], ...]
+    forced_associations_by_step: dict[int, tuple[tuple[str, int, str, int], ...]]
+    fixpoint_rounds: int
+    structural_probe_horizons: tuple[int, ...]
+    structural_horizon_skip_count: int
     earliest_solution_step: int
     phase_timings: dict[str, float]
+
+
+def _build_goal_support_for_horizon(
+    *,
+    horizon: int,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    query_goal_candidates: Iterable[str],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+    min_goal_distance_by_candidate: Mapping[str, int],
+) -> tuple[set[str], set[tuple[str, int]]]:
+    """Build horizon-local goal-support candidates and inputs for one horizon."""
+
+    query_goal_candidate_set = set(query_goal_candidates)
+    goal_support_candidates: set[str] = set()
+    goal_support_inputs: set[tuple[str, int]] = set()
+    frontier: deque[str] = deque()
+
+    for candidate_id in sorted(query_goal_candidate_set):
+        min_step = min_step_by_candidate.get(candidate_id)
+        max_step = max_step_by_candidate.get(candidate_id)
+        goal_distance = min_goal_distance_by_candidate.get(candidate_id)
+        if min_step is None or max_step is None or goal_distance is None:
+            continue
+        if min_step > horizon or horizon > max_step:
+            continue
+        if min_step + goal_distance > horizon:
+            continue
+        goal_support_candidates.add(candidate_id)
+        frontier.append(candidate_id)
+
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+        if consumer_max_step is None:
+            continue
+        consumer_latest_step = min(horizon, consumer_max_step)
+        for input_port in tuple(candidate_records_by_id[consumer_candidate]["input_ports"]):
+            consumer_port = int(input_port["port_idx"])
+            workflow_input_matches = tuple(input_port.get("workflow_input_matches", ()))
+            if workflow_input_matches:
+                goal_support_inputs.add((consumer_candidate, consumer_port))
+                continue
+            producer_ports = feasible_associations_by_input.get((consumer_candidate, consumer_port), ())
+            support_found = False
+            for producer_candidate, _producer_port in producer_ports:
+                producer_min_step = min_step_by_candidate.get(producer_candidate)
+                producer_goal_distance = min_goal_distance_by_candidate.get(producer_candidate)
+                if producer_min_step is None or producer_goal_distance is None:
+                    continue
+                if producer_min_step + producer_goal_distance > horizon:
+                    continue
+                if producer_min_step >= consumer_latest_step:
+                    continue
+                support_found = True
+                if producer_candidate not in goal_support_candidates:
+                    goal_support_candidates.add(producer_candidate)
+                    frontier.append(producer_candidate)
+            if support_found:
+                goal_support_inputs.add((consumer_candidate, consumer_port))
+
+    return goal_support_candidates, goal_support_inputs
+
+
+def _compute_smart_expansion_by_horizon(
+    *,
+    config: SnakeConfig,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    query_goal_candidates: Iterable[str],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+    min_goal_distance_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[int, int],
+]:
+    """Compute fixed-point smart-expansion surfaces for each horizon.
+
+    This keeps only the horizon-local candidate/input closure in Python. The
+    feasibility encoding applies temporal and reachability filtering over the
+    global association classes at solve time.
+    """
+
+    goal_support_candidates_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_tools_by_horizon: dict[int, tuple[str, ...]] = {}
+    goal_support_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]] = {}
+    smart_expansion_rounds_by_horizon: dict[int, int] = {}
+
+    for horizon in range(config.solution_length_min, config.solution_length_max + 1):
+        goal_support_candidates, goal_support_inputs = _build_goal_support_for_horizon(
+            horizon=horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            query_goal_candidates=query_goal_candidates,
+            feasible_associations_by_input=feasible_associations_by_input,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+            min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        )
+        smart_expansion_rounds_by_horizon[horizon] = 1
+        if not goal_support_candidates:
+            continue
+
+        goal_support_candidates_by_horizon[horizon] = tuple(sorted(goal_support_candidates))
+        goal_support_tools_by_horizon[horizon] = tuple(
+            sorted(
+                {
+                    str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                    for candidate_id in goal_support_candidates
+                }
+            )
+        )
+        goal_support_inputs_by_horizon[horizon] = tuple(sorted(goal_support_inputs))
+
+    return (
+        goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon,
+        smart_expansion_rounds_by_horizon,
+    )
+
+
+def _compute_check_surface_by_horizon(
+    *,
+    goal_support_candidates_by_horizon: Mapping[int, tuple[str, ...]],
+    goal_support_inputs_by_horizon: Mapping[int, tuple[tuple[str, int], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    signature_profiles_by_id: Mapping[int, Mapping[str, tuple[int, tuple[str, ...]]]],
+    query_goal_candidates: Iterable[str],
+    goal_requirement_profiles_by_id: Mapping[int, tuple[tuple[int, str, int], ...]],
+    goal_fsets: tuple[Mapping[str, frozenset[str]], ...],
+) -> tuple[
+    dict[int, tuple[tuple[str, int, str], ...]],
+    dict[int, tuple[tuple[str, int, str, int], ...]],
+    dict[int, tuple[int, ...]],
+]:
+    """Precompute the exact output/category/profile surface consumed by check.
+
+    This keeps the exact semantics in ASP, but removes the expensive rebuild of
+    all producer/category/profile combinations from raw bind occurrences.
+    """
+
+    query_goal_candidate_set = set(query_goal_candidates)
+    input_profiles_by_port: dict[tuple[str, int], tuple[tuple[str, int], ...]] = {}
+    goal_categories_by_output: dict[tuple[str, int], tuple[str, ...]] = {}
+
+    for candidate_id, record in candidate_records_by_id.items():
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            signature_id = int(input_port["signature_id"])
+            input_profiles_by_port[(candidate_id, port_idx)] = tuple(
+                sorted(
+                    (str(category), int(profile_id))
+                    for category, (profile_id, _values) in
+                    signature_profiles_by_id.get(signature_id, {}).items()
+                )
+            )
+
+        if candidate_id not in query_goal_candidate_set:
+            continue
+
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            port_fset = output_port["port_values_fset"]
+            categories: set[str] = set()
+            for goal_id, goal_fset in enumerate(goal_fsets):
+                if not _dynamic_output_matches_dynamic_input_fset(port_fset, goal_fset):
+                    continue
+                for _requirement_id, category, _profile_id in goal_requirement_profiles_by_id.get(goal_id, ()):
+                    categories.add(str(category))
+            if categories:
+                goal_categories_by_output[(candidate_id, port_idx)] = tuple(sorted(categories))
+
+    profile_class_id_by_members: dict[tuple[int, ...], int] = {}
+    profile_class_members: dict[int, tuple[int, ...]] = {}
+    next_profile_class_id = 0
+    relevant_output_categories_by_horizon: dict[int, tuple[tuple[str, int, str], ...]] = {}
+    required_profile_classes_by_horizon: dict[int, tuple[tuple[str, int, str, int], ...]] = {}
+
+    for horizon, goal_support_candidates in sorted(goal_support_candidates_by_horizon.items()):
+        active_candidates = set(goal_support_candidates)
+        relevant_output_categories: set[tuple[str, int, str]] = set()
+        profile_ids_by_output_category: dict[tuple[str, int, str], set[int]] = defaultdict(set)
+
+        for consumer_candidate, consumer_port in goal_support_inputs_by_horizon.get(horizon, ()):
+            for producer_candidate, producer_port in feasible_associations_by_input.get((consumer_candidate, consumer_port), ()):
+                if producer_candidate not in active_candidates:
+                    continue
+                for category, profile_id in input_profiles_by_port.get((consumer_candidate, consumer_port), ()):
+                    relevant_output_categories.add((producer_candidate, producer_port, category))
+                    profile_ids_by_output_category[(producer_candidate, producer_port, category)].add(profile_id)
+
+        for candidate_id in sorted(active_candidates & query_goal_candidate_set):
+            for (goal_candidate_id, port_idx), categories in goal_categories_by_output.items():
+                if goal_candidate_id != candidate_id:
+                    continue
+                for category in categories:
+                    relevant_output_categories.add((candidate_id, port_idx, category))
+
+        relevant_output_categories_by_horizon[horizon] = tuple(sorted(relevant_output_categories))
+
+        horizon_profile_classes: set[tuple[str, int, str, int]] = set()
+        for (producer_candidate, producer_port, category), profile_ids in sorted(profile_ids_by_output_category.items()):
+            members = tuple(sorted(profile_ids))
+            if not members:
+                continue
+            profile_class_id = profile_class_id_by_members.get(members)
+            if profile_class_id is None:
+                profile_class_id = next_profile_class_id
+                next_profile_class_id += 1
+                profile_class_id_by_members[members] = profile_class_id
+                profile_class_members[profile_class_id] = members
+            horizon_profile_classes.add((producer_candidate, producer_port, category, profile_class_id))
+        required_profile_classes_by_horizon[horizon] = tuple(sorted(horizon_profile_classes))
+
+    return (
+        relevant_output_categories_by_horizon,
+        required_profile_classes_by_horizon,
+        dict(sorted(profile_class_members.items())),
+    )
+
+
+def _compute_check_output_values_by_horizon(
+    *,
+    check_relevant_output_categories_by_horizon: Mapping[int, tuple[tuple[str, int, str], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+) -> dict[int, tuple[tuple[str, int, str, str], ...]]:
+    """Precompute retained output values for exact-check-relevant categories."""
+
+    output_values_by_port: dict[tuple[str, int, str], tuple[str, ...]] = {}
+    for candidate_id, record in candidate_records_by_id.items():
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            for category, values in output_port["port_values_by_dimension"].items():
+                output_values_by_port[(candidate_id, port_idx, str(category))] = tuple(
+                    str(value)
+                    for value in values
+                )
+
+    check_output_values_by_horizon: dict[int, tuple[tuple[str, int, str, str], ...]] = {}
+    for horizon, output_categories in sorted(check_relevant_output_categories_by_horizon.items()):
+        output_values: set[tuple[str, int, str, str]] = set()
+        for candidate_id, port_idx, category in output_categories:
+            for value in output_values_by_port.get((candidate_id, int(port_idx), str(category)), ()):
+                output_values.add((candidate_id, int(port_idx), str(category), value))
+        check_output_values_by_horizon[horizon] = tuple(sorted(output_values))
+
+    return check_output_values_by_horizon
+
+
+def _compute_structural_input_support_by_horizon(
+    *,
+    goal_support_candidates_by_horizon: Mapping[int, tuple[str, ...]],
+    goal_support_inputs_by_horizon: Mapping[int, tuple[tuple[str, int], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    association_class_by_input: Mapping[tuple[str, int], int],
+    association_class_bindable_ports: Mapping[int, tuple[tuple[str, int], ...]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[int, tuple[str, ...]],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[int, int],
+]:
+    """Compute horizon-local structural supportability for goal-support candidates."""
+
+    producer_candidates_by_input: dict[tuple[str, int], tuple[str, ...]] = {}
+    for input_key, class_id in sorted(association_class_by_input.items()):
+        producer_candidates_by_input[input_key] = tuple(
+            sorted(
+                {
+                    producer_candidate
+                    for producer_candidate, _producer_port in association_class_bindable_ports.get(class_id, ())
+                }
+            )
+        )
+
+    input_records_by_key: dict[tuple[str, int], Mapping[str, object]] = {}
+    for candidate_id, record in candidate_records_by_id.items():
+        for input_port in tuple(record["input_ports"]):
+            input_records_by_key[(candidate_id, int(input_port["port_idx"]))] = input_port
+
+    structurally_supportable_candidates_by_horizon: dict[int, tuple[str, ...]] = {}
+    structurally_unsupported_inputs_by_horizon: dict[int, tuple[tuple[str, int], ...]] = {}
+    input_support_rounds_by_horizon: dict[int, int] = {}
+
+    for horizon, candidate_ids in sorted(goal_support_candidates_by_horizon.items()):
+        candidate_set = set(candidate_ids)
+        goal_inputs = set(goal_support_inputs_by_horizon.get(horizon, ()))
+        candidate_required_inputs: dict[str, list[tuple[str, int]]] = {
+            candidate_id: []
+            for candidate_id in candidate_ids
+        }
+        producer_options_by_input: dict[tuple[str, int], tuple[str, ...]] = {}
+
+        for candidate_id, port_idx in sorted(goal_inputs):
+            input_record = input_records_by_key.get((candidate_id, port_idx))
+            if input_record is None:
+                continue
+            if tuple(input_record.get("workflow_input_matches", ())):
+                continue
+            consumer_latest_step = min(
+                horizon,
+                max_step_by_candidate.get(candidate_id, horizon),
+            )
+            filtered_producers = tuple(
+                sorted(
+                    producer_candidate
+                    for producer_candidate in producer_candidates_by_input.get((candidate_id, port_idx), ())
+                    if producer_candidate in candidate_set
+                    and min_step_by_candidate.get(producer_candidate) is not None
+                    and min_step_by_candidate[producer_candidate] < consumer_latest_step
+                )
+            )
+            candidate_required_inputs[candidate_id].append((candidate_id, port_idx))
+            producer_options_by_input[(candidate_id, port_idx)] = filtered_producers
+
+        supportable_candidates = {
+            candidate_id
+            for candidate_id, required_inputs in candidate_required_inputs.items()
+            if not required_inputs
+        }
+        rounds = 0
+        changed = True
+        while changed:
+            changed = False
+            rounds += 1
+            for candidate_id in candidate_ids:
+                if candidate_id in supportable_candidates:
+                    continue
+                required_inputs = candidate_required_inputs.get(candidate_id, [])
+                if all(
+                    any(producer_candidate in supportable_candidates for producer_candidate in producer_options_by_input.get(input_key, ()))
+                    for input_key in required_inputs
+                ):
+                    supportable_candidates.add(candidate_id)
+                    changed = True
+
+        unsupported_inputs = tuple(
+            sorted(
+                input_key
+                for input_key, producer_candidates in producer_options_by_input.items()
+                if not any(producer_candidate in supportable_candidates for producer_candidate in producer_candidates)
+            )
+        )
+        structurally_supportable_candidates_by_horizon[horizon] = tuple(sorted(supportable_candidates))
+        structurally_unsupported_inputs_by_horizon[horizon] = unsupported_inputs
+        input_support_rounds_by_horizon[horizon] = max(rounds, 1)
+
+    return (
+        structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon,
+    )
+
+
+def _reverse_edges_from_produced_bindable_ports(
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+) -> dict[str, set[str]]:
+    reverse_edges: dict[str, set[str]] = defaultdict(set)
+    for consumer_candidate, by_port in produced_bindable_ports.items():
+        for producers in by_port.values():
+            for producer_candidate in producers:
+                reverse_edges[consumer_candidate].add(producer_candidate)
+    return reverse_edges
+
+
+def _close_relevant_candidates(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    goal_candidates: Iterable[str],
+    active_candidates: Iterable[str] | None = None,
+) -> set[str]:
+    """Compute a fixed-point of forward feasible and backward goal-relevant candidates."""
+
+    allowed = set(candidate_records_by_id) if active_candidates is None else set(active_candidates)
+    reverse_edges = _reverse_edges_from_produced_bindable_ports(produced_bindable_ports)
+
+    stable = set(allowed)
+    while True:
+        forward_reachable: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for candidate_id in sorted(stable):
+                record = candidate_records_by_id[candidate_id]
+                input_ports = tuple(record["input_ports"])
+                if all(
+                    int(port["port_idx"]) in workflow_bindable_ports.get(candidate_id, set())
+                    or any(
+                        producer_candidate in forward_reachable
+                        for producer_candidate in produced_bindable_ports.get(candidate_id, {}).get(int(port["port_idx"]), set())
+                    )
+                    for port in input_ports
+                ):
+                    if candidate_id not in forward_reachable:
+                        forward_reachable.add(candidate_id)
+                        changed = True
+
+        backward_relevant: set[str] = set()
+        frontier = deque(
+            sorted(
+                candidate_id
+                for candidate_id in goal_candidates
+                if candidate_id in forward_reachable
+            )
+        )
+        while frontier:
+            candidate_id = frontier.popleft()
+            if candidate_id in backward_relevant:
+                continue
+            backward_relevant.add(candidate_id)
+            for producer_candidate in sorted(reverse_edges.get(candidate_id, set())):
+                if producer_candidate in forward_reachable and producer_candidate not in backward_relevant:
+                    frontier.append(producer_candidate)
+
+        new_stable = forward_reachable & backward_relevant
+        if new_stable == stable:
+            return new_stable
+        stable = new_stable
+
+
+def _filter_bindability_by_temporal_overlap(
+    *,
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[dict[str, dict[int, set[str]]], int]:
+    """Drop producer-consumer associations that can never respect temporal order."""
+
+    filtered: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
+    dropped = 0
+    for consumer_candidate, by_port in produced_bindable_ports.items():
+        consumer_max_step = max_step_by_candidate.get(consumer_candidate)
+        if consumer_max_step is None:
+            continue
+        for consumer_port, producer_candidates in by_port.items():
+            for producer_candidate in producer_candidates:
+                producer_min_step = min_step_by_candidate.get(producer_candidate)
+                if producer_min_step is None or producer_min_step >= consumer_max_step:
+                    dropped += 1
+                    continue
+                filtered[consumer_candidate][consumer_port].add(producer_candidate)
+    return (
+        {
+            consumer_candidate: {
+                consumer_port: set(producer_candidates)
+                for consumer_port, producer_candidates in by_port.items()
+                if producer_candidates
+            }
+            for consumer_candidate, by_port in filtered.items()
+            if any(by_port.values())
+        },
+        dropped,
+    )
+
+
+def _filter_signature_bindable_ports(
+    signature_bindable_ports: Mapping[int, set[tuple[str, int]]],
+    *,
+    active_candidates: Iterable[str],
+) -> dict[int, set[tuple[str, int]]]:
+    """Filter signature support classes to the surviving candidate universe."""
+
+    active = set(active_candidates)
+    return {
+        signature_id: {
+            (producer_candidate, producer_port)
+            for producer_candidate, producer_port in producer_ports
+            if producer_candidate in active
+        }
+        for signature_id, producer_ports in signature_bindable_ports.items()
+    }
+
+
+def _candidate_set_supports_any_goal(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    query_goal_candidates: Iterable[str],
+    active_candidates: Iterable[str],
+) -> bool:
+    closed = _close_relevant_candidates(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=produced_bindable_ports,
+        goal_candidates=query_goal_candidates,
+        active_candidates=active_candidates,
+    )
+    return any(candidate_id in closed for candidate_id in query_goal_candidates)
+
+
+def _compute_global_must_run_candidates(
+    *,
+    relevant_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    produced_bindable_ports: Mapping[str, Mapping[int, set[str]]],
+    query_goal_candidates: Iterable[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Derive conservative global must-run candidates/tools by removal testing."""
+
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
+    active_candidates = tuple(sorted(candidate_records_by_id))
+    adaptive_cap = min(MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS, max(64, len(active_candidates) // 4))
+    if len(active_candidates) > adaptive_cap:
+        return (), ()
+    must_run_candidates: list[str] = []
+
+    for candidate_id in active_candidates:
+        remaining_candidates = tuple(other for other in active_candidates if other != candidate_id)
+        if not _candidate_set_supports_any_goal(
+            candidate_records_by_id=candidate_records_by_id,
+            workflow_bindable_ports=workflow_bindable_ports,
+            produced_bindable_ports=produced_bindable_ports,
+            query_goal_candidates=query_goal_candidates,
+            active_candidates=remaining_candidates,
+        ):
+            must_run_candidates.append(candidate_id)
+
+    must_run_tools = tuple(
+        sorted(
+            {
+                str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                for candidate_id in must_run_candidates
+            }
+        )
+    )
+    return tuple(sorted(must_run_candidates)), must_run_tools
 
 
 def _factor_signature_support_classes(
@@ -85,6 +788,120 @@ def _factor_signature_support_classes(
                 for producer_ports in support_class_bindable_ports.values()
             ),
         },
+    )
+
+
+def _factor_input_association_classes(
+    *,
+    relevant_records: Iterable[Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    signature_bindable_ports: Mapping[int, set[tuple[str, int]]],
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
+) -> tuple[
+    dict[tuple[str, int], int],
+    dict[int, tuple[tuple[str, int], ...]],
+    dict[tuple[str, int], tuple[tuple[str, int], ...]],
+    dict[str, int],
+]:
+    """Factor feasible producer-port options per concrete consumer input port."""
+
+    association_class_by_key: dict[tuple[tuple[str, int], ...], int] = {}
+    association_class_by_input: dict[tuple[str, int], int] = {}
+    association_class_bindable_ports: dict[int, tuple[tuple[str, int], ...]] = {}
+    feasible_associations_by_input: dict[tuple[str, int], tuple[tuple[str, int], ...]] = {}
+    raw_port_options = 0
+
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        consumer_max_step = max_step_by_candidate.get(candidate_id)
+        if consumer_max_step is None:
+            continue
+        for input_port in tuple(record["input_ports"]):
+            port_idx = int(input_port["port_idx"])
+            signature_id = int(input_port["signature_id"])
+            feasible_producer_ports = tuple(
+                sorted(
+                    (producer_candidate, int(producer_port))
+                    for producer_candidate, producer_port in signature_bindable_ports.get(signature_id, set())
+                    if producer_candidate != candidate_id
+                    and producer_candidate in min_step_by_candidate
+                    and min_step_by_candidate[producer_candidate] < consumer_max_step
+                )
+            )
+            feasible_associations_by_input[(candidate_id, port_idx)] = feasible_producer_ports
+            raw_port_options += len(feasible_producer_ports)
+            if not feasible_producer_ports:
+                continue
+            class_id = association_class_by_key.setdefault(
+                feasible_producer_ports,
+                len(association_class_by_key),
+            )
+            association_class_by_input[(candidate_id, port_idx)] = class_id
+            association_class_bindable_ports.setdefault(class_id, feasible_producer_ports)
+
+    return (
+        association_class_by_input,
+        association_class_bindable_ports,
+        feasible_associations_by_input,
+        {
+            "dynamic_association_classes": len(association_class_bindable_ports),
+            "dynamic_association_port_options": raw_port_options,
+            "dynamic_association_port_options_collapsed": max(
+                0,
+                raw_port_options - len(association_class_bindable_ports),
+            ),
+        },
+    )
+
+
+def _propagate_forced_associations(
+    *,
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+    workflow_bindable_ports: Mapping[str, set[int]],
+    feasible_associations_by_input: Mapping[tuple[str, int], tuple[tuple[str, int], ...]],
+    seed_required_candidates: Iterable[str],
+) -> tuple[tuple[str, ...], tuple[tuple[str, int, str, int], ...], int]:
+    """Propagate unique producer choices from required candidates until stable."""
+
+    required_candidates = set(seed_required_candidates)
+    forced_associations: dict[tuple[str, int], tuple[str, int]] = {}
+    fixpoint_rounds = 0
+
+    while True:
+        changed = False
+        fixpoint_rounds += 1
+        for candidate_id in sorted(required_candidates):
+            record = candidate_records_by_id.get(candidate_id)
+            if record is None:
+                continue
+            for input_port in tuple(record["input_ports"]):
+                port_idx = int(input_port["port_idx"])
+                if port_idx in workflow_bindable_ports.get(candidate_id, set()):
+                    continue
+                feasible = feasible_associations_by_input.get((candidate_id, port_idx), ())
+                if len(feasible) != 1:
+                    continue
+                producer_candidate, producer_port = feasible[0]
+                key = (candidate_id, port_idx)
+                if forced_associations.get(key) == (producer_candidate, producer_port):
+                    continue
+                forced_associations[key] = (producer_candidate, producer_port)
+                if producer_candidate not in required_candidates:
+                    required_candidates.add(producer_candidate)
+                changed = True
+        if not changed:
+            break
+
+    return (
+        tuple(sorted(required_candidates)),
+        tuple(
+            sorted(
+                (candidate_id, port_idx, producer_candidate, producer_port)
+                for (candidate_id, port_idx), (producer_candidate, producer_port) in forced_associations.items()
+            )
+        ),
+        fixpoint_rounds,
     )
 
 
@@ -184,7 +1001,7 @@ def optimize_compressed_candidates(
     *,
     max_workers: int = 1,
 ) -> CompressedCandidateOptimizationResult:
-    """Precompute the compressed-candidate surface before fact emission.
+    """Precompute the optimized-candidate surface before fact emission.
 
     The resulting record is intentionally close to the optimized ASP schema:
     candidate-step eligibility, signature support classes, goal distances, and
@@ -253,6 +1070,7 @@ def optimize_compressed_candidates(
     t0 = perf_counter()
 
     bindable_pairs: set[tuple[str, int, str, int]] = set()
+    candidate_count_before_pruning = len(candidate_records)
     reverse_edges: dict[str, set[str]] = defaultdict(set)
     candidate_records_by_id = {
         str(record["candidate_id"]): record
@@ -276,20 +1094,41 @@ def optimize_compressed_candidates(
 
     t1 = perf_counter()
 
+    output_index: dict[frozenset[tuple[str, frozenset[str]]], list[tuple[str, int]]] = defaultdict(list)
+    output_sample: dict[frozenset[tuple[str, frozenset[str]]], Mapping[str, frozenset[str]]] = {}
     for producer_record in candidate_records:
         producer_candidate = str(producer_record["candidate_id"])
         for output_port in tuple(producer_record["output_ports"]):
             producer_port = int(output_port["port_idx"])
             output_fset = output_port["port_values_fset"]
-            for consumer_record in candidate_records:
-                consumer_candidate = str(consumer_record["candidate_id"])
-                for input_port in tuple(consumer_record["input_ports"]):
-                    consumer_port = int(input_port["port_idx"])
-                    if _dynamic_output_matches_dynamic_input_fset(output_fset, input_port["port_values_fset"]):
-                        bindable_pairs.add(
-                            (producer_candidate, producer_port, consumer_candidate, consumer_port)
-                        )
-                        reverse_edges[consumer_candidate].add(producer_candidate)
+            out_key = frozenset(output_fset.items())
+            output_index[out_key].append((producer_candidate, producer_port))
+            if out_key not in output_sample:
+                output_sample[out_key] = output_fset
+
+    input_index: dict[frozenset[tuple[str, frozenset[str]]], list[tuple[str, int]]] = defaultdict(list)
+    input_sample: dict[frozenset[tuple[str, frozenset[str]]], Mapping[str, frozenset[str]]] = {}
+    for consumer_record in candidate_records:
+        consumer_candidate = str(consumer_record["candidate_id"])
+        for input_port in tuple(consumer_record["input_ports"]):
+            consumer_port = int(input_port["port_idx"])
+            input_fset = input_port["port_values_fset"]
+            in_key = frozenset(input_fset.items())
+            input_index[in_key].append((consumer_candidate, consumer_port))
+            if in_key not in input_sample:
+                input_sample[in_key] = input_fset
+
+    for out_key, producers in output_index.items():
+        output_fset = output_sample[out_key]
+        for in_key, consumers in input_index.items():
+            if not _dynamic_output_matches_dynamic_input_fset(output_fset, input_sample[in_key]):
+                continue
+            for producer_candidate, producer_port in producers:
+                for consumer_candidate, consumer_port in consumers:
+                    bindable_pairs.add(
+                        (producer_candidate, producer_port, consumer_candidate, consumer_port)
+                    )
+                    reverse_edges[consumer_candidate].add(producer_candidate)
 
     t2 = perf_counter()
 
@@ -342,20 +1181,19 @@ def optimize_compressed_candidates(
     t3 = perf_counter()
 
     min_anchor_distance_by_candidate: dict[str, int] = {}
-    if config.use_all_generated_data == "ALL":
-        backward_relevant_candidates, min_anchor_distance_by_candidate = _collect_dynamic_backward_relevant_candidates(
-            config,
-            ontology,
-            tools,
-            candidate_records=(
-                record
-                for record in candidate_records
-                if str(record["candidate_id"]) in relevant_candidates
-            ),
-            reverse_edges=reverse_edges,
-            direct_goal_candidates=direct_goal_candidates,
-        )
-        relevant_candidates &= backward_relevant_candidates
+    backward_relevant_candidates, min_anchor_distance_by_candidate = _collect_dynamic_backward_relevant_candidates(
+        config,
+        ontology,
+        tools,
+        candidate_records=candidate_records,
+        reverse_edges=reverse_edges,
+        direct_goal_candidates=direct_goal_candidates,
+    )
+    # Keep the strict backward goal closure available, but do not prune away
+    # forward-feasible tail consumers here. With use_all_generated_data=ALL the
+    # final workflow can still need sink steps after the goal is already
+    # reachable so that intermediate outputs are consumed.
+    relevant_candidates |= backward_relevant_candidates
 
     relevant_records = [
         record
@@ -371,10 +1209,24 @@ def optimize_compressed_candidates(
         for record in relevant_records
         for input_port in tuple(record["input_ports"])
     )
+    unique_input_signatures: dict[int, tuple[Mapping[str, object], Mapping[str, frozenset[str]]]] = {}
     signature_profiles_by_id, _profile_values_by_id, profile_accepts_by_id, dynamic_schema_stats = _assign_dynamic_signature_profiles(
         ontology,
         roots,
         relevant_input_ports,
+    )
+    for input_port in relevant_input_ports:
+        signature_id = int(input_port["signature_id"])
+        unique_input_signatures.setdefault(
+            signature_id,
+            (
+                input_port.get("signature_requirements", input_port["port_values_by_dimension"]),
+                input_port["port_values_fset"],
+            ),
+        )
+    bindable_input_signatures = tuple(
+        (signature_id, signature_requirements, signature_fsets)
+        for signature_id, (signature_requirements, signature_fsets) in sorted(unique_input_signatures.items())
     )
     goal_requirement_profiles_by_id: dict[int, tuple[tuple[int, str, int], ...]] = {}
     profile_id_by_accepts = {
@@ -416,7 +1268,7 @@ def optimize_compressed_candidates(
                     ontology,
                     output_port["port_values_by_dimension"],
                     output_port["port_values_fset"],
-                    relevant_input_ports,
+                    bindable_input_signatures,
                     goal_port_values_tuple,
                     goal_fsets,
                     preserve_goal_profiles=preserve_goal_profiles,
@@ -440,30 +1292,20 @@ def optimize_compressed_candidates(
             profile_accepts_by_id=profile_accepts_by_id,
         )
     )
-    (
-        signature_support_class_by_id,
-        support_class_bindable_ports,
-        support_class_stats,
-    ) = _factor_signature_support_classes(signature_bindable_ports)
 
-    candidate_output_id_map: dict[tuple[str, int], int] = {}
-    for record in relevant_records:
-        candidate_id = str(record["candidate_id"])
-        for output_port in tuple(record["output_ports"]):
-            port_idx = int(output_port["port_idx"])
-            candidate_output_id_map[(candidate_id, port_idx)] = len(candidate_output_id_map) + 1
+    selective_split_stats: dict[str, int] = {
+        "selective_split_ports_examined": 0,
+        "selective_split_ports_diverged": 0,
+        "selective_split_extra_ports_emitted": 0,
+        "selective_split_per_dim_divergence_hits": 0,
+        "selective_split_relevant_consumer_inputs": 0,
+    }
 
-    # Precompute canonical producers for each SupportClass at each possible step
-    canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
-    # (Not strictly necessary to precompute EVERYTHING here, but we can do it for Step 8)
-    # Actually, the canonical producer depends on which tools ARE RUNNING. 
-    # Python can't know that. Only ASP knows.
-    # So I must find a better way for Point 8.
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
 
-    t4 = perf_counter()
-
-
-    relevant_tools = tuple(record["tool"] for record in relevant_records)
     query_goal_candidates: set[str] = set()
     for record in relevant_records:
         candidate_id = str(record["candidate_id"])
@@ -503,20 +1345,6 @@ def optimize_compressed_candidates(
         for record in relevant_records
         if str(record["candidate_id"]) in query_goal_candidates
     }
-    min_goal_distance_by_candidate: dict[str, int] = {}
-    frontier = deque(sorted(query_goal_candidates))
-    for candidate_id in frontier:
-        min_goal_distance_by_candidate[candidate_id] = 0
-    while frontier:
-        consumer_candidate = frontier.popleft()
-        next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
-        for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
-            if producer_candidate in min_goal_distance_by_candidate:
-                continue
-            if producer_candidate not in relevant_candidates:
-                continue
-            min_goal_distance_by_candidate[producer_candidate] = next_distance
-            frontier.append(producer_candidate)
 
     min_step_by_candidate = _compute_dynamic_candidate_min_steps(
         relevant_records,
@@ -568,11 +1396,212 @@ def optimize_compressed_candidates(
         if max_step < min_step:
             continue
         max_step_by_candidate[candidate_id] = max_step
+
+    compressed_produced_bindable_ports, temporally_dropped_associations = _filter_bindability_by_temporal_overlap(
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+    )
+    compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+
+    closure_goal_candidates = set(query_goal_candidates) | set(backward_relevant_candidates)
+    if config.use_all_generated_data == "ALL":
+        closure_goal_candidates |= {
+            candidate_id
+            for candidate_id, record in candidate_records_by_id.items()
+            if not tuple(record["output_ports"])
+        }
+    brave_closed_candidates = _close_relevant_candidates(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        goal_candidates=closure_goal_candidates,
+    )
+    relevant_records = [
+        record
+        for record in relevant_records
+        if str(record["candidate_id"]) in brave_closed_candidates
+    ]
+    candidate_records_by_id = {
+        str(record["candidate_id"]): record
+        for record in relevant_records
+    }
+    query_goal_candidates &= brave_closed_candidates
+    query_goal_tools = {
+        str(record["tool"].mode_id)
+        for record in relevant_records
+        if str(record["candidate_id"]) in query_goal_candidates
+    }
+    compressed_produced_bindable_ports = {
+        consumer_candidate: {
+            consumer_port: {
+                producer_candidate
+                for producer_candidate in producer_candidates
+                if producer_candidate in brave_closed_candidates
+            }
+            for consumer_port, producer_candidates in by_port.items()
+            if any(producer_candidate in brave_closed_candidates for producer_candidate in producer_candidates)
+        }
+        for consumer_candidate, by_port in compressed_produced_bindable_ports.items()
+        if consumer_candidate in brave_closed_candidates
+    }
+    compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+    min_step_by_candidate = _compute_dynamic_candidate_min_steps(
+        relevant_records,
+        workflow_bindable_ports,
+        compressed_produced_bindable_ports,
+    )
+    max_step_by_candidate = {
+        candidate_id: max_step
+        for candidate_id, max_step in max_step_by_candidate.items()
+        if candidate_id in brave_closed_candidates
+    }
+    signature_bindable_ports = _filter_signature_bindable_ports(
+        signature_bindable_ports,
+        active_candidates=brave_closed_candidates,
+    )
+    (
+        signature_support_class_by_id,
+        support_class_bindable_ports,
+        support_class_stats,
+    ) = _factor_signature_support_classes(signature_bindable_ports)
+    (
+        association_class_by_input,
+        association_class_bindable_ports,
+        feasible_associations_by_input,
+        association_class_stats,
+    ) = _factor_input_association_classes(
+        relevant_records=relevant_records,
+        workflow_bindable_ports=workflow_bindable_ports,
+        signature_bindable_ports=signature_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+    )
+    # Still intentionally empty; canonical producers remain a solve-time notion.
+    canonical_producers: dict[tuple[int, int], tuple[int, int]] = {}
+
+    relevant_tools = tuple(record["tool"] for record in relevant_records)
+    min_goal_distance_by_candidate: dict[str, int] = {}
+    frontier = deque(sorted(query_goal_candidates))
+    for candidate_id in frontier:
+        min_goal_distance_by_candidate[candidate_id] = 0
+    while frontier:
+        consumer_candidate = frontier.popleft()
+        next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
+        for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
+            if producer_candidate in min_goal_distance_by_candidate:
+                continue
+            if producer_candidate not in candidate_records_by_id:
+                continue
+            min_goal_distance_by_candidate[producer_candidate] = next_distance
+            frontier.append(producer_candidate)
+
+    must_run_candidates_global, must_run_tools_global = _compute_global_must_run_candidates(
+        relevant_records=relevant_records,
+        workflow_bindable_ports=workflow_bindable_ports,
+        produced_bindable_ports=compressed_produced_bindable_ports,
+        query_goal_candidates=query_goal_candidates,
+    )
+    (
+        propagated_required_candidates,
+        forced_associations_global,
+        fixpoint_rounds,
+    ) = _propagate_forced_associations(
+        candidate_records_by_id=candidate_records_by_id,
+        workflow_bindable_ports=workflow_bindable_ports,
+        feasible_associations_by_input=feasible_associations_by_input,
+        seed_required_candidates=must_run_candidates_global,
+    )
+    must_run_candidates_global = propagated_required_candidates
+    must_run_tools_global = tuple(
+        sorted(
+            {
+                str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                for candidate_id in must_run_candidates_global
+                if candidate_id in candidate_records_by_id
+            }
+        )
+    )
+
+    (
+        goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon,
+        smart_expansion_rounds_by_horizon,
+    ) = _compute_smart_expansion_by_horizon(
+        config=config,
+        candidate_records_by_id=candidate_records_by_id,
+        query_goal_candidates=query_goal_candidates,
+        feasible_associations_by_input=feasible_associations_by_input,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+        min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+    )
+    (
+        structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon,
+    ) = _compute_structural_input_support_by_horizon(
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+        association_class_by_input=association_class_by_input,
+        association_class_bindable_ports=association_class_bindable_ports,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+    )
+    (
+        check_relevant_output_categories_by_horizon,
+        check_required_profile_classes_by_horizon,
+        check_profile_class_members,
+    ) = _compute_check_surface_by_horizon(
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+        feasible_associations_by_input=feasible_associations_by_input,
+        signature_profiles_by_id=signature_profiles_by_id,
+        query_goal_candidates=query_goal_candidates,
+        goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
+        goal_fsets=goal_fsets,
+    )
+    check_output_values_by_horizon = _compute_check_output_values_by_horizon(
+        check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+    )
+
+    t4 = perf_counter()
+
+    for record in relevant_records:
+        candidate_id = str(record["candidate_id"])
+        tool_id = str(record["tool"].mode_id)
+        min_step = min_step_by_candidate.get(candidate_id)
+        max_step = max_step_by_candidate.get(candidate_id)
+        if min_step is None or max_step is None or max_step < min_step:
+            continue
         for step_index in range(min_step, max_step + 1):
             allowed_candidates_by_step[step_index].add(candidate_id)
             allowed_tools_by_step[step_index].add(tool_id)
 
     t5 = perf_counter()
+
+    must_run_tools_by_step: dict[int, tuple[str, ...]] = {}
+    must_run_candidates_by_step: dict[int, tuple[str, ...]] = {}
+    forced_associations_by_step: dict[int, tuple[tuple[str, int, str, int], ...]] = {}
+    for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
+        if len(tool_ids) == 1:
+            must_run_tools_by_step[step_index] = tuple(sorted(tool_ids))
+    for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
+        if len(candidate_ids) == 1:
+            must_run_candidates_by_step[step_index] = tuple(sorted(candidate_ids))
+        step_forced_associations = tuple(
+            sorted(
+                association
+                for association in forced_associations_global
+                if association[0] in candidate_ids
+            )
+        )
+        if step_forced_associations:
+            forced_associations_by_step[step_index] = step_forced_associations
 
     earliest_goal_step = min(
         (
@@ -589,6 +1618,183 @@ def optimize_compressed_candidates(
         *must_use_min_steps,
         *at_step_lower_bounds,
     )
+    structural_horizon_skip_count = max(0, earliest_solution_step - config.solution_length_min)
+    candidate_pruned_count = max(0, candidate_count_before_pruning - len(relevant_records))
+    structural_probe_horizons = tuple(
+        sorted(
+            step_index
+            for step_index, candidate_ids in allowed_candidates_by_step.items()
+            if step_index >= earliest_solution_step
+            and any(candidate_id in query_goal_candidates for candidate_id in candidate_ids)
+        )
+    )
+    structural_horizon_skip_count += max(
+        0,
+        sum(
+            1
+            for step_index in range(max(config.solution_length_min, earliest_solution_step), config.solution_length_max + 1)
+            if step_index not in set(structural_probe_horizons)
+        )
+    )
+
+    split_consumer_horizons = structural_probe_horizons or tuple(sorted(goal_support_inputs_by_horizon))
+    split_relevant_consumer_inputs = {
+        input_key
+        for horizon in split_consumer_horizons
+        for input_key in goal_support_inputs_by_horizon.get(horizon, ())
+    }
+    selective_split_stats = _split_output_ports_for_consumer_divergence(
+        relevant_records=relevant_records,
+        bindable_pairs=bindable_pairs,
+        relevant_consumer_inputs=split_relevant_consumer_inputs,
+    )
+
+    if selective_split_stats["selective_split_ports_diverged"]:
+        (
+            compressed_reverse_edges,
+            compressed_produced_bindable_ports,
+            signature_bindable_ports,
+            bindability_stats,
+        ) = _collect_compressed_dynamic_bindability_surface(
+            bindable_pairs,
+            relevant_records=relevant_records,
+            signature_profiles_by_id=signature_profiles_by_id,
+            profile_accepts_by_id=profile_accepts_by_id,
+        )
+        compressed_produced_bindable_ports, temporally_dropped_associations = _filter_bindability_by_temporal_overlap(
+            produced_bindable_ports=compressed_produced_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+        compressed_reverse_edges = _reverse_edges_from_produced_bindable_ports(compressed_produced_bindable_ports)
+        signature_bindable_ports = _filter_signature_bindable_ports(
+            signature_bindable_ports,
+            active_candidates=brave_closed_candidates,
+        )
+        (
+            signature_support_class_by_id,
+            support_class_bindable_ports,
+            support_class_stats,
+        ) = _factor_signature_support_classes(signature_bindable_ports)
+        (
+            association_class_by_input,
+            association_class_bindable_ports,
+            feasible_associations_by_input,
+            association_class_stats,
+        ) = _factor_input_association_classes(
+            relevant_records=relevant_records,
+            workflow_bindable_ports=workflow_bindable_ports,
+            signature_bindable_ports=signature_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+
+        min_goal_distance_by_candidate = {}
+        frontier = deque(sorted(query_goal_candidates))
+        for candidate_id in frontier:
+            min_goal_distance_by_candidate[candidate_id] = 0
+        while frontier:
+            consumer_candidate = frontier.popleft()
+            next_distance = min_goal_distance_by_candidate[consumer_candidate] + 1
+            for producer_candidate in sorted(compressed_reverse_edges.get(consumer_candidate, set())):
+                if producer_candidate in min_goal_distance_by_candidate:
+                    continue
+                if producer_candidate not in candidate_records_by_id:
+                    continue
+                min_goal_distance_by_candidate[producer_candidate] = next_distance
+                frontier.append(producer_candidate)
+
+        must_run_candidates_global, must_run_tools_global = _compute_global_must_run_candidates(
+            relevant_records=relevant_records,
+            workflow_bindable_ports=workflow_bindable_ports,
+            produced_bindable_ports=compressed_produced_bindable_ports,
+            query_goal_candidates=query_goal_candidates,
+        )
+        (
+            propagated_required_candidates,
+            forced_associations_global,
+            fixpoint_rounds,
+        ) = _propagate_forced_associations(
+            candidate_records_by_id=candidate_records_by_id,
+            workflow_bindable_ports=workflow_bindable_ports,
+            feasible_associations_by_input=feasible_associations_by_input,
+            seed_required_candidates=must_run_candidates_global,
+        )
+        must_run_candidates_global = propagated_required_candidates
+        must_run_tools_global = tuple(
+            sorted(
+                {
+                    str(candidate_records_by_id[candidate_id]["tool"].mode_id)
+                    for candidate_id in must_run_candidates_global
+                    if candidate_id in candidate_records_by_id
+                }
+            )
+        )
+
+        (
+            goal_support_candidates_by_horizon,
+            goal_support_tools_by_horizon,
+            goal_support_inputs_by_horizon,
+            smart_expansion_rounds_by_horizon,
+        ) = _compute_smart_expansion_by_horizon(
+            config=config,
+            candidate_records_by_id=candidate_records_by_id,
+            query_goal_candidates=query_goal_candidates,
+            feasible_associations_by_input=feasible_associations_by_input,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+            min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        )
+        (
+            structurally_supportable_candidates_by_horizon,
+            structurally_unsupported_inputs_by_horizon,
+            input_support_rounds_by_horizon,
+        ) = _compute_structural_input_support_by_horizon(
+            goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+            goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            association_class_by_input=association_class_by_input,
+            association_class_bindable_ports=association_class_bindable_ports,
+            min_step_by_candidate=min_step_by_candidate,
+            max_step_by_candidate=max_step_by_candidate,
+        )
+        (
+            check_relevant_output_categories_by_horizon,
+            check_required_profile_classes_by_horizon,
+            check_profile_class_members,
+        ) = _compute_check_surface_by_horizon(
+            goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+            goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+            feasible_associations_by_input=feasible_associations_by_input,
+            signature_profiles_by_id=signature_profiles_by_id,
+            query_goal_candidates=query_goal_candidates,
+            goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
+            goal_fsets=goal_fsets,
+        )
+        check_output_values_by_horizon = _compute_check_output_values_by_horizon(
+            check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+        )
+
+        must_run_tools_by_step = {}
+        must_run_candidates_by_step = {}
+        forced_associations_by_step = {}
+        for step_index, tool_ids in sorted(allowed_tools_by_step.items()):
+            if len(tool_ids) == 1:
+                must_run_tools_by_step[step_index] = tuple(sorted(tool_ids))
+        for step_index, candidate_ids in sorted(allowed_candidates_by_step.items()):
+            if len(candidate_ids) == 1:
+                must_run_candidates_by_step[step_index] = tuple(sorted(candidate_ids))
+            step_forced_associations = tuple(
+                sorted(
+                    association
+                    for association in forced_associations_global
+                    if association[0] in candidate_ids
+                )
+            )
+            if step_forced_associations:
+                forced_associations_by_step[step_index] = step_forced_associations
 
     return CompressedCandidateOptimizationResult(
         tool_stats=tuple(tool_stats),
@@ -597,6 +1803,15 @@ def optimize_compressed_candidates(
         query_goal_candidates=tuple(sorted(query_goal_candidates)),
         query_goal_tools=tuple(sorted(query_goal_tools)),
         min_goal_distance_by_candidate=min_goal_distance_by_candidate,
+        min_step_by_candidate=min_step_by_candidate,
+        max_step_by_candidate=max_step_by_candidate,
+        goal_support_candidates_by_horizon=goal_support_candidates_by_horizon,
+        goal_support_tools_by_horizon=goal_support_tools_by_horizon,
+        goal_support_inputs_by_horizon=goal_support_inputs_by_horizon,
+        smart_expansion_rounds_by_horizon=smart_expansion_rounds_by_horizon,
+        structurally_supportable_candidates_by_horizon=structurally_supportable_candidates_by_horizon,
+        structurally_unsupported_inputs_by_horizon=structurally_unsupported_inputs_by_horizon,
+        input_support_rounds_by_horizon=input_support_rounds_by_horizon,
         allowed_candidates_by_step={
             step_index: tuple(sorted(candidate_ids))
             for step_index, candidate_ids in sorted(allowed_candidates_by_step.items())
@@ -605,22 +1820,76 @@ def optimize_compressed_candidates(
             step_index: tuple(sorted(tool_ids))
             for step_index, tool_ids in sorted(allowed_tools_by_step.items())
         },
+        check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+        check_required_profile_classes_by_horizon=check_required_profile_classes_by_horizon,
+        check_output_values_by_horizon=check_output_values_by_horizon,
+        check_profile_class_members=check_profile_class_members,
         signature_profiles_by_id=signature_profiles_by_id,
         profile_accepts_by_id=profile_accepts_by_id,
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
         signature_support_class_by_id=signature_support_class_by_id,
         support_class_bindable_ports=support_class_bindable_ports,
-        candidate_output_id_map=candidate_output_id_map,
+        association_class_by_input=association_class_by_input,
+        association_class_bindable_ports=association_class_bindable_ports,
         canonical_producers=canonical_producers,
         cache_stats={
-
-
             **resolver.stats(),
             **dynamic_schema_stats,
             **bindability_stats,
+            **selective_split_stats,
             **support_class_stats,
+            **association_class_stats,
             **goal_profile_stats,
+            "dynamic_candidates_before_pruning": candidate_count_before_pruning,
+            "dynamic_candidates_after_pruning": len(relevant_records),
+            "dynamic_candidates_pruned": candidate_pruned_count,
+            "dynamic_brave_relevant_candidates_after_closure": len(brave_closed_candidates),
+            "dynamic_temporally_impossible_associations_pruned": temporally_dropped_associations,
+            "dynamic_check_profile_classes": len(check_profile_class_members),
+            "dynamic_check_relevant_output_categories": sum(
+                len(entries) for entries in check_relevant_output_categories_by_horizon.values()
+            ),
+            "dynamic_check_required_profile_classes": sum(
+                len(entries) for entries in check_required_profile_classes_by_horizon.values()
+            ),
+            "dynamic_check_output_values": sum(
+                len(entries) for entries in check_output_values_by_horizon.values()
+            ),
+            "dynamic_forced_associations_global": len(forced_associations_global),
+            "dynamic_fixpoint_rounds": fixpoint_rounds,
+            "dynamic_goal_support_horizons": len(goal_support_candidates_by_horizon),
+            "dynamic_goal_support_candidates": sum(
+                len(candidate_ids)
+                for candidate_ids in goal_support_candidates_by_horizon.values()
+            ),
+            "dynamic_goal_support_inputs": sum(
+                len(input_ports)
+                for input_ports in goal_support_inputs_by_horizon.values()
+            ),
+            "dynamic_structurally_supportable_candidates": sum(
+                len(candidate_ids)
+                for candidate_ids in structurally_supportable_candidates_by_horizon.values()
+            ),
+            "dynamic_structurally_unsupported_inputs": sum(
+                len(input_ports)
+                for input_ports in structurally_unsupported_inputs_by_horizon.values()
+            ),
+            "dynamic_smart_expansion_rounds_total": sum(
+                smart_expansion_rounds_by_horizon.values()
+            ),
+            "dynamic_input_support_rounds_total": sum(
+                input_support_rounds_by_horizon.values()
+            ),
         },
+        must_run_tools_global=must_run_tools_global,
+        must_run_candidates_global=must_run_candidates_global,
+        must_run_tools_by_step=must_run_tools_by_step,
+        must_run_candidates_by_step=must_run_candidates_by_step,
+        forced_associations_global=forced_associations_global,
+        forced_associations_by_step=forced_associations_by_step,
+        fixpoint_rounds=fixpoint_rounds,
+        structural_probe_horizons=structural_probe_horizons,
+        structural_horizon_skip_count=structural_horizon_skip_count,
         earliest_solution_step=earliest_solution_step,
         phase_timings={
             "goal_check": t1 - t0,

@@ -1,5 +1,4 @@
 #program step_query(t).
-#external query(t).
 
 % STEP_QUERY — exact-horizon query-time output filtering
 % When exact horizon mode is active, the current horizon can restrict itself to

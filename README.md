@@ -32,8 +32,8 @@ Meaning:
 Backend note:
 
 - `--optimized` is currently supported only for `multi-shot`
-- `multi-shot --optimized` switches to the compressed-candidate backend under
-  `encodings/multi_shot_compressed_candidate`
+- `multi-shot --optimized` switches to the optimized-candidate backend under
+  `encodings/multi_shot_optimized_candidate`
 - `single-shot --optimized` is not implemented yet
 - `single-shot-sliding-window --optimized` is not implemented yet
 - `--ground-only` does not support `single-shot-sliding-window`
@@ -78,7 +78,7 @@ Translation only:
 ./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --translate-only --output-dir /tmp/clindaws-translate
 ```
 
-Translation only with compressed-candidate optimization:
+Translation only with optimized-candidate translation:
 
 ```bash
 ./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --optimized --translate-only --output-dir /tmp/clindaws-translate-opt
@@ -156,8 +156,8 @@ Current count basis:
 - `--project` / `--no-project` — enable/disable clingo model projection during solving
 - `--no-graphs`
 - `--graph-format png|dot|svg`
-- `--optimized` — enable the optimized backend; for `multi-shot` this selects the compressed-candidate translation/encoding path
-- `--translation-workers N` — worker processes for optimized compressed-candidate translation (default 1, sequential)
+- `--optimized` — enable the optimized backend; for `multi-shot` this selects the optimized-candidate translation/encoding path
+- `--translation-workers N` — worker processes for optimized-candidate translation (default 1, sequential)
 - `--ground-only`
 - `--ground-only-stage base|full`
 - `--translate-only`

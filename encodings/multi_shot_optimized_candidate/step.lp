@@ -10,7 +10,28 @@
 
 time(t).
 
+exact_support_filter_active(t, H) :-
+    exact_horizon_mode,
+    exact_target_horizon(H),
+    not enable_all_inputs_used,
+    not enable_all_outputs_consumed.
+
+exact_support_filter_present(t) :-
+    exact_support_filter_active(t, _).
+
+exact_support_tool_allowed(t, Tool) :-
+    exact_support_filter_active(t, H),
+    dynamic_goal_support_tool_at_horizon(Tool, H).
+
+exact_support_candidate_allowed(t, Candidate) :-
+    exact_support_filter_active(t, H),
+    dynamic_structurally_supportable_candidate_at_horizon(Candidate, H).
+
 1 { occurs(t, run(Tool)) : dynamic_step_allowed_tool(Tool, t) } 1.
+
+:- exact_support_filter_active(t, _),
+   occurs(t, run(Tool)),
+   not exact_support_tool_allowed(t, Tool).
 
 :- dynamic_must_run_tool_at_step(ToolMust, t),
    occurs(t, run(Tool)),
@@ -23,11 +44,45 @@ time(t).
 } 1 :-
     occurs(t, run(Tool)).
 
+:- exact_support_filter_active(t, _),
+   occurs(t, use_dynamic_candidate(_, Candidate)),
+   not exact_support_candidate_allowed(t, Candidate).
+
 :- dynamic_must_run_candidate_at_step(CandidateMust, t),
    occurs(t, use_dynamic_candidate(_, Candidate)),
    Candidate != CandidateMust.
 
 occurs(t, run(Tool)) :- occurs(t, use_dynamic_candidate(Tool, _)).
+
+selected_dynamic_candidate(t, Tool, Candidate) :-
+    occurs(t, use_dynamic_candidate(Tool, Candidate)).
+
+selected_candidate_bind_port(t, Candidate, Port) :-
+    selected_dynamic_candidate(t, _, Candidate),
+    dynamic_candidate_input_port(Candidate, Port).
+
+selected_candidate_support_class(
+    t,
+    Candidate,
+    Port,
+    SupportClassId
+) :-
+    selected_candidate_bind_port(t, Candidate, Port),
+    optimized_candidate_input_support_class(Candidate, Port, SupportClassId).
+
+selected_candidate_bindable_producer_port(
+    t,
+    Candidate,
+    Port,
+    ProducerCandidate,
+    ProducerPort
+) :-
+    selected_candidate_support_class(t, Candidate, Port, SupportClassId),
+    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort).
+
+input_profile_requirement(Candidate, Port, Category, ProfileId) :-
+    dynamic_candidate_input_signature_id(Candidate, Port, SignatureId),
+    dynamic_signature_profile(SignatureId, Category, ProfileId).
 
 1 {
     occurs(t, bind(Tool, Port, WF)) : eligible(Candidate, Port, WF);
@@ -54,65 +109,37 @@ produced_bind_option(
     ProducerCandidate,
     ProducerPort
 ) :-
-    occurs(t, use_dynamic_candidate(_, Candidate)),
-    compressed_candidate_input_support_class(Candidate, Port, SupportClassId),
-    dynamic_support_class_bindable_producer_port(SupportClassId, ProducerCandidate, ProducerPort),
-    occurs(TPrev, use_dynamic_candidate(ToolPrev, ProducerCandidate)),
-    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
-    TPrev < t.
-
-chosen_produced_bind(
-    t,
-    Tool,
-    Candidate,
-    Port,
-    TPrev,
-    ToolPrev,
-    ProducerCandidate,
-    ProducerPort
-) :-
-    occurs(t, use_dynamic_candidate(Tool, Candidate)),
-    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
-    produced_bind_option(
+    selected_candidate_bindable_producer_port(
         t,
         Candidate,
         Port,
-        TPrev,
-        ToolPrev,
-        ProducerCandidate,
-        ProducerPort
-    ).
-
-bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category) :-
-    chosen_produced_bind(
-        t,
-        Tool,
-        Candidate,
-        Port,
-        TPrev,
-        ToolPrev,
         ProducerCandidate,
         ProducerPort
     ),
-    dynamic_candidate_input_signature_id(Candidate, Port, SignatureId),
-    dynamic_signature_profile(SignatureId, Category, ProfileId),
-    artifact_dim(out(TPrev, ToolPrev, ProducerPort), ActualV, Category),
-    dynamic_profile_accepts(ProfileId, ActualV).
+    occurs(TPrev, output(ToolPrev, ProducerCandidate, ProducerPort)),
+    TPrev < t.
 
-:- occurs(t, use_dynamic_candidate(Tool, Candidate)),
-   occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))),
+bound_produced_artifact(t, Candidate, Port, out(TPrev, ToolPrev, ProducerPort)) :-
+    selected_dynamic_candidate(t, Tool, Candidate),
+    occurs(t, bind(Tool, Port, out(TPrev, ToolPrev, ProducerPort))).
+
+bound_produced_satisfies_profile(t, Candidate, Port, Category) :-
+    bound_produced_artifact(t, Candidate, Port, Artifact),
+    input_profile_requirement(Candidate, Port, Category, ProfileId),
+    artifact_profile_member(Artifact, Category, ProfileId).
+
+:- bound_produced_artifact(t, Candidate, Port, _),
    dynamic_candidate_input_category(Candidate, Port, Category),
-   not bound_output_category_match(t, Tool, Candidate, Port, out(TPrev, ToolPrev, ProducerPort), Category).
+   not bound_produced_satisfies_profile(t, Candidate, Port, Category).
 
-% Carry workflow-input lineage only; input-usage checks do not need full
-% produced-artifact transitive ancestry in the optimized backend.
-workflow_input_lineage(t, Artifact, WF) :-
-    workflow_input_lineage(t-1, Artifact, WF).
-
-workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
+% Lineage atoms are t-less: the artifact term `out(t, Tool, P)` already
+% embeds the producing step, so each step emits unique fresh ground atoms
+% and clingo's monotonicity carries them forward without an explicit
+% carry-forward rule (which previously duplicated O(steps × |lineage|)).
+workflow_input_lineage(out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),
-    workflow_input_lineage(t-1, Artifact, WF).
+    workflow_input_lineage(Artifact, WF).
 
 % Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
@@ -154,6 +181,10 @@ artifact_dim(out(t, Tool, Port), V, Category) :-
 artifact_dim(out(t, Tool, Port), V, Category) :-
     occurs(t, output(Tool, Candidate, Port)),
     dynamic_candidate_output_singleton(Candidate, Port, V, Category).
+
+artifact_profile_member(out(t, Tool, Port), Category, ProfileId) :-
+    artifact_dim(out(t, Tool, Port), ActualV, Category),
+    dynamic_profile_accepts(ProfileId, ActualV).
 
 consumes_output(t, Tool) :-
     occurs(t, bind(Tool, _, out(_, _, _))).
