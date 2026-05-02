@@ -435,6 +435,20 @@ def build_compressed_candidate_fact_bundle(
                 str(profile_class_id),
                 str(horizon),
             )
+    for horizon, output_values in sorted(optimization.check_output_values_by_horizon.items()):
+        if horizon < earliest_solve_horizon:
+            continue
+        if max_probe_horizon is not None and horizon > max_probe_horizon:
+            continue
+        for candidate_id, port_idx, category, value in output_values:
+            writer.emit_fact(
+                "dynamic_check_output_value_at_horizon",
+                _quote(candidate_id),
+                str(port_idx),
+                _quote(category),
+                str(horizon),
+                _quote(value),
+            )
     for profile_class_id, profile_ids in sorted(optimization.check_profile_class_members.items()):
         for profile_id in profile_ids:
             writer.emit_fact(
@@ -508,6 +522,12 @@ def build_compressed_candidate_fact_bundle(
                     int(horizon): len(entries)
                     for horizon, entries in sorted(
                         optimization.check_required_profile_classes_by_horizon.items()
+                    )
+                },
+                "check_output_value_counts_by_horizon": {
+                    int(horizon): len(entries)
+                    for horizon, entries in sorted(
+                        optimization.check_output_values_by_horizon.items()
                     )
                 },
                 "check_profile_class_count": len(optimization.check_profile_class_members),

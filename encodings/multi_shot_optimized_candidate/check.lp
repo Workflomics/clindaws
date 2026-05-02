@@ -134,9 +134,23 @@ required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
 % categories that can matter at the current horizon.
 output_port_value(t, TProd, ToolProd, Port, V, Category) :-
     query(t),
+    TProd = t,
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
     check_relevant_output_category(t, TProd, ToolProd, Port, Category),
-    query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
+    dynamic_query_output_value(ProducerCandidate, Port, V, Category).
+
+output_port_value(t, TProd, ToolProd, Port, V, Category) :-
+    query(t),
+    TProd != t,
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    dynamic_check_output_value_at_horizon(ProducerCandidate, Port, Category, t, V).
+
+output_port_value(t, TProd, ToolProd, Port, V, Category) :-
+    query(t),
+    not query_output_filter_active(t),
+    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
+    check_relevant_output_category(t, TProd, ToolProd, Port, Category),
+    dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
 
 output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
     output_port_value(t, TProd, ToolProd, Port, V, Category),

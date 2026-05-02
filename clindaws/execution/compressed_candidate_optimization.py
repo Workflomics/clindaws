@@ -193,6 +193,7 @@ class CompressedCandidateOptimizationResult:
     allowed_tools_by_step: dict[int, tuple[str, ...]]
     check_relevant_output_categories_by_horizon: dict[int, tuple[tuple[str, int, str], ...]]
     check_required_profile_classes_by_horizon: dict[int, tuple[tuple[str, int, str, int], ...]]
+    check_output_values_by_horizon: dict[int, tuple[tuple[str, int, str, str], ...]]
     check_profile_class_members: dict[int, tuple[int, ...]]
     signature_profiles_by_id: dict[int, dict[str, tuple[int, tuple[str, ...]]]]
     profile_accepts_by_id: dict[int, tuple[str, ...]]
@@ -438,6 +439,34 @@ def _compute_check_surface_by_horizon(
         required_profile_classes_by_horizon,
         dict(sorted(profile_class_members.items())),
     )
+
+
+def _compute_check_output_values_by_horizon(
+    *,
+    check_relevant_output_categories_by_horizon: Mapping[int, tuple[tuple[str, int, str], ...]],
+    candidate_records_by_id: Mapping[str, Mapping[str, object]],
+) -> dict[int, tuple[tuple[str, int, str, str], ...]]:
+    """Precompute retained output values for exact-check-relevant categories."""
+
+    output_values_by_port: dict[tuple[str, int, str], tuple[str, ...]] = {}
+    for candidate_id, record in candidate_records_by_id.items():
+        for output_port in tuple(record["output_ports"]):
+            port_idx = int(output_port["port_idx"])
+            for category, values in output_port["port_values_by_dimension"].items():
+                output_values_by_port[(candidate_id, port_idx, str(category))] = tuple(
+                    str(value)
+                    for value in values
+                )
+
+    check_output_values_by_horizon: dict[int, tuple[tuple[str, int, str, str], ...]] = {}
+    for horizon, output_categories in sorted(check_relevant_output_categories_by_horizon.items()):
+        output_values: set[tuple[str, int, str, str]] = set()
+        for candidate_id, port_idx, category in output_categories:
+            for value in output_values_by_port.get((candidate_id, int(port_idx), str(category)), ()):
+                output_values.add((candidate_id, int(port_idx), str(category), value))
+        check_output_values_by_horizon[horizon] = tuple(sorted(output_values))
+
+    return check_output_values_by_horizon
 
 
 def _compute_structural_input_support_by_horizon(
@@ -1535,6 +1564,10 @@ def optimize_compressed_candidates(
         goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
         goal_fsets=goal_fsets,
     )
+    check_output_values_by_horizon = _compute_check_output_values_by_horizon(
+        check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+        candidate_records_by_id=candidate_records_by_id,
+    )
 
     t4 = perf_counter()
 
@@ -1739,6 +1772,10 @@ def optimize_compressed_candidates(
             goal_requirement_profiles_by_id=goal_requirement_profiles_by_id,
             goal_fsets=goal_fsets,
         )
+        check_output_values_by_horizon = _compute_check_output_values_by_horizon(
+            check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
+            candidate_records_by_id=candidate_records_by_id,
+        )
 
         must_run_tools_by_step = {}
         must_run_candidates_by_step = {}
@@ -1785,6 +1822,7 @@ def optimize_compressed_candidates(
         },
         check_relevant_output_categories_by_horizon=check_relevant_output_categories_by_horizon,
         check_required_profile_classes_by_horizon=check_required_profile_classes_by_horizon,
+        check_output_values_by_horizon=check_output_values_by_horizon,
         check_profile_class_members=check_profile_class_members,
         signature_profiles_by_id=signature_profiles_by_id,
         profile_accepts_by_id=profile_accepts_by_id,
@@ -1813,6 +1851,9 @@ def optimize_compressed_candidates(
             ),
             "dynamic_check_required_profile_classes": sum(
                 len(entries) for entries in check_required_profile_classes_by_horizon.values()
+            ),
+            "dynamic_check_output_values": sum(
+                len(entries) for entries in check_output_values_by_horizon.values()
             ),
             "dynamic_forced_associations_global": len(forced_associations_global),
             "dynamic_fixpoint_rounds": fixpoint_rounds,
