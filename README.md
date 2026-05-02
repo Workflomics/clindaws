@@ -2,30 +2,23 @@
 
 ## Running
 
-Run from the workspace root (`/Volumes/ZGMF-X20A/GARYU`):
+Run from the workspace root:
 
 ```bash
 ./clindaws/clindaws-cli <path-to-config.json> [flags]
 ```
 
-Example:
-
-```bash
-./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode multi-shot --output-dir /tmp/clindaws-run
-```
 
 ## Modes
 
 The CLI supports 3 runtime modes:
 
 - `single-shot`
-- `single-shot-sliding-window`
 - `multi-shot`
 
 Meaning:
 
 - `single-shot`: one-shot solve over a full grounding for `time(1..max_length)`
-- `single-shot-sliding-window`: single-shot horizon traversal from `solution_length.min`
   to `solution_length.max`, stopping once the configured workflow limit is met
 - `multi-shot`: APE-style incremental grounding and solving
 
@@ -33,10 +26,6 @@ Backend note:
 
 - `--optimized` is currently supported only for `multi-shot`
 - `multi-shot --optimized` switches to the optimized-candidate backend under
-  `encodings/multi_shot_optimized_candidate`
-- `single-shot --optimized` is not implemented yet
-- `single-shot-sliding-window --optimized` is not implemented yet
-- `--ground-only` does not support `single-shot-sliding-window`
 
 All runtime ASP encodings are vendored under `clindaws/encodings`.
 
@@ -54,11 +43,6 @@ Single-shot:
 ./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot --solutions 1 --no-graphs --output-dir /tmp/clindaws-single
 ```
 
-Sliding-window single-shot:
-
-```bash
-./clindaws/clindaws-cli ironAPE/APE_Example/defect_concentration/config.json --mode single-shot-sliding-window --solutions 1 --no-graphs --output-dir /tmp/clindaws-single-window
-```
 
 Plain multi-shot:
 
@@ -90,11 +74,6 @@ Optimized multi-shot:
 ./clindaws/clindaws-cli ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --output-dir /tmp/clindaws-multi-opt
 ```
 
-Parallel translation expansion (8 workers):
-
-```bash
-./clindaws/clindaws-cli ironAPE/APE_Example/biotools/config.json --mode multi-shot --optimized --translation-workers 8 --output-dir /tmp/clindaws-multi-opt-par
-```
 
 ## Output Artifacts
 
