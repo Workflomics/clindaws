@@ -10,11 +10,11 @@
   "python_precompute_stats": {},
   "backend_stats": {
     "optimized_candidate_phase_timings": {
-      "bfs_pruning": 0.25936649995855987,
-      "bindable_pairs": 0.2762105419533327,
-      "compression": 5.3362976249773055,
-      "goal_check": 0.0012406670721247792,
-      "step_indexing": 0.0011853330070152879
+      "bfs_pruning": 0.2555424580350518,
+      "bindable_pairs": 0.2513332919916138,
+      "compression": 5.680493249907158,
+      "goal_check": 0.0010436660377308726,
+      "step_indexing": 0.0011607500491663814
     },
     "translation_workers": 1,
     "smart_expansion": {
@@ -44,15 +44,15 @@
       },
       "check_relevant_output_category_counts_by_horizon": {
         "1": 16,
-        "2": 448,
-        "3": 4028
+        "2": 452,
+        "3": 4278
       },
       "check_required_profile_class_counts_by_horizon": {
         "1": 14,
-        "2": 448,
-        "3": 4022
+        "2": 452,
+        "3": 4272
       },
-      "check_profile_class_count": 615,
+      "check_profile_class_count": 613,
       "goal_support_tool_counts_by_horizon": {
         "1": 8,
         "2": 207,
@@ -111,25 +111,25 @@
   },
   "workflow_input_compression": null,
   "solve_callback_profile": {
-    "model_callback_sec": 0.04441662167664617,
-    "shown_symbols_sec": 0.027841791976243258,
-    "workflow_signature_key_sec": 0.010864337324164808,
-    "canonicalization_sec": 0.005411623162217438,
-    "other_callback_sec": 0.00029886921402066946,
-    "model_callback_share_of_solving_sec": 0.0031684661618021485
+    "model_callback_sec": 0.04434925096575171,
+    "shown_symbols_sec": 0.028412874089553952,
+    "workflow_signature_key_sec": 0.01031471136957407,
+    "canonicalization_sec": 0.0053357090801000595,
+    "other_callback_sec": 0.00028595642652362585,
+    "model_callback_share_of_solving_sec": 0.0029171510482352584
   },
   "effective_parallel_mode": "2,split",
-  "translation_peak_rss_mb": 635.453125,
-  "combined_peak_rss_mb": 12492.34375,
-  "base_grounding_peak_rss_mb": 371.59375,
-  "base_grounding_sec": 0.47420991701073945,
+  "translation_peak_rss_mb": 746.546875,
+  "combined_peak_rss_mb": 14268.921875,
+  "base_grounding_peak_rss_mb": 395.3125,
+  "base_grounding_sec": 0.4925531670451164,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 1,
-      "grounding_sec": 0.03491537517402321,
+      "grounding_sec": 0.03352083289064467,
       "solving_sec": 0.0,
-      "peak_rss_mb": 1082.0,
+      "peak_rss_mb": 1163.921875,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -151,7 +151,7 @@
       "feasibility_stage_timings": [],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 0.03491537517402321,
+      "feasibility_grounding_sec": 0.03352083289064467,
       "certificate_grounding_sec": 0.0,
       "certificate_solving_sec": null,
       "full_grounding_sec": 0.0,
@@ -163,19 +163,19 @@
       "grounding_parts": [
         [
           "step_initial",
-          0.03403029206674546
+          0.03273612493649125
         ],
         [
           "constraint_step",
-          0.000885083107277751
+          0.0007847079541534185
         ]
       ]
     },
     {
       "horizon": 2,
-      "grounding_sec": 1.75741520896554,
+      "grounding_sec": 1.7233435830567032,
       "solving_sec": 0.0,
-      "peak_rss_mb": 1542.046875,
+      "peak_rss_mb": 1670.6875,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -197,7 +197,7 @@
       "feasibility_stage_timings": [],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 1.75741520896554,
+      "feasibility_grounding_sec": 1.7233435830567032,
       "certificate_grounding_sec": 0.0,
       "certificate_solving_sec": null,
       "full_grounding_sec": 0.0,
@@ -209,19 +209,19 @@
       "grounding_parts": [
         [
           "step",
-          1.6501721249660477
+          1.6390903750434518
         ],
         [
           "constraint_step",
-          0.10724308399949223
+          0.08425320801325142
         ]
       ]
     },
     {
       "horizon": 3,
-      "grounding_sec": 33.681547415908426,
-      "solving_sec": 14.018335500033572,
-      "peak_rss_mb": 12492.34375,
+      "grounding_sec": 38.28954908414744,
+      "solving_sec": 15.20293266698718,
+      "peak_rss_mb": 14260.125,
       "satisfiable": true,
       "models_seen": 91,
       "models_stored": 0,
@@ -233,29 +233,29 @@
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.04441662167664617,
-      "shown_symbols_sec": 0.027841791976243258,
-      "workflow_signature_key_sec": 0.010864337324164808,
-      "canonicalization_sec": 0.005411623162217438,
+      "model_callback_sec": 0.04434925096575171,
+      "shown_symbols_sec": 0.028412874089553952,
+      "workflow_signature_key_sec": 0.01031471136957407,
+      "canonicalization_sec": 0.0053357090801000595,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 9.709037840366364e-06,
+      "feasibility_sec": 7.917056791484356e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          3.4999102354049683e-06
+          2.7080532163381577e-06
         ],
         [
           "input_support_structural",
-          8.749775588512421e-07
+          7.499475032091141e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 12.310381792020053,
-      "certificate_grounding_sec": 1.8748862500069663,
-      "certificate_solving_sec": 8.688458290998824,
-      "full_grounding_sec": 21.371165623888373,
+      "feasibility_grounding_sec": 12.133074376033619,
+      "certificate_grounding_sec": 1.8959647500887513,
+      "certificate_solving_sec": 9.443573708995245,
+      "full_grounding_sec": 26.15647470811382,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -264,27 +264,27 @@
       "grounding_parts": [
         [
           "step",
-          10.220146417035721
+          10.244320709025487
         ],
         [
           "constraint_step",
-          2.0902353749843314
+          1.8887536670081317
         ],
         [
           "exact_certificate_check",
-          1.8748862500069663
+          1.8959647500887513
         ],
         [
           "exact_step_query",
-          0.2545490409247577
+          0.26161866704933345
         ],
         [
           "exact_check",
-          18.580633124918677
+          23.28919166594278
         ],
         [
           "exact_check_usage",
-          0.6610972080379725
+          0.7096996250329539
         ]
       ]
     }

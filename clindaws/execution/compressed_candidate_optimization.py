@@ -29,41 +29,27 @@ from clindaws.core.ontology import Ontology
 MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS = 512
 
 
-def _output_port_consumers_diverge_check(
-    output_port: Mapping[str, object],
+def _consumer_fset_key(
+    cf: Mapping[str, frozenset[str]],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        sorted((str(dim), tuple(sorted(values))) for dim, values in cf.items())
+    )
+
+
+def _producer_fset_key(
+    pf: Mapping[str, frozenset[str]],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        sorted((str(dim), tuple(sorted(values))) for dim, values in pf.items())
+    )
+
+
+def _consumers_diverge(
     *,
-    candidate_id: str,
-    bindable_pairs_by_producer: Mapping[tuple[str, int], Iterable[tuple[str, int]]],
-    consumer_input_fset_by_port: Mapping[tuple[str, int], Mapping[str, frozenset[str]]],
-    goal_relevant_candidates: frozenset[str] | None,
+    producer_fset: Mapping[str, frozenset[str]],
+    consumer_fsets: tuple[Mapping[str, frozenset[str]], ...],
 ) -> bool:
-    if int(output_port.get("multiplicity", 1)) <= 1:
-        return False
-    sources = tuple(output_port.get("source_port_indices", ()))
-    if len(sources) <= 1:
-        return False
-    producer_fset: Mapping[str, frozenset[str]] = output_port["port_values_fset"]
-    if all(len(v) <= 1 for v in producer_fset.values()):
-        return False
-
-    merged_idx = int(output_port["port_idx"])
-    seen: set[tuple[str, int]] = set()
-    consumer_fsets: list[Mapping[str, frozenset[str]]] = []
-    for cons_cand, cons_port in bindable_pairs_by_producer.get(
-        (candidate_id, merged_idx), ()
-    ):
-        if goal_relevant_candidates is not None and cons_cand not in goal_relevant_candidates:
-            continue
-        key = (cons_cand, cons_port)
-        if key in seen:
-            continue
-        seen.add(key)
-        cf = consumer_input_fset_by_port.get(key)
-        if cf is not None:
-            consumer_fsets.append(cf)
-    if len(consumer_fsets) <= 1:
-        return False
-
     for dim, available in producer_fset.items():
         if not available:
             continue
@@ -82,7 +68,9 @@ def _split_output_ports_for_consumer_divergence(
     *,
     relevant_records: Iterable[dict[str, object]],
     bindable_pairs: set[tuple[str, int, str, int]],
-    goal_relevant_candidates: frozenset[str] | None,
+    relevant_candidates: frozenset[str] | None,
+    min_step_by_candidate: Mapping[str, int],
+    max_step_by_candidate: Mapping[str, int],
 ) -> dict[str, int]:
     consumer_input_fset_by_port: dict[
         tuple[str, int], Mapping[str, frozenset[str]]
@@ -106,129 +94,126 @@ def _split_output_ports_for_consumer_divergence(
         "selective_split_ports_examined": 0,
         "selective_split_ports_diverged": 0,
         "selective_split_extra_ports_emitted": 0,
-        "selective_split_classes_total": 0,
+        "selective_split_cache_hits": 0,
+        "selective_split_cache_misses": 0,
+        "selective_split_consumers_dropped_temporal": 0,
     }
     pairs_to_delete: list[tuple[str, int, str, int]] = []
     pairs_to_add: list[tuple[str, int, str, int]] = []
 
+    # Cache: (producer_fset_key, sorted multiset of consumer fset keys) -> diverges.
+    divergence_cache: dict[
+        tuple[
+            tuple[tuple[str, tuple[str, ...]], ...],
+            tuple[tuple[tuple[str, tuple[str, ...]], ...], ...],
+        ],
+        bool,
+    ] = {}
+
     for record in relevant_records:
         cand = str(record["candidate_id"])
+        producer_min_step = min_step_by_candidate.get(cand)
         rebuilt: list[Mapping[str, object]] = []
         for output_port in tuple(record["output_ports"]):
             if int(output_port.get("multiplicity", 1)) <= 1:
                 rebuilt.append(output_port)
                 continue
-            stats["selective_split_ports_examined"] += 1
-            if not _output_port_consumers_diverge_check(
-                output_port,
-                candidate_id=cand,
-                bindable_pairs_by_producer=bindable_pairs_by_producer,
-                consumer_input_fset_by_port=consumer_input_fset_by_port,
-                goal_relevant_candidates=goal_relevant_candidates,
-            ):
+            sources = tuple(int(s) for s in output_port["source_port_indices"])
+            if len(sources) <= 1:
                 rebuilt.append(output_port)
                 continue
-            sources = tuple(int(s) for s in output_port["source_port_indices"])
-            merged_idx = int(output_port["port_idx"])
-            multiplicity = int(output_port["multiplicity"])
             producer_fset: Mapping[str, frozenset[str]] = output_port["port_values_fset"]
-            consumers = tuple(
-                (cons_cand, cons_port)
-                for cons_cand, cons_port in bindable_pairs_by_producer.get(
-                    (cand, merged_idx), ()
-                )
-                if goal_relevant_candidates is None
-                or cons_cand in goal_relevant_candidates
-            )
+            if all(len(v) <= 1 for v in producer_fset.values()):
+                rebuilt.append(output_port)
+                continue
 
-            # Greedy color consumers into value-equivalence classes.
-            class_members: list[list[tuple[str, int]]] = []
-            class_intersections: list[dict[str, frozenset[str]]] = []
-            for cons in consumers:
-                cf = consumer_input_fset_by_port.get(cons)
+            stats["selective_split_ports_examined"] += 1
+            merged_idx = int(output_port["port_idx"])
+
+            # Build per-port consumers list under relevance + temporal filters.
+            # All entries originally in bindable_pairs at (cand, merged_idx)
+            # will be deleted; only consumers in this filtered list will be
+            # re-emitted at any sub-port. Non-relevant or temporally-impossible
+            # consumers cannot appear in any goal-reaching workflow, so the
+            # surgery's drop is correctness-preserving.
+            consumers_list: list[tuple[tuple[str, int], Mapping[str, frozenset[str]]]] = []
+            for cons_cand, cons_port in bindable_pairs_by_producer.get(
+                (cand, merged_idx), ()
+            ):
+                if (
+                    relevant_candidates is not None
+                    and cons_cand not in relevant_candidates
+                ):
+                    continue
+                cons_max_step = max_step_by_candidate.get(cons_cand)
+                if (
+                    producer_min_step is not None
+                    and cons_max_step is not None
+                    and producer_min_step >= cons_max_step
+                ):
+                    stats["selective_split_consumers_dropped_temporal"] += 1
+                    continue
+                cf = consumer_input_fset_by_port.get((cons_cand, cons_port))
                 if cf is None:
                     continue
-                placed = False
-                for cls_idx, cls_intersection in enumerate(class_intersections):
-                    candidate_intersection: dict[str, frozenset[str]] = {}
-                    ok = True
-                    for dim, current in cls_intersection.items():
-                        req = cf.get(dim)
-                        if req is None:
-                            candidate_intersection[dim] = current
-                            continue
-                        merged = current & req
-                        if not merged:
-                            ok = False
-                            break
-                        candidate_intersection[dim] = merged
-                    if ok:
-                        class_members[cls_idx].append(cons)
-                        class_intersections[cls_idx] = candidate_intersection
-                        placed = True
-                        break
-                if not placed:
-                    seed = {
-                        dim: (available & cf[dim]) if dim in cf else available
-                        for dim, available in producer_fset.items()
-                    }
-                    class_members.append([cons])
-                    class_intersections.append(seed)
+                consumers_list.append(((cons_cand, cons_port), cf))
 
-            num_classes = len(class_members)
-            # Defensive: if greedy yielded ≤1 class the divergence check should
-            # not have flagged the port; if more classes than source ports the
-            # workflow is unsatisfiable in any form (matches merged behavior).
-            if num_classes <= 1 or num_classes > len(sources):
+            if len(consumers_list) <= 1:
                 rebuilt.append(output_port)
                 continue
 
-            sub_port_indices = sources[:num_classes]
-            base = multiplicity // num_classes
-            extra = multiplicity % num_classes
-            multiplicities = [
-                base + (1 if i < extra else 0) for i in range(num_classes)
-            ]
+            consumer_fsets_tuple = tuple(cf for _, cf in consumers_list)
+            cache_key = (
+                _producer_fset_key(producer_fset),
+                tuple(sorted(_consumer_fset_key(cf) for cf in consumer_fsets_tuple)),
+            )
+            cached = divergence_cache.get(cache_key)
+            if cached is None:
+                stats["selective_split_cache_misses"] += 1
+                diverges = _consumers_diverge(
+                    producer_fset=producer_fset,
+                    consumer_fsets=consumer_fsets_tuple,
+                )
+                divergence_cache[cache_key] = diverges
+            else:
+                stats["selective_split_cache_hits"] += 1
+                diverges = cached
 
-            for sub_idx, mult in zip(sub_port_indices, multiplicities):
+            if not diverges:
+                rebuilt.append(output_port)
+                continue
+
+            # 1:N split — each source port becomes its own multiplicity=1
+            # sub-port, and every filtered consumer is bindable to all N
+            # sub-ports. The encoding's `bound_output_category_match`
+            # constraint (step.lp:86–100) filters bind-options whose chosen V
+            # doesn't satisfy a consumer at solve time, so APE workflows
+            # involving uneven V allocations across source ports are
+            # preserved. Cost growth is bounded by the relevance+temporal
+            # filters above. Consecutive sym pairs are recorded so the
+            # translator can emit output_sym_ports facts for the encoding's
+            # symmetry-breaking rule (step.lp).
+            for sub_idx in sources:
                 split = dict(output_port)
                 split["port_idx"] = sub_idx
-                split["multiplicity"] = mult
+                split["multiplicity"] = 1
                 split["source_port_indices"] = (sub_idx,)
                 rebuilt.append(split)
 
-            # bindable_pairs surgery: drop ALL existing entries for this
-            # candidate at merged_idx, then re-emit per-class entries with
-            # COMPATIBILITY expansion — each consumer attaches to every
-            # sub-port whose final class-intersection still admits it, not
-            # just the class it landed in during greedy coloring. This
-            # restores APE bindability for consumers spanning multiple
-            # classes while still avoiding the 1:N full-replication blowup.
+            sym_pairs = record.setdefault("sym_output_pairs", [])
+            for prev_idx, next_idx in zip(sources, sources[1:]):
+                sym_pairs.append((next_idx, prev_idx))
+
             for cons_cand, cons_port in bindable_pairs_by_producer.get(
                 (cand, merged_idx), ()
             ):
                 pairs_to_delete.append((cand, merged_idx, cons_cand, cons_port))
-            for cons in consumers:
-                cf = consumer_input_fset_by_port.get(cons)
-                if cf is None:
-                    continue
-                for cls_idx, cls_intersection in enumerate(class_intersections):
-                    compatible = True
-                    for dim, current in cls_intersection.items():
-                        req = cf.get(dim)
-                        if req is None:
-                            continue
-                        if not (current & req):
-                            compatible = False
-                            break
-                    if compatible:
-                        pairs_to_add.append(
-                            (cand, sub_port_indices[cls_idx], cons[0], cons[1])
-                        )
+            for (cons_cand, cons_port), _cf in consumers_list:
+                for sub_idx in sources:
+                    pairs_to_add.append((cand, sub_idx, cons_cand, cons_port))
 
             stats["selective_split_ports_diverged"] += 1
-            stats["selective_split_extra_ports_emitted"] += num_classes - 1
-            stats["selective_split_classes_total"] += num_classes
+            stats["selective_split_extra_ports_emitted"] += len(sources) - 1
         record["output_ports"] = tuple(rebuilt)
 
     for entry in pairs_to_delete:
@@ -1421,10 +1406,37 @@ def optimize_compressed_candidates(
             )
         record["output_ports"] = _compress_duplicate_output_ports(tuple(compressed_output_ports))
 
+    # Early step bounds — feed only the splitter. Use the pre-bindability-surface
+    # produced_bindable_ports (already populated at line ~1289) which is a strict
+    # superset of the post-filter version, so these bounds are conservative
+    # lower bounds on the canonical min/max steps computed later. Filtering
+    # with them only drops pairs the canonical pipeline drops anyway.
+    early_min_step_by_candidate = _compute_dynamic_candidate_min_steps(
+        relevant_records,
+        workflow_bindable_ports,
+        produced_bindable_ports,
+    )
+    early_max_step_by_candidate: dict[str, int] = {}
+    for record in relevant_records:
+        cid = str(record["candidate_id"])
+        min_step = early_min_step_by_candidate.get(cid)
+        if min_step is None:
+            continue
+        max_step = config.solution_length_max
+        if config.use_all_generated_data == "ALL":
+            anchor = min_anchor_distance_by_candidate.get(cid)
+            if anchor is not None:
+                max_step = min(max_step, config.solution_length_max - anchor)
+        if max_step < min_step:
+            continue
+        early_max_step_by_candidate[cid] = max_step
+
     selective_split_stats = _split_output_ports_for_consumer_divergence(
         relevant_records=relevant_records,
         bindable_pairs=bindable_pairs,
-        goal_relevant_candidates=frozenset(backward_relevant_candidates | direct_goal_candidates),
+        relevant_candidates=frozenset(relevant_candidates),
+        min_step_by_candidate=early_min_step_by_candidate,
+        max_step_by_candidate=early_max_step_by_candidate,
     )
 
     compressed_reverse_edges, compressed_produced_bindable_ports, signature_bindable_ports, bindability_stats = (

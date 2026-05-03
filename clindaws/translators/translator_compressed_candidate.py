@@ -328,6 +328,13 @@ def build_compressed_candidate_fact_bundle(
             _quote(candidate_id),
             str(sum(int(output_port.get("multiplicity", 1)) for output_port in tuple(record["output_ports"]))),
         )
+        for port_high, port_low in tuple(record.get("sym_output_pairs", ())):
+            writer.emit_fact(
+                "output_sym_ports",
+                _quote(candidate_id),
+                str(int(port_high)),
+                str(int(port_low)),
+            )
 
     for signature_id, support_class_id in sorted(optimization.signature_support_class_by_id.items()):
         writer.emit_fact(

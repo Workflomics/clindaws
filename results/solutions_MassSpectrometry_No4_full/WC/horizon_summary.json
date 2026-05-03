@@ -10,11 +10,11 @@
   "python_precompute_stats": {},
   "backend_stats": {
     "optimized_candidate_phase_timings": {
-      "bfs_pruning": 0.24416325008496642,
-      "bindable_pairs": 0.292435749899596,
-      "compression": 8.167807542020455,
-      "goal_check": 0.001342916046269238,
-      "step_indexing": 0.0017725419020280242
+      "bfs_pruning": 0.2537417080020532,
+      "bindable_pairs": 0.25732450000941753,
+      "compression": 10.343187125050463,
+      "goal_check": 0.0012015829561278224,
+      "step_indexing": 0.0017805419629439712
     },
     "translation_workers": 1,
     "smart_expansion": {
@@ -73,29 +73,29 @@
       },
       "check_relevant_output_category_counts_by_horizon": {
         "1": 18,
-        "2": 610,
-        "3": 4202,
-        "4": 4584,
-        "5": 4606,
-        "6": 4606,
-        "7": 4606,
-        "8": 4606,
-        "9": 4606,
-        "10": 4606
+        "2": 614,
+        "3": 4474,
+        "4": 4862,
+        "5": 4884,
+        "6": 4884,
+        "7": 4884,
+        "8": 4884,
+        "9": 4884,
+        "10": 4884
       },
       "check_required_profile_class_counts_by_horizon": {
         "1": 14,
-        "2": 604,
-        "3": 4202,
-        "4": 4584,
-        "5": 4606,
-        "6": 4606,
-        "7": 4606,
-        "8": 4606,
-        "9": 4606,
-        "10": 4606
+        "2": 608,
+        "3": 4474,
+        "4": 4862,
+        "5": 4884,
+        "6": 4884,
+        "7": 4884,
+        "8": 4884,
+        "9": 4884,
+        "10": 4884
       },
-      "check_profile_class_count": 1455,
+      "check_profile_class_count": 1435,
       "goal_support_tool_counts_by_horizon": {
         "1": 9,
         "2": 288,
@@ -217,25 +217,25 @@
   },
   "workflow_input_compression": null,
   "solve_callback_profile": {
-    "model_callback_sec": 1.5692504757316783,
-    "shown_symbols_sec": 1.2629723644349724,
-    "workflow_signature_key_sec": 0.21834842034149915,
-    "canonicalization_sec": 0.08289018843788654,
-    "other_callback_sec": 0.005039502517320216,
-    "model_callback_share_of_solving_sec": 0.002982330003883573
+    "model_callback_sec": 1.557289121672511,
+    "shown_symbols_sec": 1.2392008383758366,
+    "workflow_signature_key_sec": 0.230227260151878,
+    "canonicalization_sec": 0.08224549191072583,
+    "other_callback_sec": 0.005615531234070659,
+    "model_callback_share_of_solving_sec": 0.00234913140785135
   },
   "effective_parallel_mode": "2,split",
-  "translation_peak_rss_mb": 796.40625,
-  "combined_peak_rss_mb": 43533.625,
-  "base_grounding_peak_rss_mb": 563.546875,
-  "base_grounding_sec": 0.4688386250054464,
+  "translation_peak_rss_mb": 870.421875,
+  "combined_peak_rss_mb": 44064.125,
+  "base_grounding_peak_rss_mb": 623.4375,
+  "base_grounding_sec": 0.5671584169613197,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 1,
-      "grounding_sec": 0.032087541883811355,
+      "grounding_sec": 0.036173583939671516,
       "solving_sec": 0.0,
-      "peak_rss_mb": 1444.765625,
+      "peak_rss_mb": 1582.171875,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -257,7 +257,7 @@
       "feasibility_stage_timings": [],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 0.032087541883811355,
+      "feasibility_grounding_sec": 0.036173583939671516,
       "certificate_grounding_sec": 0.0,
       "certificate_solving_sec": null,
       "full_grounding_sec": 0.0,
@@ -269,19 +269,19 @@
       "grounding_parts": [
         [
           "step_initial",
-          0.031272374908439815
+          0.03537987498566508
         ],
         [
           "constraint_step",
-          0.0008151669753715396
+          0.0007937089540064335
         ]
       ]
     },
     {
       "horizon": 2,
-      "grounding_sec": 5.048933417187072,
-      "solving_sec": 0.9528527499642223,
-      "peak_rss_mb": 3053.75,
+      "grounding_sec": 5.650427707936615,
+      "solving_sec": 1.0594432500656694,
+      "peak_rss_mb": 3372.9375,
       "satisfiable": false,
       "models_seen": 0,
       "models_stored": 0,
@@ -299,23 +299,23 @@
       "canonicalization_sec": 0.0,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 9.042094461619854e-06,
+      "feasibility_sec": 8.750008419156075e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          3.2080570235848427e-06
+          2.9159709811210632e-06
         ],
         [
           "input_support_structural",
-          9.160721674561501e-07
+          9.59029421210289e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 1.5290932910284027,
-      "certificate_grounding_sec": 0.08443112508393824,
-      "certificate_solving_sec": 0.7920278339879587,
-      "full_grounding_sec": 3.5198401261586696,
+      "feasibility_grounding_sec": 2.050900915870443,
+      "certificate_grounding_sec": 0.11863566702231765,
+      "certificate_solving_sec": 0.9179447499336675,
+      "full_grounding_sec": 3.5995267920661718,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -324,35 +324,35 @@
       "grounding_parts": [
         [
           "step",
-          1.4548019580543041
+          1.9063737909309566
         ],
         [
           "constraint_step",
-          0.07429133297409862
+          0.14452712493948638
         ],
         [
           "exact_certificate_check",
-          0.08443112508393824
+          0.11863566702231765
         ],
         [
           "exact_step_query",
-          0.05234887509141117
+          0.05950604099780321
         ],
         [
           "exact_check",
-          3.306645834003575
+          3.3372203749604523
         ],
         [
           "exact_check_usage",
-          0.07641429197974503
+          0.08416470908559859
         ]
       ]
     },
     {
       "horizon": 3,
-      "grounding_sec": 68.30964520922862,
-      "solving_sec": 141.07682258391287,
-      "peak_rss_mb": 23319.6875,
+      "grounding_sec": 91.54673029307742,
+      "solving_sec": 40.08312187495176,
+      "peak_rss_mb": 28293.3125,
       "satisfiable": true,
       "models_seen": 19,
       "models_stored": 0,
@@ -364,29 +364,29 @@
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.011216378072276711,
-      "shown_symbols_sec": 0.007331165135838091,
-      "workflow_signature_key_sec": 0.0026460442459210753,
-      "canonicalization_sec": 0.0011669171508401632,
+      "model_callback_sec": 0.0111731281504035,
+      "shown_symbols_sec": 0.0073187489761039615,
+      "workflow_signature_key_sec": 0.002607873873785138,
+      "canonicalization_sec": 0.001181543106213212,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 8.499948307871819e-06,
+      "feasibility_sec": 8.916016668081284e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          2.5830231606960297e-06
+          2.6669586077332497e-06
         ],
         [
           "input_support_structural",
-          7.920898497104645e-07
+          9.579816833138466e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 17.3462453330867,
-      "certificate_grounding_sec": 2.7230781249236315,
-      "certificate_solving_sec": 12.144606624962762,
-      "full_grounding_sec": 50.96339987614192,
+      "feasibility_grounding_sec": 21.224838791997172,
+      "certificate_grounding_sec": 3.140211542020552,
+      "certificate_solving_sec": 14.803308499976993,
+      "full_grounding_sec": 70.32189150108024,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -395,37 +395,37 @@
       "grounding_parts": [
         [
           "step",
-          13.624594792025164
+          18.126701124943793
         ],
         [
           "constraint_step",
-          3.7216505410615355
+          3.098137667053379
         ],
         [
           "exact_certificate_check",
-          2.7230781249236315
+          3.140211542020552
         ],
         [
           "exact_step_query",
-          0.4707855840679258
+          0.5460091250715777
         ],
         [
           "exact_check",
-          46.344073875108734
+          61.82402266690042
         ],
         [
           "exact_check_usage",
-          1.4254622920416296
+          4.8116481670876965
         ]
       ]
     },
     {
       "horizon": 4,
-      "grounding_sec": 130.09091895993333,
-      "solving_sec": 384.1530320419697,
-      "peak_rss_mb": 43533.625,
+      "grounding_sec": 169.60394549998455,
+      "solving_sec": 621.77868162503,
+      "peak_rss_mb": 44064.125,
       "satisfiable": true,
-      "models_seen": 1340,
+      "models_seen": 1405,
       "models_stored": 0,
       "unique_workflows_seen": 981,
       "unique_workflows_stored": 981,
@@ -435,29 +435,29 @@
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 1.5580340976594016,
-      "shown_symbols_sec": 1.2556411992991343,
-      "workflow_signature_key_sec": 0.21570237609557807,
-      "canonicalization_sec": 0.08172327128704637,
+      "model_callback_sec": 1.5461159935221076,
+      "shown_symbols_sec": 1.2318820893997326,
+      "workflow_signature_key_sec": 0.22761938627809286,
+      "canonicalization_sec": 0.08106394880451262,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 5.916925147175789e-06,
+      "feasibility_sec": 6.459071300923824e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          2.1669548004865646e-06
+          2.500019036233425e-06
         ],
         [
           "input_support_structural",
-          8.330680429935455e-07
+          7.910421118140221e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 29.864318249979988,
-      "certificate_grounding_sec": 5.418103417032398,
-      "certificate_solving_sec": 26.142236916930415,
-      "full_grounding_sec": 100.22660070995335,
+      "feasibility_grounding_sec": 37.528759415843524,
+      "certificate_grounding_sec": 5.670400792034343,
+      "certificate_solving_sec": 31.133473000023514,
+      "full_grounding_sec": 132.07518608414102,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -466,27 +466,27 @@
       "grounding_parts": [
         [
           "step",
-          24.52491887495853
+          31.767657332937233
         ],
         [
           "constraint_step",
-          5.339399375021458
+          5.761102082906291
         ],
         [
           "exact_certificate_check",
-          5.418103417032398
+          5.670400792034343
         ],
         [
           "exact_step_query",
-          1.7018130840733647
+          2.0273975000018254
         ],
         [
           "exact_check",
-          88.88422154192813
+          119.59923329204321
         ],
         [
           "exact_check_usage",
-          4.222462666919455
+          4.778154500061646
         ]
       ]
     }

@@ -148,6 +148,22 @@ workflow_input_lineage(out(t, Tool, PortOut), WF) :-
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
    ArtifactHigh < ArtifactLow.
 
+% Output-port symmetry breaking for 1:N split sub-ports of a divergent
+% producer. The consumer tool runs at the current step t and binds two of
+% its input ports to two symmetric output sub-ports of the same producer
+% from an earlier step TProducer. The smaller consumer-port must bind to
+% the smaller producer-sub-port. Mirrors workflow.py's
+% _canonicalize_binding_assignments. Translator emits
+% output_sym_ports(Candidate, PortHigh, PortLow) for consecutive sub-port
+% pairs; transitivity over consecutive pairs covers the full N-port order.
+:- output_sym_ports(Candidate, PortHigh, PortLow),
+   occurs(TProducer, output(Tool, Candidate, PortLow)),
+   occurs(TProducer, output(Tool, Candidate, PortHigh)),
+   occurs(t, bind(Tool2, ConsumerPortHigh, out(TProducer, Tool, PortLow))),
+   occurs(t, bind(Tool2, ConsumerPortLow,  out(TProducer, Tool, PortHigh))),
+   TProducer < t,
+   ConsumerPortLow < ConsumerPortHigh.
+
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),
    occurs(t, bind(Tool, Port2, WF2)),

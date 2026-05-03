@@ -1,2 +1,3 @@
 approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
 optimized_multi_shot,config_ASP_Masspectrometry_No2_full_bio_tools_WC.json,777.673461,15.863560,208.054915,553.748324,44220.188
+optimized_multi_shot,config_ASP_Masspectrometry_No2_full_bio_tools_WC.json,1419.100346,16.712403,265.323109,1137.055279,44933.188

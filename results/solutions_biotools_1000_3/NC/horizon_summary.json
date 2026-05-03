@@ -10,11 +10,11 @@
   "python_precompute_stats": {},
   "backend_stats": {
     "optimized_candidate_phase_timings": {
-      "bfs_pruning": 0.26586333301384,
-      "bindable_pairs": 0.26077208295464516,
-      "compression": 4.911620042053983,
-      "goal_check": 0.0010931669967249036,
-      "step_indexing": 0.0011774169979617
+      "bfs_pruning": 0.27904566703364253,
+      "bindable_pairs": 0.3078493330394849,
+      "compression": 7.52459391602315,
+      "goal_check": 0.001906291930936277,
+      "step_indexing": 0.001460416940972209
     },
     "translation_workers": 1,
     "smart_expansion": {
@@ -46,15 +46,15 @@
       },
       "check_relevant_output_category_counts_by_horizon": {
         "1": 16,
-        "2": 450,
-        "3": 4208
+        "2": 454,
+        "3": 4462
       },
       "check_required_profile_class_counts_by_horizon": {
         "1": 14,
-        "2": 450,
-        "3": 4202
+        "2": 454,
+        "3": 4456
       },
-      "check_profile_class_count": 1063,
+      "check_profile_class_count": 1042,
       "goal_support_tool_counts_by_horizon": {
         "1": 8,
         "2": 208,
@@ -106,32 +106,32 @@
       "must_run_candidate_steps": 0,
       "forced_associations_global": 0,
       "forced_association_steps": 0,
-      "association_class_count": 1289,
-      "association_class_candidate_edges": 415744,
+      "association_class_count": 1286,
+      "association_class_candidate_edges": 415074,
       "fixpoint_rounds": 1
     }
   },
   "workflow_input_compression": null,
   "solve_callback_profile": {
-    "model_callback_sec": 0.4250727678881958,
-    "shown_symbols_sec": 0.2454132045386359,
-    "workflow_signature_key_sec": 0.13090900098904967,
-    "canonicalization_sec": 0.04594651621300727,
-    "other_callback_sec": 0.0028040461475029588,
-    "model_callback_share_of_solving_sec": 0.010562054483397261
+    "model_callback_sec": 1.1542187319137156,
+    "shown_symbols_sec": 0.4783302416326478,
+    "workflow_signature_key_sec": 0.6179790819296613,
+    "canonicalization_sec": 0.04975362808909267,
+    "other_callback_sec": 0.008155780262313783,
+    "model_callback_share_of_solving_sec": 0.013509745025334216
   },
   "effective_parallel_mode": "2,split",
-  "translation_peak_rss_mb": 738.234375,
-  "combined_peak_rss_mb": 23228.890625,
-  "base_grounding_peak_rss_mb": 494.5625,
-  "base_grounding_sec": 0.45377679204102606,
+  "translation_peak_rss_mb": 817.96875,
+  "combined_peak_rss_mb": 12986.515625,
+  "base_grounding_peak_rss_mb": 556.59375,
+  "base_grounding_sec": 0.5370660000480711,
   "timed_out": false,
   "horizons": [
     {
       "horizon": 1,
-      "grounding_sec": 0.15075950010214,
-      "solving_sec": 0.010602124966681004,
-      "peak_rss_mb": 1334.734375,
+      "grounding_sec": 0.17054295702837408,
+      "solving_sec": 0.013493290985934436,
+      "peak_rss_mb": 1485.953125,
       "satisfiable": true,
       "models_seen": 1,
       "models_stored": 0,
@@ -143,29 +143,29 @@
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.0002026669681072235,
-      "shown_symbols_sec": 4.116608761250973e-05,
-      "workflow_signature_key_sec": 0.00012345798313617706,
-      "canonicalization_sec": 3.38749960064888e-05,
+      "model_callback_sec": 0.00022266700398176908,
+      "shown_symbols_sec": 4.6791043132543564e-05,
+      "workflow_signature_key_sec": 0.00013624993152916431,
+      "canonicalization_sec": 3.5375007428228855e-05,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 6.291083991527557e-06,
+      "feasibility_sec": 6.332993507385254e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          1.9579892978072166e-06
+          1.959037035703659e-06
         ],
         [
           "input_support_structural",
-          7.910421118140221e-07
+          7.50063918530941e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 0.0302583749871701,
-      "certificate_grounding_sec": 0.0011506249429658055,
-      "certificate_solving_sec": 0.02470616705249995,
-      "full_grounding_sec": 0.12050112511496991,
+      "feasibility_grounding_sec": 0.03926841600332409,
+      "certificate_grounding_sec": 0.0014806659892201424,
+      "certificate_solving_sec": 0.027915499988012016,
+      "full_grounding_sec": 0.13127454102504998,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -174,69 +174,69 @@
       "grounding_parts": [
         [
           "step_initial",
-          0.029551499988883734
+          0.038381375023163855
         ],
         [
           "constraint_step",
-          0.0007068749982863665
+          0.0008870409801602364
         ],
         [
           "exact_certificate_check",
-          0.0011506249429658055
+          0.0014806659892201424
         ],
         [
           "exact_step_query",
-          0.015693332999944687
+          0.019354249932803214
         ],
         [
           "exact_check",
-          0.10194679209962487
+          0.1084452080540359
         ],
         [
           "exact_check_usage",
-          0.0017103750724345446
+          0.0019944170489907265
         ]
       ]
     },
     {
       "horizon": 2,
-      "grounding_sec": 4.608090208959766,
-      "solving_sec": 2.980001042014919,
-      "peak_rss_mb": 2880.59375,
+      "grounding_sec": 5.503749126102775,
+      "solving_sec": 14.917388209025376,
+      "peak_rss_mb": 2705.265625,
       "satisfiable": true,
-      "models_seen": 933,
+      "models_seen": 5715,
       "models_stored": 0,
-      "unique_workflows_seen": 753,
-      "unique_workflows_stored": 753,
+      "unique_workflows_seen": 763,
+      "unique_workflows_stored": 763,
       "diagnostic_counts_enabled": true,
       "available_artifacts_at_step": null,
       "eligible_artifacts_at_step": null,
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.12868544168304652,
-      "shown_symbols_sec": 0.043521813233383,
-      "workflow_signature_key_sec": 0.055814680410549045,
-      "canonicalization_sec": 0.02805825404357165,
+      "model_callback_sec": 0.8585893438430503,
+      "shown_symbols_sec": 0.2841130797751248,
+      "workflow_signature_key_sec": 0.5382031690096483,
+      "canonicalization_sec": 0.03008358459919691,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 7.2909751906991005e-06,
+      "feasibility_sec": 7.5410353019833565e-06,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          2.459040842950344e-06
+          2.1670712158083916e-06
         ],
         [
           "input_support_structural",
-          7.499475032091141e-07
+          8.329516276717186e-07
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 1.5876311670290306,
-      "certificate_grounding_sec": 0.09972133301198483,
-      "certificate_solving_sec": 0.7367646250640973,
-      "full_grounding_sec": 3.020459041930735,
+      "feasibility_grounding_sec": 1.9866846670629457,
+      "certificate_grounding_sec": 0.15299145900644362,
+      "certificate_solving_sec": 0.9495774999959394,
+      "full_grounding_sec": 3.5170644590398297,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -245,69 +245,69 @@
       "grounding_parts": [
         [
           "step",
-          1.504872667021118
+          1.8862232500687242
         ],
         [
           "constraint_step",
-          0.08275850000791252
+          0.10046141699422151
         ],
         [
           "exact_certificate_check",
-          0.09972133301198483
+          0.15299145900644362
         ],
         [
           "exact_step_query",
-          0.051086083985865116
+          0.06247970799449831
         ],
         [
           "exact_check",
-          2.7951089999405667
+          3.193165958044119
         ],
         [
           "exact_check_usage",
-          0.07454262499231845
+          0.10842733399476856
         ]
       ]
     },
     {
       "horizon": 3,
-      "grounding_sec": 70.44344241684303,
-      "solving_sec": 37.254669999936596,
-      "peak_rss_mb": 23228.890625,
+      "grounding_sec": 108.90125762496609,
+      "solving_sec": 70.50513004197273,
+      "peak_rss_mb": 12422.296875,
       "satisfiable": true,
-      "models_seen": 626,
+      "models_seen": 482,
       "models_stored": 0,
-      "unique_workflows_seen": 246,
-      "unique_workflows_stored": 246,
+      "unique_workflows_seen": 236,
+      "unique_workflows_stored": 236,
       "diagnostic_counts_enabled": true,
       "available_artifacts_at_step": null,
       "eligible_artifacts_at_step": null,
       "eligible_workflow_inputs_at_step": null,
       "eligible_produced_outputs_at_step": null,
       "bind_choice_domain_size_at_step": null,
-      "model_callback_sec": 0.29618465923704207,
-      "shown_symbols_sec": 0.2018502252176404,
-      "workflow_signature_key_sec": 0.07497086259536445,
-      "canonicalization_sec": 0.01785438717342913,
+      "model_callback_sec": 0.29540672106668353,
+      "shown_symbols_sec": 0.19417037081439048,
+      "workflow_signature_key_sec": 0.0796396629884839,
+      "canonicalization_sec": 0.019634668482467532,
       "feasibility_checked": true,
       "feasibility_possible": true,
-      "feasibility_sec": 5.709007382392883e-06,
+      "feasibility_sec": 1.695798709988594e-05,
       "feasibility_stage_timings": [
         [
           "goal_only_structural",
-          2.084067091345787e-06
+          6.207963451743126e-06
         ],
         [
           "input_support_structural",
-          6.669433787465096e-07
+          3.1670788303017616e-06
         ]
       ],
       "feasibility_failure_category": null,
       "feasibility_failure_details": [],
-      "feasibility_grounding_sec": 17.73083749995567,
-      "certificate_grounding_sec": 2.807661874918267,
-      "certificate_solving_sec": 12.697474957909435,
-      "full_grounding_sec": 52.71260491688736,
+      "feasibility_grounding_sec": 22.26877833297476,
+      "certificate_grounding_sec": 3.4057382080936804,
+      "certificate_solving_sec": 15.624884791090153,
+      "full_grounding_sec": 86.63247929199133,
       "full_solve_performed": true,
       "structural_skip_only": false,
       "solve_skipped_reason": null,
@@ -316,27 +316,27 @@
       "grounding_parts": [
         [
           "step",
-          13.972283666022122
+          18.871548541937955
         ],
         [
           "constraint_step",
-          3.758553833933547
+          3.397229791036807
         ],
         [
           "exact_certificate_check",
-          2.807661874918267
+          3.4057382080936804
         ],
         [
           "exact_step_query",
-          0.4784104999853298
+          0.6004429999738932
         ],
         [
           "exact_check",
-          48.183365958044305
+          76.09275483398233
         ],
         [
           "exact_check_usage",
-          1.2431665839394554
+          6.533543249941431
         ]
       ]
     }
