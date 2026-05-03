@@ -5,3 +5,7 @@ approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_t
 optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,70.222841,10.396479,42.616314,17.209342,14375.719
 optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,71.212071,11.037557,42.336961,17.837091,14360.188
 optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,54.120869,9.257305,32.937468,11.925435,12443.266
+optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,53.917829,9.681339,33.215541,11.020363,12492.031
+optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,59.932627,10.007646,34.706966,15.217164,18908.297
+optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,59.554870,10.056962,34.572841,14.924548,15723.125
+optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,60.002766,10.035901,35.948088,14.018336,12492.344

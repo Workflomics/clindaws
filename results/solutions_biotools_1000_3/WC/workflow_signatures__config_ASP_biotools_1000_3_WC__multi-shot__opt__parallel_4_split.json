@@ -4,460 +4,6 @@
       "index": 1,
       "length": 3,
       "tools": [
-        "ProSight PTM",
-        "MassWiz",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 2,
-      "length": 3,
-      "tools": [
-        "ThermoRawFileParser",
-        "MassWiz",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 3,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "selecthitscore",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 4,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "selectbesthit",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 5,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "roi_sort",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 6,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "roi_metrics",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 7,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "roi_filter",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 8,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "RAISS",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 9,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "fetch-taxonomic-ranks",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 10,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_apply",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 11,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_intersect",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 12,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_normalize",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 13,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_not-evidence",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 14,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_union",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 15,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_validate",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 16,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "hgv_sift",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 17,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "lca",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 18,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "hgv_ldtools",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 19,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_mutations",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 20,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "roi_pca",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 21,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "taxonomy_summary",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 22,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "clc_find_variations_tab_convertor",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 23,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "clustering_resume",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 24,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_simulate-mutations",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 25,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "master2pgsnp",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 26,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "grep_count",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 27,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "hgv_codingsnps",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 28,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_mask",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 29,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_subtract",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 30,
-      "length": 3,
-      "tools": [
-        "SIMAT",
-        "gdtools_check",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
-      "index": 31,
-      "length": 3,
-      "tools": [
         "SIMAT",
         "bedtools_mergebedgraph",
         "rt"
@@ -472,7 +18,189 @@
       "goals": []
     },
     {
-      "index": 32,
+      "index": 2,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "bedtools_mergebedgraph",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
+        "t2:in2<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 3,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "clc_find_variations_tab_convertor",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 4,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "clc_find_variations_tab_convertor",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 5,
+      "length": 3,
+      "tools": [
+        "CompassXport",
+        "ComPIL",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 6,
+      "length": 3,
+      "tools": [
+        "MassHunter File Reader",
+        "ComPIL",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 7,
+      "length": 3,
+      "tools": [
+        "msConvert",
+        "ComPIL",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 8,
+      "length": 3,
+      "tools": [
+        "RawTools",
+        "ComPIL",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 9,
+      "length": 3,
+      "tools": [
+        "export",
+        "MyriMatch",
+        "rt"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 10,
+      "length": 3,
+      "tools": [
+        "export_one_data",
+        "MyriMatch",
+        "rt"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 11,
+      "length": 3,
+      "tools": [
+        "export_sbw",
+        "MyriMatch",
+        "rt"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 12,
+      "length": 3,
+      "tools": [
+        "msConvert",
+        "MassWiz",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 13,
+      "length": 3,
+      "tools": [
+        "ThermoRawFileParser",
+        "MassWiz",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 14,
       "length": 3,
       "tools": [
         "SIM",
@@ -487,7 +215,112 @@
       "goals": []
     },
     {
-      "index": 33,
+      "index": 15,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "selectbesthit",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 16,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "selecthitscore",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 17,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "selecthitscore",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 18,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "roi_sort",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 19,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "roi_pca",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 20,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "roi_metrics",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 21,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "roi_filter",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 22,
       "length": 3,
       "tools": [
         "SIM",
@@ -502,7 +335,7 @@
       "goals": []
     },
     {
-      "index": 34,
+      "index": 23,
       "length": 3,
       "tools": [
         "SIM",
@@ -517,7 +350,7 @@
       "goals": []
     },
     {
-      "index": 35,
+      "index": 24,
       "length": 3,
       "tools": [
         "SIM",
@@ -532,7 +365,7 @@
       "goals": []
     },
     {
-      "index": 36,
+      "index": 25,
       "length": 3,
       "tools": [
         "SIM",
@@ -547,7 +380,97 @@
       "goals": []
     },
     {
-      "index": 37,
+      "index": 26,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "replace_regex",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 27,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "reformat_fastq",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 28,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "RAISS",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 29,
+      "length": 3,
+      "tools": [
+        "NCBI Mass Sequence Downloader",
+        "MyriMatch",
+        "rt"
+      ],
+      "bindings": [
+        "t2:in0<-wf_input_0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 30,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "replace_regex",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 31,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "reformat_fastq",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 32,
       "length": 3,
       "tools": [
         "SIM",
@@ -562,11 +485,11 @@
       "goals": []
     },
     {
-      "index": 38,
+      "index": 33,
       "length": 3,
       "tools": [
-        "SIM",
-        "gdtools_apply",
+        "SIMAT",
+        "micropita",
         "rt"
       ],
       "bindings": [
@@ -577,11 +500,56 @@
       "goals": []
     },
     {
-      "index": 39,
+      "index": 34,
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_check",
+        "micropita",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 35,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "master2pgsnp",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 36,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "master2pgsnp",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 37,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "listinputs",
         "rt"
       ],
       "bindings": [
@@ -593,11 +561,42 @@
       "goals": []
     },
     {
+      "index": 38,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "listinputs",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 39,
+      "length": 3,
+      "tools": [
+        "SIMAT",
+        "lca",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
       "index": 40,
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_intersect",
+        "lca",
         "rt"
       ],
       "bindings": [
@@ -611,8 +610,8 @@
       "index": 41,
       "length": 3,
       "tools": [
-        "SIM",
-        "gdtools_mask",
+        "SIMAT",
+        "indices_diversity",
         "rt"
       ],
       "bindings": [
@@ -628,12 +627,13 @@
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_normalize",
+        "indices_diversity",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -642,8 +642,8 @@
       "index": 43,
       "length": 3,
       "tools": [
-        "SIM",
-        "gdtools_not-evidence",
+        "SIMAT",
+        "solid_qual_stats",
         "rt"
       ],
       "bindings": [
@@ -657,8 +657,8 @@
       "index": 44,
       "length": 3,
       "tools": [
-        "SIM",
-        "gdtools_mutations",
+        "SIMAT",
+        "taxonomy_summary",
         "rt"
       ],
       "bindings": [
@@ -673,7 +673,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_simulate-mutations",
+        "solid_qual_stats",
         "rt"
       ],
       "bindings": [
@@ -688,13 +688,12 @@
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_subtract",
+        "taxonomy_summary",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -704,7 +703,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "gdtools_union",
+        "fastq_groomer_parallel",
         "rt"
       ],
       "bindings": [
@@ -718,8 +717,8 @@
       "index": 48,
       "length": 3,
       "tools": [
-        "SIM",
-        "gdtools_validate",
+        "ProSight PTM",
+        "MassWiz",
         "rt"
       ],
       "bindings": [
@@ -733,8 +732,8 @@
       "index": 49,
       "length": 3,
       "tools": [
-        "SIM",
-        "grep_count",
+        "SIMAT",
+        "hgv_sift",
         "rt"
       ],
       "bindings": [
@@ -746,6 +745,21 @@
     },
     {
       "index": 50,
+      "length": 3,
+      "tools": [
+        "SIM",
+        "hgv_sift",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 51,
       "length": 3,
       "tools": [
         "SIM",
@@ -761,26 +775,11 @@
       "goals": []
     },
     {
-      "index": 51,
-      "length": 3,
-      "tools": [
-        "SIM",
-        "hgv_ldtools",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
       "index": 52,
       "length": 3,
       "tools": [
-        "SIM",
-        "hgv_sift",
+        "SIMAT",
+        "hgv_add_scores",
         "rt"
       ],
       "bindings": [
@@ -795,7 +794,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "lca",
+        "hgv_add_scores",
         "rt"
       ],
       "bindings": [
@@ -810,7 +809,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "master2pgsnp",
+        "clustering_resume",
         "rt"
       ],
       "bindings": [
@@ -825,7 +824,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "fetch-taxonomic-ranks",
+        "hgv_ldtools",
         "rt"
       ],
       "bindings": [
@@ -839,8 +838,8 @@
       "index": 56,
       "length": 3,
       "tools": [
-        "SIM",
-        "taxonomy_summary",
+        "SIMAT",
+        "clustering_resume",
         "rt"
       ],
       "bindings": [
@@ -854,15 +853,13 @@
       "index": 57,
       "length": 3,
       "tools": [
-        "SIM",
-        "bedtools_mergebedgraph",
+        "SIMAT",
+        "hgv_ldtools",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t2:in2<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -871,13 +868,14 @@
       "index": 58,
       "length": 3,
       "tools": [
-        "SIM",
-        "clc_find_variations_tab_convertor",
+        "SIMAT",
+        "hgv_codingsnps",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -887,7 +885,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "clustering_resume",
+        "grep_count",
         "rt"
       ],
       "bindings": [
@@ -901,8 +899,8 @@
       "index": 60,
       "length": 3,
       "tools": [
-        "SIM",
-        "selecthitscore",
+        "SIMAT",
+        "grep_count",
         "rt"
       ],
       "bindings": [
@@ -917,12 +915,13 @@
       "length": 3,
       "tools": [
         "SIM",
-        "GenePattern",
+        "gmap_snpindex",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -932,6 +931,22 @@
       "length": 3,
       "tools": [
         "SIMAT",
+        "gmap_snpindex",
+        "rt"
+      ],
+      "bindings": [
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
+        "t3:in0<-t2:out0"
+      ],
+      "goals": []
+    },
+    {
+      "index": 63,
+      "length": 3,
+      "tools": [
+        "SIM",
         "GenePattern",
         "rt"
       ],
@@ -943,33 +958,16 @@
       "goals": []
     },
     {
-      "index": 63,
-      "length": 3,
-      "tools": [
-        "SIM",
-        "gmap_snpindex",
-        "rt"
-      ],
-      "bindings": [
-        "t1:in0<-wf_input_0",
-        "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
-        "t3:in0<-t2:out0"
-      ],
-      "goals": []
-    },
-    {
       "index": 64,
       "length": 3,
       "tools": [
         "SIMAT",
-        "gmap_snpindex",
+        "GenePattern",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -979,7 +977,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "hgv_add_scores",
+        "gdtools_validate",
         "rt"
       ],
       "bindings": [
@@ -994,7 +992,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "hgv_add_scores",
+        "gdtools_validate",
         "rt"
       ],
       "bindings": [
@@ -1009,7 +1007,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "reformat_fastq",
+        "gdtools_union",
         "rt"
       ],
       "bindings": [
@@ -1024,7 +1022,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "reformat_fastq",
+        "gdtools_union",
         "rt"
       ],
       "bindings": [
@@ -1039,7 +1037,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "indices_diversity",
+        "gdtools_subtract",
         "rt"
       ],
       "bindings": [
@@ -1055,7 +1053,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "indices_diversity",
+        "gdtools_subtract",
         "rt"
       ],
       "bindings": [
@@ -1071,7 +1069,7 @@
       "length": 3,
       "tools": [
         "SIM",
-        "replace_regex",
+        "gdtools_simulate-mutations",
         "rt"
       ],
       "bindings": [
@@ -1086,7 +1084,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "replace_regex",
+        "gdtools_simulate-mutations",
         "rt"
       ],
       "bindings": [
@@ -1101,13 +1099,12 @@
       "length": 3,
       "tools": [
         "SIM",
-        "listinputs",
+        "gdtools_not-evidence",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1117,13 +1114,12 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "listinputs",
+        "gdtools_not-evidence",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
-        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1132,8 +1128,8 @@
       "index": 75,
       "length": 3,
       "tools": [
-        "SIM",
-        "fastq_groomer_parallel",
+        "SIMAT",
+        "gdtools_apply",
         "rt"
       ],
       "bindings": [
@@ -1148,7 +1144,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "fastq_groomer_parallel",
+        "gdtools_mutations",
         "rt"
       ],
       "bindings": [
@@ -1162,13 +1158,14 @@
       "index": 77,
       "length": 3,
       "tools": [
-        "SIM",
-        "micropita",
+        "SIMAT",
+        "gdtools_check",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1178,7 +1175,7 @@
       "length": 3,
       "tools": [
         "SIMAT",
-        "micropita",
+        "gdtools_intersect",
         "rt"
       ],
       "bindings": [
@@ -1192,7 +1189,7 @@
       "index": 79,
       "length": 3,
       "tools": [
-        "SIM",
+        "SIMAT",
         "filtercontrol",
         "rt"
       ],
@@ -1208,7 +1205,7 @@
       "index": 80,
       "length": 3,
       "tools": [
-        "SIMAT",
+        "SIM",
         "filtercontrol",
         "rt"
       ],
@@ -1224,13 +1221,14 @@
       "index": 81,
       "length": 3,
       "tools": [
-        "SIM",
-        "solid_qual_stats",
+        "SIMAT",
+        "gdtools_mask",
         "rt"
       ],
       "bindings": [
         "t1:in0<-wf_input_0",
         "t2:in0<-t1:out0",
+        "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1239,8 +1237,8 @@
       "index": 82,
       "length": 3,
       "tools": [
-        "SIMAT",
-        "solid_qual_stats",
+        "SIM",
+        "fetch-taxonomic-ranks",
         "rt"
       ],
       "bindings": [
@@ -1254,8 +1252,8 @@
       "index": 83,
       "length": 3,
       "tools": [
-        "CompassXport",
-        "ComPIL",
+        "SIMAT",
+        "gdtools_normalize",
         "rt"
       ],
       "bindings": [
@@ -1269,8 +1267,8 @@
       "index": 84,
       "length": 3,
       "tools": [
-        "RawTools",
-        "ComPIL",
+        "SIMAT",
+        "fetch-taxonomic-ranks",
         "rt"
       ],
       "bindings": [
@@ -1284,8 +1282,8 @@
       "index": 85,
       "length": 3,
       "tools": [
-        "MassHunter File Reader",
-        "ComPIL",
+        "SIM",
+        "gdtools_apply",
         "rt"
       ],
       "bindings": [
@@ -1299,13 +1297,13 @@
       "index": 86,
       "length": 3,
       "tools": [
-        "NCBI Mass Sequence Downloader",
-        "MyriMatch",
+        "SIMAT",
+        "fastq_groomer_parallel",
         "rt"
       ],
       "bindings": [
-        "t2:in0<-wf_input_0",
-        "t2:in1<-t1:out0",
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1314,8 +1312,8 @@
       "index": 87,
       "length": 3,
       "tools": [
-        "msConvert",
-        "ComPIL",
+        "SIM",
+        "gdtools_intersect",
         "rt"
       ],
       "bindings": [
@@ -1329,8 +1327,8 @@
       "index": 88,
       "length": 3,
       "tools": [
-        "msConvert",
-        "MassWiz",
+        "SIM",
+        "gdtools_normalize",
         "rt"
       ],
       "bindings": [
@@ -1344,13 +1342,13 @@
       "index": 89,
       "length": 3,
       "tools": [
-        "export_sbw",
-        "MyriMatch",
+        "SIM",
+        "gdtools_mutations",
         "rt"
       ],
       "bindings": [
-        "t2:in0<-wf_input_0",
-        "t2:in1<-t1:out0",
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
         "t3:in0<-t2:out0"
       ],
       "goals": []
@@ -1359,12 +1357,13 @@
       "index": 90,
       "length": 3,
       "tools": [
-        "export",
-        "MyriMatch",
+        "SIM",
+        "gdtools_mask",
         "rt"
       ],
       "bindings": [
-        "t2:in0<-wf_input_0",
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
         "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
@@ -1374,12 +1373,13 @@
       "index": 91,
       "length": 3,
       "tools": [
-        "export_one_data",
-        "MyriMatch",
+        "SIM",
+        "gdtools_check",
         "rt"
       ],
       "bindings": [
-        "t2:in0<-wf_input_0",
+        "t1:in0<-wf_input_0",
+        "t2:in0<-t1:out0",
         "t2:in1<-t1:out0",
         "t3:in0<-t2:out0"
       ],
