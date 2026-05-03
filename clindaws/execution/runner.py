@@ -271,6 +271,15 @@ def _solver_approach(mode: str) -> str:
     return _mode_config(mode).solver_approach
 
 
+def _approach_label(mode: str, optimized: bool) -> str:
+    family = _mode_config(mode).solver_family
+    if family == "single-shot":
+        return "single_shot"
+    if optimized or _mode_config(mode).solver_approach == "optimized_candidate":
+        return "optimized_multi_shot"
+    return "multi-shot"
+
+
 def _report(progress_callback: ProgressCallback, message: str) -> None:
     if progress_callback is not None:
         progress_callback(message)
@@ -732,8 +741,6 @@ class _RunLogWriter:
         "mode",
         "horizon",
         "optimized_enabled",
-        "effective_parallel_mode",
-        "compressed_candidate_engaged",
         "translation_ms",
         "setup_grounding_ms",
         "solving_ms",
@@ -756,8 +763,6 @@ class _RunLogWriter:
         run_id: str,
         timestamp_utc: str,
         optimized_enabled: bool,
-        effective_parallel_mode: str | None,
-        compressed_candidate_engaged: bool,
     ) -> None:
         self.csv_path = csv_path
         self.cumulative_unique_solutions = 0
@@ -765,8 +770,6 @@ class _RunLogWriter:
         self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
         self.mode = mode
         self.optimized_enabled = optimized_enabled
-        self.effective_parallel_mode = effective_parallel_mode or ""
-        self.compressed_candidate_engaged = str(compressed_candidate_engaged).lower()
         self.base_grounding_ms = 0
         self.base_grounding_peak_rss_mb = 0.0
         self._translation_ms = 0
@@ -796,8 +799,6 @@ class _RunLogWriter:
                 "mode": self.mode,
                 "horizon": record.horizon,
                 "optimized_enabled": str(self.optimized_enabled).lower(),
-                "effective_parallel_mode": self.effective_parallel_mode,
-                "compressed_candidate_engaged": self.compressed_candidate_engaged,
                 "translation_ms": self._translation_ms,
                 "setup_grounding_ms": setup_grounding_ms,
                 "solving_ms": round(record.solving_sec * 1000),
@@ -816,8 +817,6 @@ class _RunLogWriter:
                 "mode": self.mode,
                 "horizon": "timeout",
                 "optimized_enabled": str(self.optimized_enabled).lower(),
-                "effective_parallel_mode": self.effective_parallel_mode,
-                "compressed_candidate_engaged": self.compressed_candidate_engaged,
                 "translation_ms": self._translation_ms,
                 "setup_grounding_ms": elapsed_ms,
                 "solving_ms": "",
@@ -833,40 +832,13 @@ class _RunSummaryWriter:
     """Append-only per-run summary CSV logger."""
 
     fieldnames = [
-        "run_id",
-        "timestamp_utc",
-        "mode",
-        "solver_family",
-        "solver_approach",
-        "grounding_strategy",
-        "config_path",
-        "ontology_used",
-        "ontology_entry_count",
-        "tool_annotation_used",
-        "tool_count",
-        "constraints_used",
-        "constraint_count",
-        "translation_builder",
-        "translation_schema",
-        "completed_stage",
-        "fact_count",
+        "approach",
+        "config_file",
+        "total_sec",
         "translation_sec",
-        "translation_peak_rss_mb",
-        "combined_peak_rss_mb",
-        "base_grounding_sec",
-        "base_grounding_peak_rss_mb",
         "grounding_sec_total",
         "solving_sec_total",
-        "rendering_sec_total",
-        "total_sec",
-        "raw_models_seen",
-        "raw_solutions_found",
-        "solutions_found",
-        "grounded_horizons",
-        "first_satisfiable_horizon",
-        "optimized_enabled",
-        "effective_parallel_mode",
-        "compressed_candidate_engaged",
+        "peak_rss_mb",
     ]
 
     def __init__(
@@ -874,75 +846,30 @@ class _RunSummaryWriter:
         *,
         csv_path: Path,
         mode: str,
-        grounding_strategy: str,
-        fact_count: int,
         run_metadata: dict[str, object],
-        translation_builder: TranslationBuilder,
-        translation_schema: str,
-        run_id: str,
-        timestamp_utc: str,
         optimized_enabled: bool,
-        compressed_candidate_engaged: bool,
     ) -> None:
         self.csv_path = csv_path
         self.base_row = {
-            "run_id": run_id,
-            "timestamp_utc": timestamp_utc,
-            "mode": mode,
-            "solver_family": _solver_family(mode),
-            "solver_approach": _solver_approach(mode),
-            "grounding_strategy": grounding_strategy,
-            "config_path": run_metadata["config_path"],
-            "ontology_used": run_metadata["ontology_used"],
-            "ontology_entry_count": run_metadata["ontology_entry_count"],
-            "tool_annotation_used": run_metadata["tool_annotation_used"],
-            "tool_count": run_metadata["tool_count"],
-            "constraints_used": run_metadata["constraints_used"],
-            "constraint_count": run_metadata["constraint_count"],
-            "translation_builder": translation_builder,
-            "translation_schema": translation_schema,
-            "fact_count": fact_count,
-            "optimized_enabled": str(optimized_enabled).lower(),
-            "compressed_candidate_engaged": str(compressed_candidate_engaged).lower(),
+            "approach": _approach_label(mode, optimized_enabled),
+            "config_file": Path(str(run_metadata["config_path"])).name,
         }
         _ensure_csv_header(self.csv_path, self.fieldnames)
 
     def log_summary(
         self,
         *,
-        completed_stage: str,
         timings: TimingBreakdown,
-        translation_peak_rss_mb: float,
         combined_peak_rss_mb: float,
-        base_grounding_sec: float,
-        base_grounding_peak_rss_mb: float,
-        horizon_records: tuple[HorizonRecord, ...],
-        raw_models_seen: int,
-        raw_solutions_found: int,
-        solutions_found: int,
-        grounded_horizons: tuple[int, ...] = (),
-        effective_parallel_mode: str | None = None,
+        **_ignored: object,
     ) -> None:
-        first_satisfiable = next((record.horizon for record in horizon_records if record.satisfiable), None)
-        grounded_horizons_text = ",".join(str(horizon) for horizon in grounded_horizons)
         row = {
             **self.base_row,
-            "completed_stage": completed_stage,
+            "total_sec": f"{timings.total_sec:.6f}",
             "translation_sec": f"{timings.translation_sec:.6f}",
-            "translation_peak_rss_mb": f"{translation_peak_rss_mb:.3f}" if translation_peak_rss_mb else "",
-            "combined_peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
-            "base_grounding_sec": f"{base_grounding_sec:.6f}" if base_grounding_sec else "",
-            "base_grounding_peak_rss_mb": f"{base_grounding_peak_rss_mb:.3f}" if base_grounding_peak_rss_mb else "",
             "grounding_sec_total": f"{timings.grounding_sec:.6f}",
             "solving_sec_total": f"{timings.solving_sec:.6f}",
-            "rendering_sec_total": f"{timings.rendering_sec:.6f}",
-            "total_sec": f"{timings.total_sec:.6f}",
-            "raw_models_seen": raw_models_seen,
-            "raw_solutions_found": raw_solutions_found,
-            "solutions_found": solutions_found,
-            "grounded_horizons": grounded_horizons_text,
-            "first_satisfiable_horizon": first_satisfiable if first_satisfiable is not None else "",
-            "effective_parallel_mode": effective_parallel_mode or "",
+            "peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
         }
         with self.csv_path.open("a", encoding="utf-8", newline="") as handle:
             csv.DictWriter(handle, fieldnames=self.fieldnames).writerow(row)
@@ -962,8 +889,6 @@ class _RunCsvWriters:
         translation_builder: TranslationBuilder,
         translation_schema: str,
         optimized_enabled: bool,
-        effective_parallel_mode: str | None,
-        compressed_candidate_engaged: bool,
     ) -> None:
         run_id = str(uuid4())
         timestamp_utc = datetime.now(timezone.utc).isoformat()
@@ -979,21 +904,12 @@ class _RunCsvWriters:
             run_id=run_id,
             timestamp_utc=timestamp_utc,
             optimized_enabled=optimized_enabled,
-            effective_parallel_mode=effective_parallel_mode,
-            compressed_candidate_engaged=compressed_candidate_engaged,
         )
         self.summary_writer = _RunSummaryWriter(
             csv_path=csv_dir / "asp_run_summary.csv",
             mode=mode,
-            grounding_strategy=grounding_strategy,
-            fact_count=fact_count,
             run_metadata=run_metadata,
-            translation_builder=translation_builder,
-            translation_schema=translation_schema,
-            run_id=run_id,
-            timestamp_utc=timestamp_utc,
             optimized_enabled=optimized_enabled,
-            compressed_candidate_engaged=compressed_candidate_engaged,
         )
 
     @property
@@ -1626,8 +1542,6 @@ def run_translate_only(
             translation_builder=ctx.resolved_translation_builder,
             translation_schema=_translation_schema(ctx.fact_bundle),
             optimized_enabled=optimized,
-            effective_parallel_mode=None,
-            compressed_candidate_engaged=_compressed_candidate_engaged(ctx.fact_bundle),
         )
         csv_writers.step_writer.log_translation(
             translation_sec=ctx.translation_sec,
@@ -1742,8 +1656,6 @@ def run_once(
             translation_builder=_translation_builder,
             translation_schema=_translation_schema(fact_bundle),
             optimized_enabled=optimized,
-            effective_parallel_mode=effective_parallel_mode,
-            compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
         )
         csv_writers.step_writer.log_translation(
             translation_sec=translation_sec,
@@ -2120,8 +2032,6 @@ def run_ground_only(
             translation_builder=translation_builder,
             translation_schema=_translation_schema(fact_bundle),
             optimized_enabled=optimized,
-            effective_parallel_mode=None,
-            compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
         )
         csv_writers.step_writer.log_translation(
             translation_sec=translation_sec,

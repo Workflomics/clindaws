@@ -29,6 +29,216 @@ from clindaws.core.ontology import Ontology
 MAX_GLOBAL_MUST_RUN_REMOVAL_TESTS = 512
 
 
+def _output_port_consumers_diverge_check(
+    output_port: Mapping[str, object],
+    *,
+    candidate_id: str,
+    bindable_pairs_by_producer: Mapping[tuple[str, int], Iterable[tuple[str, int]]],
+    consumer_input_fset_by_port: Mapping[tuple[str, int], Mapping[str, frozenset[str]]],
+    goal_relevant_candidates: frozenset[str] | None,
+) -> bool:
+    if int(output_port.get("multiplicity", 1)) <= 1:
+        return False
+    sources = tuple(output_port.get("source_port_indices", ()))
+    if len(sources) <= 1:
+        return False
+    producer_fset: Mapping[str, frozenset[str]] = output_port["port_values_fset"]
+    if all(len(v) <= 1 for v in producer_fset.values()):
+        return False
+
+    merged_idx = int(output_port["port_idx"])
+    seen: set[tuple[str, int]] = set()
+    consumer_fsets: list[Mapping[str, frozenset[str]]] = []
+    for cons_cand, cons_port in bindable_pairs_by_producer.get(
+        (candidate_id, merged_idx), ()
+    ):
+        if goal_relevant_candidates is not None and cons_cand not in goal_relevant_candidates:
+            continue
+        key = (cons_cand, cons_port)
+        if key in seen:
+            continue
+        seen.add(key)
+        cf = consumer_input_fset_by_port.get(key)
+        if cf is not None:
+            consumer_fsets.append(cf)
+    if len(consumer_fsets) <= 1:
+        return False
+
+    for dim, available in producer_fset.items():
+        if not available:
+            continue
+        intersection = available
+        for cf in consumer_fsets:
+            req = cf.get(dim)
+            if req is None:
+                continue
+            intersection = intersection & req
+            if not intersection:
+                return True
+    return False
+
+
+def _split_output_ports_for_consumer_divergence(
+    *,
+    relevant_records: Iterable[dict[str, object]],
+    bindable_pairs: set[tuple[str, int, str, int]],
+    goal_relevant_candidates: frozenset[str] | None,
+) -> dict[str, int]:
+    consumer_input_fset_by_port: dict[
+        tuple[str, int], Mapping[str, frozenset[str]]
+    ] = {}
+    for record in relevant_records:
+        cand = str(record["candidate_id"])
+        for input_port in tuple(record["input_ports"]):
+            consumer_input_fset_by_port[(cand, int(input_port["port_idx"]))] = (
+                input_port["port_values_fset"]
+            )
+
+    bindable_pairs_by_producer: dict[tuple[str, int], list[tuple[str, int]]] = (
+        defaultdict(list)
+    )
+    for prod_cand, prod_port, cons_cand, cons_port in bindable_pairs:
+        bindable_pairs_by_producer[(prod_cand, int(prod_port))].append(
+            (cons_cand, int(cons_port))
+        )
+
+    stats = {
+        "selective_split_ports_examined": 0,
+        "selective_split_ports_diverged": 0,
+        "selective_split_extra_ports_emitted": 0,
+        "selective_split_classes_total": 0,
+    }
+    pairs_to_delete: list[tuple[str, int, str, int]] = []
+    pairs_to_add: list[tuple[str, int, str, int]] = []
+
+    for record in relevant_records:
+        cand = str(record["candidate_id"])
+        rebuilt: list[Mapping[str, object]] = []
+        for output_port in tuple(record["output_ports"]):
+            if int(output_port.get("multiplicity", 1)) <= 1:
+                rebuilt.append(output_port)
+                continue
+            stats["selective_split_ports_examined"] += 1
+            if not _output_port_consumers_diverge_check(
+                output_port,
+                candidate_id=cand,
+                bindable_pairs_by_producer=bindable_pairs_by_producer,
+                consumer_input_fset_by_port=consumer_input_fset_by_port,
+                goal_relevant_candidates=goal_relevant_candidates,
+            ):
+                rebuilt.append(output_port)
+                continue
+            sources = tuple(int(s) for s in output_port["source_port_indices"])
+            merged_idx = int(output_port["port_idx"])
+            multiplicity = int(output_port["multiplicity"])
+            producer_fset: Mapping[str, frozenset[str]] = output_port["port_values_fset"]
+            consumers = tuple(
+                (cons_cand, cons_port)
+                for cons_cand, cons_port in bindable_pairs_by_producer.get(
+                    (cand, merged_idx), ()
+                )
+                if goal_relevant_candidates is None
+                or cons_cand in goal_relevant_candidates
+            )
+
+            # Greedy color consumers into value-equivalence classes.
+            class_members: list[list[tuple[str, int]]] = []
+            class_intersections: list[dict[str, frozenset[str]]] = []
+            for cons in consumers:
+                cf = consumer_input_fset_by_port.get(cons)
+                if cf is None:
+                    continue
+                placed = False
+                for cls_idx, cls_intersection in enumerate(class_intersections):
+                    candidate_intersection: dict[str, frozenset[str]] = {}
+                    ok = True
+                    for dim, current in cls_intersection.items():
+                        req = cf.get(dim)
+                        if req is None:
+                            candidate_intersection[dim] = current
+                            continue
+                        merged = current & req
+                        if not merged:
+                            ok = False
+                            break
+                        candidate_intersection[dim] = merged
+                    if ok:
+                        class_members[cls_idx].append(cons)
+                        class_intersections[cls_idx] = candidate_intersection
+                        placed = True
+                        break
+                if not placed:
+                    seed = {
+                        dim: (available & cf[dim]) if dim in cf else available
+                        for dim, available in producer_fset.items()
+                    }
+                    class_members.append([cons])
+                    class_intersections.append(seed)
+
+            num_classes = len(class_members)
+            # Defensive: if greedy yielded ≤1 class the divergence check should
+            # not have flagged the port; if more classes than source ports the
+            # workflow is unsatisfiable in any form (matches merged behavior).
+            if num_classes <= 1 or num_classes > len(sources):
+                rebuilt.append(output_port)
+                continue
+
+            sub_port_indices = sources[:num_classes]
+            base = multiplicity // num_classes
+            extra = multiplicity % num_classes
+            multiplicities = [
+                base + (1 if i < extra else 0) for i in range(num_classes)
+            ]
+
+            for sub_idx, mult in zip(sub_port_indices, multiplicities):
+                split = dict(output_port)
+                split["port_idx"] = sub_idx
+                split["multiplicity"] = mult
+                split["source_port_indices"] = (sub_idx,)
+                rebuilt.append(split)
+
+            # bindable_pairs surgery: drop ALL existing entries for this
+            # candidate at merged_idx, then re-emit per-class entries with
+            # COMPATIBILITY expansion — each consumer attaches to every
+            # sub-port whose final class-intersection still admits it, not
+            # just the class it landed in during greedy coloring. This
+            # restores APE bindability for consumers spanning multiple
+            # classes while still avoiding the 1:N full-replication blowup.
+            for cons_cand, cons_port in bindable_pairs_by_producer.get(
+                (cand, merged_idx), ()
+            ):
+                pairs_to_delete.append((cand, merged_idx, cons_cand, cons_port))
+            for cons in consumers:
+                cf = consumer_input_fset_by_port.get(cons)
+                if cf is None:
+                    continue
+                for cls_idx, cls_intersection in enumerate(class_intersections):
+                    compatible = True
+                    for dim, current in cls_intersection.items():
+                        req = cf.get(dim)
+                        if req is None:
+                            continue
+                        if not (current & req):
+                            compatible = False
+                            break
+                    if compatible:
+                        pairs_to_add.append(
+                            (cand, sub_port_indices[cls_idx], cons[0], cons[1])
+                        )
+
+            stats["selective_split_ports_diverged"] += 1
+            stats["selective_split_extra_ports_emitted"] += num_classes - 1
+            stats["selective_split_classes_total"] += num_classes
+        record["output_ports"] = tuple(rebuilt)
+
+    for entry in pairs_to_delete:
+        bindable_pairs.discard(entry)
+    for entry in pairs_to_add:
+        bindable_pairs.add(entry)
+
+    return stats
+
+
 @dataclass(frozen=True)
 class CompressedCandidateOptimizationResult:
     """Optimized-candidate surface ready for fact emission."""
@@ -1211,6 +1421,12 @@ def optimize_compressed_candidates(
             )
         record["output_ports"] = _compress_duplicate_output_ports(tuple(compressed_output_ports))
 
+    selective_split_stats = _split_output_ports_for_consumer_divergence(
+        relevant_records=relevant_records,
+        bindable_pairs=bindable_pairs,
+        goal_relevant_candidates=frozenset(backward_relevant_candidates | direct_goal_candidates),
+    )
+
     compressed_reverse_edges, compressed_produced_bindable_ports, signature_bindable_ports, bindability_stats = (
         _collect_compressed_dynamic_bindability_surface(
             bindable_pairs,
@@ -1590,6 +1806,7 @@ def optimize_compressed_candidates(
             **resolver.stats(),
             **dynamic_schema_stats,
             **bindability_stats,
+            **selective_split_stats,
             **support_class_stats,
             **association_class_stats,
             **goal_profile_stats,

@@ -1,0 +1,2 @@
+approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
+optimized_multi_shot,config_ASP_ImageMagick_Ex2_WC.json,0.673181,0.017058,0.211705,0.437882,289.016

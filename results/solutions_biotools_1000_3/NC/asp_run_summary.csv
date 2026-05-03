@@ -1,0 +1,3 @@
+approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
+,,209.867277,9.972571,96.287988,103.604722,
+optimized_multi_shot,config_ASP_biotools_1000_3_NC.json,125.340774,9.437470,75.656069,40.245273,23228.891
