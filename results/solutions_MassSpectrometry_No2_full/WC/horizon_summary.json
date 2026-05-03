@@ -1,0 +1,468 @@
+{
+  "mode": "multi-shot",
+  "grounding_strategy": "hybrid",
+  "internal_schema": "optimized_candidate",
+  "internal_solver_mode": "multi-shot-optimized-candidate",
+  "earliest_solution_step": 3,
+  "effective_solve_start_horizon": 3,
+  "python_precompute_enabled": false,
+  "python_precompute_fact_count": 0,
+  "python_precompute_stats": {},
+  "backend_stats": {
+    "optimized_candidate_phase_timings": {
+      "bfs_pruning": 0.2620909169781953,
+      "bindable_pairs": 0.29204887500964105,
+      "compression": 9.364365875022486,
+      "goal_check": 0.0014735000440850854,
+      "step_indexing": 0.002521708025597036
+    },
+    "translation_workers": 1,
+    "smart_expansion": {
+      "earliest_feasible_horizon": 3,
+      "structural_horizon_skip_count": 2,
+      "structural_probe_horizons": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "query_control_mode": "assumptions",
+      "available_model_blocking_modes": [
+        "candidate_sequence_clause"
+      ],
+      "smart_expansion_rounds_by_horizon": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1
+      },
+      "goal_support_candidate_counts_by_horizon": {
+        "1": 9,
+        "2": 228,
+        "3": 1441,
+        "4": 1618,
+        "5": 1628,
+        "6": 1628,
+        "7": 1628,
+        "8": 1628,
+        "9": 1628,
+        "10": 1628
+      },
+      "goal_support_input_counts_by_horizon": {
+        "1": 2,
+        "2": 426,
+        "3": 2389,
+        "4": 2624,
+        "5": 2637,
+        "6": 2637,
+        "7": 2637,
+        "8": 2637,
+        "9": 2637,
+        "10": 2637
+      },
+      "check_relevant_output_category_counts_by_horizon": {
+        "1": 18,
+        "2": 490,
+        "3": 4168,
+        "4": 4586,
+        "5": 4608,
+        "6": 4608,
+        "7": 4608,
+        "8": 4608,
+        "9": 4608,
+        "10": 4608
+      },
+      "check_required_profile_class_counts_by_horizon": {
+        "1": 14,
+        "2": 488,
+        "3": 4168,
+        "4": 4586,
+        "5": 4608,
+        "6": 4608,
+        "7": 4608,
+        "8": 4608,
+        "9": 4608,
+        "10": 4608
+      },
+      "check_profile_class_count": 1416,
+      "goal_support_tool_counts_by_horizon": {
+        "1": 9,
+        "2": 228,
+        "3": 1441,
+        "4": 1618,
+        "5": 1628,
+        "6": 1628,
+        "7": 1628,
+        "8": 1628,
+        "9": 1628,
+        "10": 1628
+      },
+      "goal_support_goal_counts_by_horizon": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1
+      },
+      "goal_support_missing_goals_by_horizon": {
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": [],
+        "8": [],
+        "9": [],
+        "10": []
+      },
+      "supportable_candidate_counts_by_horizon": {
+        "1": 9,
+        "2": 228,
+        "3": 1441,
+        "4": 1618,
+        "5": 1628,
+        "6": 1628,
+        "7": 1628,
+        "8": 1628,
+        "9": 1628,
+        "10": 1628
+      },
+      "unsupported_input_counts_by_horizon": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "10": 0
+      },
+      "unsupported_input_samples_by_horizon": {
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": [],
+        "8": [],
+        "9": [],
+        "10": []
+      },
+      "supportable_goal_counts_by_horizon": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1
+      },
+      "supportable_missing_goals_by_horizon": {
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": [],
+        "8": [],
+        "9": [],
+        "10": []
+      },
+      "input_support_rounds_by_horizon": {
+        "1": 1,
+        "2": 2,
+        "3": 2,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3,
+        "10": 3
+      },
+      "must_run_tools_global": 0,
+      "must_run_candidates_global": 0,
+      "must_run_tool_steps": 0,
+      "must_run_candidate_steps": 0,
+      "forced_associations_global": 0,
+      "forced_association_steps": 0,
+      "association_class_count": 1329,
+      "association_class_candidate_edges": 432027,
+      "fixpoint_rounds": 1
+    }
+  },
+  "workflow_input_compression": null,
+  "solve_callback_profile": {
+    "model_callback_sec": 2.5273588108830154,
+    "shown_symbols_sec": 2.010536731220782,
+    "workflow_signature_key_sec": 0.42940419481601566,
+    "canonicalization_sec": 0.07913029775954783,
+    "other_callback_sec": 0.0082875870866701,
+    "model_callback_share_of_solving_sec": 0.004564092927824754
+  },
+  "effective_parallel_mode": "2,split",
+  "translation_peak_rss_mb": 796.859375,
+  "combined_peak_rss_mb": 44220.1875,
+  "base_grounding_peak_rss_mb": 562.53125,
+  "base_grounding_sec": 0.48568754200823605,
+  "timed_out": false,
+  "horizons": [
+    {
+      "horizon": 1,
+      "grounding_sec": 0.03368712496012449,
+      "solving_sec": 0.0,
+      "peak_rss_mb": 1449.734375,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "diagnostic_counts_enabled": true,
+      "available_artifacts_at_step": null,
+      "eligible_artifacts_at_step": null,
+      "eligible_workflow_inputs_at_step": null,
+      "eligible_produced_outputs_at_step": null,
+      "bind_choice_domain_size_at_step": null,
+      "model_callback_sec": null,
+      "shown_symbols_sec": null,
+      "workflow_signature_key_sec": null,
+      "canonicalization_sec": null,
+      "feasibility_checked": false,
+      "feasibility_possible": null,
+      "feasibility_sec": null,
+      "feasibility_stage_timings": [],
+      "feasibility_failure_category": null,
+      "feasibility_failure_details": [],
+      "feasibility_grounding_sec": 0.03368712496012449,
+      "certificate_grounding_sec": 0.0,
+      "certificate_solving_sec": null,
+      "full_grounding_sec": 0.0,
+      "full_solve_performed": false,
+      "structural_skip_only": true,
+      "solve_skipped_reason": "structural_lower_bound",
+      "clause_blocking_mode": null,
+      "clause_constraints_added": 0,
+      "grounding_parts": [
+        [
+          "step_initial",
+          0.032847292022779584
+        ],
+        [
+          "constraint_step",
+          0.0008398329373449087
+        ]
+      ]
+    },
+    {
+      "horizon": 2,
+      "grounding_sec": 1.760324375005439,
+      "solving_sec": 0.0,
+      "peak_rss_mb": 1876.171875,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "diagnostic_counts_enabled": true,
+      "available_artifacts_at_step": null,
+      "eligible_artifacts_at_step": null,
+      "eligible_workflow_inputs_at_step": null,
+      "eligible_produced_outputs_at_step": null,
+      "bind_choice_domain_size_at_step": null,
+      "model_callback_sec": null,
+      "shown_symbols_sec": null,
+      "workflow_signature_key_sec": null,
+      "canonicalization_sec": null,
+      "feasibility_checked": false,
+      "feasibility_possible": null,
+      "feasibility_sec": null,
+      "feasibility_stage_timings": [],
+      "feasibility_failure_category": null,
+      "feasibility_failure_details": [],
+      "feasibility_grounding_sec": 1.760324375005439,
+      "certificate_grounding_sec": 0.0,
+      "certificate_solving_sec": null,
+      "full_grounding_sec": 0.0,
+      "full_solve_performed": false,
+      "structural_skip_only": true,
+      "solve_skipped_reason": "structural_lower_bound",
+      "clause_blocking_mode": null,
+      "clause_constraints_added": 0,
+      "grounding_parts": [
+        [
+          "step",
+          1.6607922499533743
+        ],
+        [
+          "constraint_step",
+          0.09953212505206466
+        ]
+      ]
+    },
+    {
+      "horizon": 3,
+      "grounding_sec": 75.53488879406359,
+      "solving_sec": 88.14717641600873,
+      "peak_rss_mb": 22664.5,
+      "satisfiable": true,
+      "models_seen": 73,
+      "models_stored": 0,
+      "unique_workflows_seen": 65,
+      "unique_workflows_stored": 65,
+      "diagnostic_counts_enabled": true,
+      "available_artifacts_at_step": null,
+      "eligible_artifacts_at_step": null,
+      "eligible_workflow_inputs_at_step": null,
+      "eligible_produced_outputs_at_step": null,
+      "bind_choice_domain_size_at_step": null,
+      "model_callback_sec": 0.03940228768624365,
+      "shown_symbols_sec": 0.026573752285912633,
+      "workflow_signature_key_sec": 0.008724835817702115,
+      "canonicalization_sec": 0.00388463051058352,
+      "feasibility_checked": true,
+      "feasibility_possible": true,
+      "feasibility_sec": 6.9160014390945435e-06,
+      "feasibility_stage_timings": [
+        [
+          "goal_only_structural",
+          1.750071533024311e-06
+        ],
+        [
+          "input_support_structural",
+          1.0409858077764511e-06
+        ]
+      ],
+      "feasibility_failure_category": null,
+      "feasibility_failure_details": [],
+      "feasibility_grounding_sec": 19.87081970903091,
+      "certificate_grounding_sec": 3.3692002090392634,
+      "certificate_solving_sec": 15.926137208007276,
+      "full_grounding_sec": 55.66406908503268,
+      "full_solve_performed": true,
+      "structural_skip_only": false,
+      "solve_skipped_reason": null,
+      "clause_blocking_mode": null,
+      "clause_constraints_added": 0,
+      "grounding_parts": [
+        [
+          "step",
+          15.904721291968599
+        ],
+        [
+          "constraint_step",
+          3.9660984170623124
+        ],
+        [
+          "exact_certificate_check",
+          3.3692002090392634
+        ],
+        [
+          "exact_step_query",
+          0.4576225419295952
+        ],
+        [
+          "exact_check",
+          50.621238042018376
+        ],
+        [
+          "exact_check_usage",
+          1.2160082920454443
+        ]
+      ]
+    },
+    {
+      "horizon": 4,
+      "grounding_sec": 130.2403267081827,
+      "solving_sec": 465.6011479169829,
+      "peak_rss_mb": 44220.1875,
+      "satisfiable": true,
+      "models_seen": 2229,
+      "models_stored": 0,
+      "unique_workflows_seen": 935,
+      "unique_workflows_stored": 935,
+      "diagnostic_counts_enabled": true,
+      "available_artifacts_at_step": null,
+      "eligible_artifacts_at_step": null,
+      "eligible_workflow_inputs_at_step": null,
+      "eligible_produced_outputs_at_step": null,
+      "bind_choice_domain_size_at_step": null,
+      "model_callback_sec": 2.4879565231967717,
+      "shown_symbols_sec": 1.9839629789348692,
+      "workflow_signature_key_sec": 0.42067935899831355,
+      "canonicalization_sec": 0.07524566724896431,
+      "feasibility_checked": true,
+      "feasibility_possible": true,
+      "feasibility_sec": 7.4999406933784485e-06,
+      "feasibility_stage_timings": [
+        [
+          "goal_only_structural",
+          2.00001522898674e-06
+        ],
+        [
+          "input_support_structural",
+          9.159557521343231e-07
+        ]
+      ],
+      "feasibility_failure_category": null,
+      "feasibility_failure_details": [],
+      "feasibility_grounding_sec": 30.19419954204932,
+      "certificate_grounding_sec": 5.335511208046228,
+      "certificate_solving_sec": 26.678099500015378,
+      "full_grounding_sec": 100.04612716613337,
+      "full_solve_performed": true,
+      "structural_skip_only": false,
+      "solve_skipped_reason": null,
+      "clause_blocking_mode": null,
+      "clause_constraints_added": 0,
+      "grounding_parts": [
+        [
+          "step",
+          24.885196625022218
+        ],
+        [
+          "constraint_step",
+          5.309002917027101
+        ],
+        [
+          "exact_certificate_check",
+          5.335511208046228
+        ],
+        [
+          "exact_step_query",
+          1.679059874964878
+        ],
+        [
+          "exact_check",
+          88.8517177500762
+        ],
+        [
+          "exact_check_usage",
+          4.179838333046064
+        ]
+      ]
+    }
+  ]
+}
