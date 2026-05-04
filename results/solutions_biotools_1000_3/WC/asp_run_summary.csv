@@ -1,7 +1,0 @@
-approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
-,,68.988235,12.075440,39.285025,17.627056,
-,,54.151476,8.681309,32.557683,12.912013,
-,,66.722314,9.780522,40.670904,16.270444,
-optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,70.222841,10.396479,42.616314,17.209342,14375.719
-optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,71.212071,11.037557,42.336961,17.837091,14360.188
-optimized_multi_shot,config_ASP_biotools_1000_3_WC.json,54.120869,9.257305,32.937468,11.925435,12443.266
