@@ -1,6 +1,0 @@
-test,mode,horizon,optimized_enabled,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,workflow_candidates_found,constraints_used,timed_out
-Example2,multi-shot,1,true,17,10,0,94.16,0,true,false
-Example2,multi-shot,2,true,17,17,3,94.16,0,true,false
-Example2,multi-shot,3,true,17,34,13,135.53,0,true,false
-Example2,multi-shot,4,true,17,60,51,192.12,54,true,false
-Example2,multi-shot,5,true,17,91,370,289.02,1000,true,false

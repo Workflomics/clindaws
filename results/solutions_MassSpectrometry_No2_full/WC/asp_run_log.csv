@@ -1,9 +1,0 @@
-test,mode,horizon,optimized_enabled,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,workflow_candidates_found,constraints_used,timed_out
-No2,multi-shot,1,true,15864,520,0,1449.73,0,true,false
-No2,multi-shot,2,true,15864,1760,0,1876.17,0,true,false
-No2,multi-shot,3,true,15864,75535,88147,22664.50,65,true,false
-No2,multi-shot,4,true,15864,130240,465601,44220.19,1000,true,false
-No2,multi-shot,1,true,16712,552,0,1580.73,0,true,false
-No2,multi-shot,2,true,16712,1918,0,2239.14,0,true,false
-No2,multi-shot,3,true,16712,88385,66322,27703.14,77,true,false
-No2,multi-shot,4,true,16712,174468,1070734,44933.19,1000,true,false

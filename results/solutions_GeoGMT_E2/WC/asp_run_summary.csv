@@ -1,2 +1,0 @@
-approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
-optimized_multi_shot,config_ASP_GeoGMT_E2_WC.json,192.124892,0.018028,0.692910,191.382283,841.891
