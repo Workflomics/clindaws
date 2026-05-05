@@ -271,6 +271,15 @@ def _solver_approach(mode: str) -> str:
     return _mode_config(mode).solver_approach
 
 
+def _approach_label(mode: str, optimized: bool) -> str:
+    family = _mode_config(mode).solver_family
+    if family == "single-shot":
+        return "single_shot"
+    if optimized or _mode_config(mode).solver_approach == "optimized_candidate":
+        return "optimized_multi_shot"
+    return "multi-shot"
+
+
 def _report(progress_callback: ProgressCallback, message: str) -> None:
     if progress_callback is not None:
         progress_callback(message)
@@ -833,40 +842,13 @@ class _RunSummaryWriter:
     """Append-only per-run summary CSV logger."""
 
     fieldnames = [
-        "run_id",
-        "timestamp_utc",
-        "mode",
-        "solver_family",
-        "solver_approach",
-        "grounding_strategy",
-        "config_path",
-        "ontology_used",
-        "ontology_entry_count",
-        "tool_annotation_used",
-        "tool_count",
-        "constraints_used",
-        "constraint_count",
-        "translation_builder",
-        "translation_schema",
-        "completed_stage",
-        "fact_count",
+        "approach",
+        "config_file",
+        "total_sec",
         "translation_sec",
-        "translation_peak_rss_mb",
-        "combined_peak_rss_mb",
-        "base_grounding_sec",
-        "base_grounding_peak_rss_mb",
         "grounding_sec_total",
         "solving_sec_total",
-        "rendering_sec_total",
-        "total_sec",
-        "raw_models_seen",
-        "raw_solutions_found",
-        "solutions_found",
-        "grounded_horizons",
-        "first_satisfiable_horizon",
-        "optimized_enabled",
-        "effective_parallel_mode",
-        "compressed_candidate_engaged",
+        "peak_rss_mb",
     ]
 
     def __init__(
@@ -886,63 +868,25 @@ class _RunSummaryWriter:
     ) -> None:
         self.csv_path = csv_path
         self.base_row = {
-            "run_id": run_id,
-            "timestamp_utc": timestamp_utc,
-            "mode": mode,
-            "solver_family": _solver_family(mode),
-            "solver_approach": _solver_approach(mode),
-            "grounding_strategy": grounding_strategy,
-            "config_path": run_metadata["config_path"],
-            "ontology_used": run_metadata["ontology_used"],
-            "ontology_entry_count": run_metadata["ontology_entry_count"],
-            "tool_annotation_used": run_metadata["tool_annotation_used"],
-            "tool_count": run_metadata["tool_count"],
-            "constraints_used": run_metadata["constraints_used"],
-            "constraint_count": run_metadata["constraint_count"],
-            "translation_builder": translation_builder,
-            "translation_schema": translation_schema,
-            "fact_count": fact_count,
-            "optimized_enabled": str(optimized_enabled).lower(),
-            "compressed_candidate_engaged": str(compressed_candidate_engaged).lower(),
+            "approach": _approach_label(mode, optimized_enabled),
+            "config_file": Path(str(run_metadata["config_path"])).name,
         }
         _ensure_csv_header(self.csv_path, self.fieldnames)
 
     def log_summary(
         self,
         *,
-        completed_stage: str,
         timings: TimingBreakdown,
-        translation_peak_rss_mb: float,
         combined_peak_rss_mb: float,
-        base_grounding_sec: float,
-        base_grounding_peak_rss_mb: float,
-        horizon_records: tuple[HorizonRecord, ...],
-        raw_models_seen: int,
-        raw_solutions_found: int,
-        solutions_found: int,
-        grounded_horizons: tuple[int, ...] = (),
-        effective_parallel_mode: str | None = None,
+        **_ignored: object,
     ) -> None:
-        first_satisfiable = next((record.horizon for record in horizon_records if record.satisfiable), None)
-        grounded_horizons_text = ",".join(str(horizon) for horizon in grounded_horizons)
         row = {
             **self.base_row,
-            "completed_stage": completed_stage,
+            "total_sec": f"{timings.total_sec:.6f}",
             "translation_sec": f"{timings.translation_sec:.6f}",
-            "translation_peak_rss_mb": f"{translation_peak_rss_mb:.3f}" if translation_peak_rss_mb else "",
-            "combined_peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
-            "base_grounding_sec": f"{base_grounding_sec:.6f}" if base_grounding_sec else "",
-            "base_grounding_peak_rss_mb": f"{base_grounding_peak_rss_mb:.3f}" if base_grounding_peak_rss_mb else "",
             "grounding_sec_total": f"{timings.grounding_sec:.6f}",
             "solving_sec_total": f"{timings.solving_sec:.6f}",
-            "rendering_sec_total": f"{timings.rendering_sec:.6f}",
-            "total_sec": f"{timings.total_sec:.6f}",
-            "raw_models_seen": raw_models_seen,
-            "raw_solutions_found": raw_solutions_found,
-            "solutions_found": solutions_found,
-            "grounded_horizons": grounded_horizons_text,
-            "first_satisfiable_horizon": first_satisfiable if first_satisfiable is not None else "",
-            "effective_parallel_mode": effective_parallel_mode or "",
+            "peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
         }
         with self.csv_path.open("a", encoding="utf-8", newline="") as handle:
             csv.DictWriter(handle, fieldnames=self.fieldnames).writerow(row)
