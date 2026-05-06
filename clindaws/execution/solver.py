@@ -1165,6 +1165,7 @@ def _solve_multi_shot_with_programs(
                 ):
                     break
 
+                horizon_started_ns = perf_counter_ns()
                 _report(progress_callback, f"Grounding: horizon {horizon}...")
                 optimized_two_phase = _smart_expansion_enabled(facts)
                 if optimized_two_phase:
@@ -1248,6 +1249,7 @@ def _solve_multi_shot_with_programs(
                             {
                                 "event": "horizon_complete",
                                 "horizon": horizon,
+                                "start_timestamp_ns": horizon_started_ns,
                                 "timestamp_ns": perf_counter_ns(),
                             }
                         )
@@ -1295,6 +1297,7 @@ def _solve_multi_shot_with_programs(
                             {
                                 "event": "horizon_complete",
                                 "horizon": horizon,
+                                "start_timestamp_ns": horizon_started_ns,
                                 "timestamp_ns": perf_counter_ns(),
                             }
                         )
@@ -1389,6 +1392,7 @@ def _solve_multi_shot_with_programs(
                                 {
                                     "event": "horizon_complete",
                                     "horizon": horizon,
+                                    "start_timestamp_ns": horizon_started_ns,
                                     "timestamp_ns": perf_counter_ns(),
                                 }
                             )
@@ -1501,6 +1505,7 @@ def _solve_multi_shot_with_programs(
                                     {
                                         "event": "horizon_complete",
                                         "horizon": horizon,
+                                        "start_timestamp_ns": horizon_started_ns,
                                         "timestamp_ns": perf_counter_ns(),
                                     }
                                 )
@@ -1649,6 +1654,7 @@ def _solve_multi_shot_with_programs(
                         {
                             "event": "horizon_complete",
                             "horizon": horizon,
+                            "start_timestamp_ns": horizon_started_ns,
                             "timestamp_ns": perf_counter_ns(),
                         }
                     )
@@ -1728,6 +1734,7 @@ def _solve_single_shot_with_programs(
         ):
             break
 
+        horizon_started_ns = perf_counter_ns()
         control = _make_solve_control(
             parallel_mode=parallel_mode,
             project_models=project_models,
@@ -1914,6 +1921,7 @@ def _solve_single_shot_with_programs(
                             {
                                 "event": "horizon_complete",
                                 "horizon": horizon,
+                                "start_timestamp_ns": horizon_started_ns,
                                 "timestamp_ns": perf_counter_ns(),
                             }
                         )
@@ -2021,6 +2029,7 @@ def _solve_single_shot_once(
     seen_unique_keys: set[tuple[object, ...]] = set()
     seen_tool_sequence_keys: set[tuple[object, ...]] = set()
     stored_tool_sequence_keys: set[tuple[object, ...]] = set()
+    horizon_started_ns = perf_counter_ns()
 
     try:
         with _interrupt_guard(control) as is_interrupted:
@@ -2224,6 +2233,7 @@ def _solve_single_shot_once(
             {
                 "event": "horizon_complete",
                 "horizon": horizon,
+                "start_timestamp_ns": horizon_started_ns,
                 "timestamp_ns": perf_counter_ns(),
             }
         )

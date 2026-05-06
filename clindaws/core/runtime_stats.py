@@ -213,6 +213,8 @@ class ProcessTreePeakMonitor:
         self._peak_mb = 0.0
         self._peak_timestamps_ns: list[int] = []
         self._peak_values_mb: list[float] = []
+        self._sample_timestamps_ns: list[int] = []
+        self._sample_values_mb: list[float] = []
 
     def __enter__(self) -> "ProcessTreePeakMonitor":
         self.start()
@@ -244,6 +246,8 @@ class ProcessTreePeakMonitor:
         current_mb = sample_process_tree_rss_mb(self.root_pid)
         timestamp_ns = perf_counter_ns()
         with self._lock:
+            self._sample_timestamps_ns.append(timestamp_ns)
+            self._sample_values_mb.append(current_mb)
             if current_mb > self._peak_mb:
                 self._peak_mb = current_mb
                 self._peak_timestamps_ns.append(timestamp_ns)
@@ -265,6 +269,20 @@ class ProcessTreePeakMonitor:
             if index < 0:
                 return 0.0
             return self._peak_values_mb[index]
+
+    def peak_between(self, start_timestamp_ns: int, end_timestamp_ns: int) -> float:
+        """Return the sampled peak RSS inside one perf-counter timestamp interval."""
+
+        lower = min(start_timestamp_ns, end_timestamp_ns)
+        upper = max(start_timestamp_ns, end_timestamp_ns)
+        with self._lock:
+            if not self._sample_timestamps_ns:
+                return 0.0
+            start_index = bisect_right(self._sample_timestamps_ns, lower - 1)
+            end_index = bisect_right(self._sample_timestamps_ns, upper)
+            if start_index >= end_index:
+                return 0.0
+            return max(self._sample_values_mb[start_index:end_index], default=0.0)
 
     def _run(self) -> None:
         while not self._stop_event.wait(self.sample_interval_sec):
