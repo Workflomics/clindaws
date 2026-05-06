@@ -120,7 +120,7 @@ The CSV logs are written to the output directory for each run (same as `--output
 - `translation_builder`
 - `translation_schema`
 - timing columns
-- peak RSS memory columns
+- per-horizon peak RSS memory in `memory_used_mb`
 - `workflow_candidates_found`
 - satisfiability / stored-workflow counts
 
@@ -132,6 +132,7 @@ The CSV logs are written to the output directory for each run (same as `--output
 - total solving time
 - total rendering time
 - total runtime
+- run-wide peak RSS memory in `peak_rss_mb`
 - final solution count
 
 If a run is interrupted, `asp_run_log.csv` still contains all stages that were completed before the interruption.

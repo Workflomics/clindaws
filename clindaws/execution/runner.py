@@ -24,7 +24,7 @@ import traceback
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from time import perf_counter
+from time import perf_counter, perf_counter_ns
 from typing import Callable
 from uuid import uuid4
 
@@ -418,16 +418,15 @@ def _combined_peak_mb(memory_monitor: ProcessTreePeakMonitor | None) -> float:
     return memory_monitor.current_peak_mb()
 
 
-def _records_with_combined_peak_rss(
+def _records_with_horizon_peak_rss(
     records: tuple[HorizonRecord, ...],
     *,
     memory_monitor: ProcessTreePeakMonitor | None,
     peaks_by_horizon: dict[int, float] | None = None,
 ) -> tuple[HorizonRecord, ...]:
-    """Replace per-process RSS fields with cumulative combined-process peaks."""
+    """Replace per-process RSS fields with per-horizon combined-process peaks."""
 
     updated_records: list[HorizonRecord] = []
-    cumulative_peak_mb = 0.0
     horizon_peaks = peaks_by_horizon or {}
     for record in records:
         combined_peak_mb = horizon_peaks.get(record.horizon, 0.0)
@@ -435,8 +434,7 @@ def _records_with_combined_peak_rss(
             combined_peak_mb = _combined_peak_mb(memory_monitor)
         if combined_peak_mb <= 0.0:
             combined_peak_mb = record.peak_rss_mb
-        cumulative_peak_mb = max(cumulative_peak_mb, combined_peak_mb)
-        updated_records.append(replace(record, peak_rss_mb=cumulative_peak_mb))
+        updated_records.append(replace(record, peak_rss_mb=combined_peak_mb))
     return tuple(updated_records)
 
 
@@ -545,11 +543,17 @@ def _run_solve_in_worker(
         if message.get("event") != "horizon_complete":
             return
         horizon = message.get("horizon")
+        start_timestamp_ns = message.get("start_timestamp_ns")
         timestamp_ns = message.get("timestamp_ns")
         if not isinstance(horizon, int):
             return
         if memory_monitor is None or not isinstance(timestamp_ns, int):
             horizon_peak_rss_by_horizon[horizon] = 0.0
+            return
+        current_mb = memory_monitor.sample_now()
+        if isinstance(start_timestamp_ns, int):
+            horizon_peak_mb = memory_monitor.peak_between(start_timestamp_ns, timestamp_ns)
+            horizon_peak_rss_by_horizon[horizon] = horizon_peak_mb or current_mb
             return
         horizon_peak_rss_by_horizon[horizon] = memory_monitor.peak_at(timestamp_ns)
 
@@ -1796,7 +1800,7 @@ def run_once(
                 run_summary_path=csv_writers.run_summary_path,
             )
 
-        horizon_records = _records_with_combined_peak_rss(
+        horizon_records = _records_with_horizon_peak_rss(
             solve_output.horizon_records,
             memory_monitor=memory_monitor,
             peaks_by_horizon=horizon_peak_rss_by_horizon,
@@ -2058,7 +2062,13 @@ def run_ground_only(
         grounded_horizon_peaks: dict[int, float] = {}
 
         def _log_ground_horizon(record: HorizonRecord) -> None:
-            combined_peak_mb = _combined_peak_mb(memory_monitor)
+            completed_ns = perf_counter_ns()
+            horizon_sec = max(0.0, record.grounding_sec + record.solving_sec)
+            started_ns = completed_ns - round(horizon_sec * 1_000_000_000)
+            memory_monitor.sample_now()
+            combined_peak_mb = memory_monitor.peak_between(started_ns, completed_ns)
+            if combined_peak_mb <= 0.0:
+                combined_peak_mb = _combined_peak_mb(memory_monitor)
             grounded_horizon_peaks[record.horizon] = combined_peak_mb
             csv_writers.step_writer.log_horizon(replace(record, peak_rss_mb=combined_peak_mb))
 
@@ -2079,7 +2089,7 @@ def run_ground_only(
             f"Step 2 complete: grounding finished after {grounding_output.grounding_sec:.3f}s.",
         )
 
-        horizon_records = _records_with_combined_peak_rss(
+        horizon_records = _records_with_horizon_peak_rss(
             grounding_output.horizon_records,
             memory_monitor=memory_monitor,
             peaks_by_horizon=grounded_horizon_peaks,
