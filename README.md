@@ -13,7 +13,7 @@ python -m clindaws --help
 ```
 
 For full installation notes, including optional Java and Graphviz requirements,
-see `docs/INSTALL.md`.
+see `INSTALL.md`.
 
 ## Running
 
