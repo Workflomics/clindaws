@@ -1,0 +1,721 @@
+{
+  "functions": [
+    {
+      "id": "make_dough",
+      "label": "make_dough",
+      "taxonomyOperations": ["dough_making", "dough_prep"],
+      "inputs": [
+        { "Type": ["water"], "State": ["raw"] },
+        { "Type": ["flour"], "State": ["raw"] },
+        { "Type": ["salt"], "State": ["raw"] },
+        { "Type": ["yeast"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["pizza_dough"], "State": ["kneaded"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "let_rise",
+      "label": "let_rise",
+      "taxonomyOperations": ["proofing", "dough_prep"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["kneaded"] }
+      ],
+      "outputs": [
+        { "Type": ["risen_dough"], "State": ["risen"] }
+      ],
+      "properties": ["slow_fermented"]
+    },
+    {
+      "id": "roll_dough",
+      "label": "roll_dough",
+      "taxonomyOperations": ["dough_prep"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["risen"] }
+      ],
+      "outputs": [
+        { "Type": ["rolled_dough"], "State": ["rolled"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "make_sauce_from_tomato",
+      "label": "make_sauce",
+      "taxonomyOperations": ["sauce_prep"],
+      "inputs": [
+        { "Type": ["tomato"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["marinara"], "State": ["cooked"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "make_sauce_from_premade",
+      "label": "make_sauce",
+      "taxonomyOperations": ["sauce_prep"],
+      "inputs": [
+        { "Type": ["tomato_sauce"], "State": ["cooked"] }
+      ],
+      "outputs": [
+        { "Type": ["marinara"], "State": ["cooked"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "oil_base",
+      "label": "oil_base",
+      "taxonomyOperations": ["assembly"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["rolled"] },
+        { "Type": ["oil"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["rolled_dough"], "State": ["oiled"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "add_sauce",
+      "label": "add_sauce",
+      "taxonomyOperations": ["assembly"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["oiled"] },
+        { "Type": ["sauce"], "State": ["cooked"] }
+      ],
+      "outputs": [
+        { "Type": ["sauced_base"], "State": ["sauced"] }
+      ],
+      "properties": ["has_sauce"]
+    },
+    {
+      "id": "add_cheese",
+      "label": "add_cheese",
+      "taxonomyOperations": ["assembly"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["sauced"] },
+        { "Type": ["cheese"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["cheesed_base"], "State": ["cheesed"] }
+      ],
+      "properties": ["has_cheese"]
+    },
+    {
+      "id": "add_first_topping",
+      "label": "add_first_topping",
+      "taxonomyOperations": ["topping_application"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["cheesed"] },
+        { "Type": ["topping"], "State": ["sliced"] }
+      ],
+      "outputs": [
+        { "Type": ["topped_pizza"], "State": ["topped"] }
+      ],
+      "properties": ["has_toppings"]
+    },
+    {
+      "id": "add_extra_topping",
+      "label": "add_extra_topping",
+      "taxonomyOperations": ["topping_application"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["topped"] },
+        { "Type": ["topping"], "State": ["sliced"] }
+      ],
+      "outputs": [
+        { "Type": ["topped_pizza"], "State": ["topped"] }
+      ],
+      "properties": ["has_extra_toppings"]
+    },
+    {
+      "id": "finalize_assembly_from_cheesed",
+      "label": "finalize_assembly",
+      "taxonomyOperations": ["assembly"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["cheesed"] }
+      ],
+      "outputs": [
+        { "Type": ["assembled_pizza"], "State": ["assembled"] }
+      ],
+      "properties": ["ready_for_oven"]
+    },
+    {
+      "id": "finalize_assembly_from_topped",
+      "label": "finalize_assembly",
+      "taxonomyOperations": ["assembly"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["topped"] }
+      ],
+      "outputs": [
+        { "Type": ["assembled_pizza"], "State": ["assembled"] }
+      ],
+      "properties": ["ready_for_oven"]
+    },
+    {
+      "id": "preheat_oven",
+      "label": "preheat_oven",
+      "taxonomyOperations": ["oven_preheating", "home_oven_baking"],
+      "inputs": [
+        { "Type": ["oven"], "State": ["cold"] }
+      ],
+      "outputs": [
+        { "Type": ["preheated_home_oven"], "State": ["preheated"] }
+      ],
+      "properties": ["oven_preheated"]
+    },
+    {
+      "id": "temperature_check",
+      "label": "temperature_check",
+      "taxonomyOperations": ["oven_preheating"],
+      "inputs": [
+        { "Type": ["oven"], "State": ["preheated"] }
+      ],
+      "outputs": [
+        { "Type": ["temperature_verified_home_oven"], "State": ["temperature_verified"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "set_timer",
+      "label": "set_timer",
+      "taxonomyOperations": ["oven_preheating"],
+      "inputs": [
+        { "Type": ["oven"], "State": ["temperature_verified"] }
+      ],
+      "outputs": [
+        { "Type": ["timer_set_home_oven"], "State": ["timer_set"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "bake_pizza",
+      "label": "bake_pizza",
+      "taxonomyOperations": ["home_oven_baking", "baking"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["assembled"] },
+        { "Type": ["oven"], "State": ["preheated"] }
+      ],
+      "outputs": [
+        { "Type": ["baked_pizza"], "State": ["hot"] },
+        { "Type": ["dirty_home_oven"], "State": ["dirty"] }
+      ],
+      "properties": ["oven_baked", "baked"]
+    },
+    {
+      "id": "bake_pizza_timed",
+      "label": "bake_pizza",
+      "taxonomyOperations": ["home_oven_baking", "baking"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["assembled"] },
+        { "Type": ["oven"], "State": ["timer_set"] }
+      ],
+      "outputs": [
+        { "Type": ["baked_pizza"], "State": ["hot"] },
+        { "Type": ["dirty_home_oven"], "State": ["dirty"] }
+      ],
+      "properties": ["oven_baked", "baked"]
+    },
+    {
+      "id": "cool_pizza",
+      "label": "cool_pizza",
+      "taxonomyOperations": ["baking"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["hot"] }
+      ],
+      "outputs": [
+        { "Type": ["cooled_pizza"], "State": ["warm"] }
+      ],
+      "properties": ["cooled"]
+    },
+    {
+      "id": "cut_pizza",
+      "label": "cut_pizza",
+      "taxonomyOperations": ["cutting", "finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["warm"] },
+        { "Type": ["pizza_cutter"], "State": ["clean"] }
+      ],
+      "outputs": [
+        { "Type": ["sliced_pizza"], "State": ["sliced"] },
+        { "Type": ["dirty_pizza_cutter"], "State": ["dirty"] }
+      ],
+      "properties": ["cut"]
+    },
+    {
+      "id": "plate_pizza",
+      "label": "plate_pizza",
+      "taxonomyOperations": ["plating", "finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["sliced"] },
+        { "Type": ["plate"], "State": ["clean"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["plated"] },
+        { "Type": ["dirty_pizza_plate"], "State": ["dirty"] }
+      ],
+      "properties": ["plated"]
+    },
+    {
+      "id": "drizzle_oil",
+      "label": "drizzle_oil",
+      "taxonomyOperations": ["garnishing", "finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["plated"] },
+        { "Type": ["oil"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["drizzled"] }
+      ],
+      "properties": ["oil_drizzled"]
+    },
+    {
+      "id": "add_garnish_on_plated",
+      "label": "add_garnish",
+      "taxonomyOperations": ["garnishing", "finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["plated"] },
+        { "Type": ["topping"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["garnished"] }
+      ],
+      "properties": ["herb_garnished"]
+    },
+    {
+      "id": "add_garnish_on_drizzled",
+      "label": "add_garnish",
+      "taxonomyOperations": ["garnishing", "finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["drizzled"] },
+        { "Type": ["topping"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["garnished"] }
+      ],
+      "properties": ["herb_garnished"]
+    },
+    {
+      "id": "serve_pizza_plated",
+      "label": "serve_pizza",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["plated"] }
+      ],
+      "outputs": [
+        { "Type": ["served_pizza"], "State": ["served"] }
+      ],
+      "properties": ["served"]
+    },
+    {
+      "id": "serve_pizza_drizzled",
+      "label": "serve_pizza",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["drizzled"] }
+      ],
+      "outputs": [
+        { "Type": ["served_pizza"], "State": ["served"] }
+      ],
+      "properties": ["served"]
+    },
+    {
+      "id": "serve_pizza_garnished",
+      "label": "serve_pizza",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["garnished"] }
+      ],
+      "outputs": [
+        { "Type": ["served_pizza"], "State": ["served"] }
+      ],
+      "properties": ["served"]
+    },
+    {
+      "id": "clean_oven",
+      "label": "clean_oven",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["oven"], "State": ["dirty"] }
+      ],
+      "outputs": [
+        { "Type": ["clean_home_oven"], "State": ["cold"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "clean_cutter",
+      "label": "clean_cutter",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["dirty_pizza_cutter"], "State": ["dirty"] }
+      ],
+      "outputs": [
+        { "Type": ["clean_pizza_cutter"], "State": ["clean"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "clean_plate",
+      "label": "clean_plate",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["dirty_pizza_plate"], "State": ["dirty"] }
+      ],
+      "outputs": [
+        { "Type": ["clean_pizza_plate"], "State": ["clean"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "clean_kitchen",
+      "label": "clean_kitchen",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["clean_home_oven"], "State": ["cold"] },
+        { "Type": ["clean_pizza_cutter"], "State": ["clean"] },
+        { "Type": ["clean_pizza_plate"], "State": ["clean"] },
+        { "Type": ["served_pizza"], "State": ["served"] }
+      ],
+      "outputs": [
+        { "Type": ["clean_kitchen"], "State": ["clean"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "buy_frozen_pizza",
+      "label": "buy_frozen_pizza",
+      "taxonomyOperations": ["frozen_pipeline"],
+      "inputs": [
+        { "Type": ["frozen_pizza"], "State": ["frozen"] }
+      ],
+      "outputs": [
+        { "Type": ["frozen_pizza"], "State": ["frozen"] }
+      ],
+      "properties": ["frozen_pipeline"]
+    },
+    {
+      "id": "thaw_pizza",
+      "label": "thaw_pizza",
+      "taxonomyOperations": ["frozen_pipeline"],
+      "inputs": [
+        { "Type": ["frozen_pizza"], "State": ["frozen"] }
+      ],
+      "outputs": [
+        { "Type": ["frozen_pizza"], "State": ["thawed"] }
+      ],
+      "properties": ["pizza_thawed_before_baking"]
+    },
+    {
+      "id": "bake_frozen_pizza_from_frozen",
+      "label": "bake_frozen_pizza",
+      "taxonomyOperations": ["frozen_pipeline"],
+      "inputs": [
+        { "Type": ["frozen_pizza"], "State": ["frozen"] },
+        { "Type": ["oven"], "State": ["preheated"] }
+      ],
+      "outputs": [
+        { "Type": ["baked_pizza"], "State": ["hot"] },
+        { "Type": ["dirty_home_oven"], "State": ["dirty"] }
+      ],
+      "properties": ["oven_baked"]
+    },
+    {
+      "id": "bake_frozen_pizza_from_thawed",
+      "label": "bake_frozen_pizza",
+      "taxonomyOperations": ["frozen_pipeline"],
+      "inputs": [
+        { "Type": ["frozen_pizza"], "State": ["thawed"] },
+        { "Type": ["oven"], "State": ["preheated"] }
+      ],
+      "outputs": [
+        { "Type": ["baked_pizza"], "State": ["hot"] },
+        { "Type": ["dirty_home_oven"], "State": ["dirty"] }
+      ],
+      "properties": ["oven_baked"]
+    },
+    {
+      "id": "knead_by_hand",
+      "label": "knead_by_hand",
+      "taxonomyOperations": ["dough_making", "dough_prep"],
+      "inputs": [
+        { "Type": ["water"], "State": ["raw"] },
+        { "Type": ["flour"], "State": ["raw"] },
+        { "Type": ["salt"], "State": ["raw"] },
+        { "Type": ["yeast"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["pizza_dough"], "State": ["kneaded"] }
+      ],
+      "properties": ["artisan_dough"]
+    },
+    {
+      "id": "knead_by_machine",
+      "label": "knead_by_machine",
+      "taxonomyOperations": ["dough_making", "dough_prep"],
+      "inputs": [
+        { "Type": ["water"], "State": ["raw"] },
+        { "Type": ["flour"], "State": ["raw"] },
+        { "Type": ["salt"], "State": ["raw"] },
+        { "Type": ["yeast"], "State": ["raw"] },
+        { "Type": ["stand_mixer"], "State": ["clean"] }
+      ],
+      "outputs": [
+        { "Type": ["pizza_dough"], "State": ["kneaded"] }
+      ],
+      "properties": ["machine_dough"]
+    },
+    {
+      "id": "preheat_wood_fire_oven",
+      "label": "preheat_wood_fire_oven",
+      "taxonomyOperations": ["wood_fire_baking"],
+      "inputs": [
+        { "Type": ["wood_fire_oven"], "State": ["cold"] }
+      ],
+      "outputs": [
+        { "Type": ["preheated_wood_fire_oven"], "State": ["preheated"] }
+      ],
+      "properties": ["wood_fire_preheated"]
+    },
+    {
+      "id": "bake_in_wood_fire_oven",
+      "label": "bake_in_wood_fire_oven",
+      "taxonomyOperations": ["wood_fire_baking"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["assembled"] },
+        { "Type": ["preheated_wood_fire_oven"], "State": ["preheated"] }
+      ],
+      "outputs": [
+        { "Type": ["baked_pizza"], "State": ["hot"] },
+        { "Type": ["dirty_wood_fire_oven"], "State": ["dirty"] }
+      ],
+      "properties": ["wood_fire_baked"]
+    },
+    {
+      "id": "sous_vide_proof",
+      "label": "sous_vide_proof",
+      "taxonomyOperations": ["proofing", "dough_prep"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["kneaded"] }
+      ],
+      "outputs": [
+        { "Type": ["risen_dough"], "State": ["risen"] }
+      ],
+      "properties": ["precision_fermented"]
+    },
+    {
+      "id": "clean_wood_fire_oven",
+      "label": "clean_wood_fire_oven",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["wood_fire_oven"], "State": ["dirty"] }
+      ],
+      "outputs": [
+        { "Type": ["wood_fire_oven"], "State": ["cold"] }
+      ],
+      "properties": []
+    },
+    {
+      "id": "convert_flour_to_grams",
+      "label": "convert_flour_to_grams",
+      "taxonomyOperations": ["unit_conversion"],
+      "inputs": [
+        { "Type": ["flour"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["flour"], "State": ["raw"] }
+      ],
+      "properties": ["flour_unit_converted"]
+    },
+    {
+      "id": "rest_pizza",
+      "label": "rest_pizza",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["plated"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["rested"] }
+      ],
+      "properties": ["rested_before_packing"]
+    },
+    {
+      "id": "quality_check",
+      "label": "quality_check",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["rested"] }
+      ],
+      "outputs": [
+        { "Type": ["plated_pizza"], "State": ["checked"] }
+      ],
+      "properties": ["quality_checked"]
+    },
+    {
+      "id": "box_pizza",
+      "label": "box_pizza",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["checked"] },
+        { "Type": ["pizza_box"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["boxed_pizza"], "State": ["boxed"] }
+      ],
+      "properties": ["boxed_for_delivery"]
+    },
+    {
+      "id": "label_order",
+      "label": "label_order",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["boxed"] },
+        { "Type": ["order_label"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["labeled_pizza"], "State": ["labeled"] }
+      ],
+      "properties": ["labeled_for_delivery"]
+    },
+    {
+      "id": "prepare_dipping_sauce_garlic",
+      "label": "prepare_dipping_sauce",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["oil"], "State": ["raw"] },
+        { "Type": ["roasted_garlic"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["dipping_sauce"], "State": ["ready"] }
+      ],
+      "properties": ["dipping_prepared"]
+    },
+    {
+      "id": "prepare_dipping_sauce_tomato",
+      "label": "prepare_dipping_sauce",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["tomato"], "State": ["raw"] },
+        { "Type": ["chili_flakes"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["dipping_sauce"], "State": ["ready"] }
+      ],
+      "properties": ["dipping_prepared"]
+    },
+    {
+      "id": "prepare_drink_pairing",
+      "label": "prepare_drink_pairing",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["water"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["drink_pairing"], "State": ["ready"] }
+      ],
+      "properties": ["drink_prepared"]
+    },
+    {
+      "id": "handoff_order_full",
+      "label": "handoff_order",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["dough_ingredients"], "State": ["labeled"] },
+        { "Type": ["dipping_sauce"], "State": ["ready"] },
+        { "Type": ["drink_pairing"], "State": ["ready"] }
+      ],
+      "outputs": [
+        { "Type": ["handoff_order_item"], "State": ["handed_off"] }
+      ],
+      "properties": ["handoff_ready"]
+    },
+    {
+      "id": "wipe_counter",
+      "label": "wipe_counter",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["clean_kitchen"], "State": ["clean"] },
+        { "Type": ["cleaning_cloth"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["wiped_counter"], "State": ["wiped"] }
+      ],
+      "properties": ["counter_wiped"]
+    },
+    {
+      "id": "sanitize_station",
+      "label": "sanitize_station",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["wiped_counter"], "State": ["wiped"] },
+        { "Type": ["sanitizer"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["sanitized_station"], "State": ["sanitized"] }
+      ],
+      "properties": ["station_sanitized"]
+    },
+    {
+      "id": "restock_station",
+      "label": "restock_station",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["sanitized_station"], "State": ["sanitized"] },
+        { "Type": ["restock_kit"], "State": ["raw"] }
+      ],
+      "outputs": [
+        { "Type": ["restocked_station"], "State": ["restocked"] }
+      ],
+      "properties": ["station_restocked"]
+    },
+    {
+      "id": "inventory_check",
+      "label": "inventory_check",
+      "taxonomyOperations": ["maintenance"],
+      "inputs": [
+        { "Type": ["restocked_station"], "State": ["restocked"] }
+      ],
+      "outputs": [
+        { "Type": ["audited_station"], "State": ["audited"] }
+      ],
+      "properties": ["inventory_checked"]
+    },
+    {
+      "id": "close_ticket",
+      "label": "close_ticket",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["handoff_order_item"], "State": ["handed_off"] },
+        { "Type": ["audited_station"], "State": ["audited"] }
+      ],
+      "outputs": [
+        { "Type": ["closed_ticket_item"], "State": ["closed"] }
+      ],
+      "properties": ["ticket_closed"]
+    },
+    {
+      "id": "archive_order",
+      "label": "archive_order",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["closed_ticket_item"], "State": ["closed"] }
+      ],
+      "outputs": [
+        { "Type": ["archived_order_item"], "State": ["archived"] }
+      ],
+      "properties": ["order_archived"]
+    },
+    {
+      "id": "shutdown_kitchen",
+      "label": "shutdown_kitchen",
+      "taxonomyOperations": ["finishing"],
+      "inputs": [
+        { "Type": ["archived_order_item"], "State": ["archived"] }
+      ],
+      "outputs": [
+        { "Type": ["kitchen_shutdown_item"], "State": ["shutdown"] }
+      ],
+      "properties": ["kitchen_shutdown"]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+    "constraints": [
+      "use_m(operation_3645)",
+      "prev_m(operation_3645, operation_3649)",
+      "prev_m(operation_3649, operation_3646)",
+      "itn_m(operation_3649, operation_3649)"
+    ]
+}

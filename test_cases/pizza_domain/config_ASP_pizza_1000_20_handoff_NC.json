@@ -1,0 +1,93 @@
+{
+  "ontology_path": "./test_cases/pizza_domain/pizza_taxonomy.owl",
+  "ontologyPrefixIRI": "http://example.org/pizza#",
+  "toolsTaxonomyRoot": "Tool",
+  "dataDimensionsTaxonomyRoots": [
+    "Type",
+    "State"
+  ],
+  "tool_annotations_path": "./test_cases/pizza_domain/tool_annotations.json",
+  "strict_tool_annotations": "true",
+  "constraints_path": "./test_cases/constraints_empty.json",
+  "timeout_sec": "1200",
+  "solutions_dir_path": "./solutions_pizza_handoff/",
+  "solution_length": {
+    "min": 1,
+    "max": 20
+  },
+  "solutions": "1000",
+  "number_of_execution_scripts": "0",
+  "number_of_generated_graphs": "0",
+  "debug_mode": "true",
+  "use_workflow_input": "all",
+  "use_all_generated_data": "one",
+  "tool_seq_repeat": "false",
+  "inputs": [
+    {
+      "Type": ["water"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["flour"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["salt"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["yeast"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["oil"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["tomato"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["cheese"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["oven"],
+      "State": ["cold"]
+    },
+    {
+      "Type": ["plate"],
+      "State": ["clean"]
+    },
+    {
+      "Type": ["pizza_cutter"],
+      "State": ["clean"]
+    },
+    {
+      "Type": ["water"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["tomato"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["chili_flakes"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["pizza_box"],
+      "State": ["raw"]
+    },
+    {
+      "Type": ["order_label"],
+      "State": ["raw"]
+    }
+  ],
+  "outputs": [
+    {
+      "Type": ["handoff_order_item"],
+      "State": ["handed_off"]
+    }
+  ]
+}

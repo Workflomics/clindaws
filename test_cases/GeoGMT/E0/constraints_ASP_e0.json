@@ -1,0 +1,31 @@
+{
+    "constraints": [
+      "ite_m(Modules_with_xyz_file_output, Modules_with_xyz_file_input)",
+      "ite_m(Modules_with_grid_file_output, Modules_with_grid_file_input)",
+      "ite_m(Modules_with_color_palette_output, Modules_with_color_palette_input)",
+      "itn_m(Data_generation, Adding_data)",
+      "itn_m(Data_processing, Adding_data)",
+      "itn_m(Data_processing, Data_generation)",
+      "itn_m(Plot_creation, Adding_data)",
+      "itn_m(Plot_creation, Data_generation)",
+      "itn_m(Plot_creation, Data_processing)",
+      "itn_m(Data_presentation, Adding_data)",
+      "itn_m(Data_presentation, Data_generation)",
+      "itn_m(Data_presentation, Data_processing)",
+      "itn_m(Data_presentation, Plot_creation)",
+      "itn_m(Layer2, Layer1)",
+      "itn_m(Layer3, Layer1)",
+      "itn_m(Layer3, Layer2)",
+      "itn_m(Layer4, Layer1)",
+      "itn_m(Layer4, Layer2)",
+      "itn_m(Layer4, Layer3)",
+      "itn_m(gs, gs)",
+      "next_m(initGMT, Plot_creation)",
+      "use_t(Plots)",
+      "nuse_m(3D_surfaces)",
+      "use_m(Draw_water)",
+      "use_m(Draw_land)",
+      "use_m(Draw_political_borders)"
+    ]
+}
+

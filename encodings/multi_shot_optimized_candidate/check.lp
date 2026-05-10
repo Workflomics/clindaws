@@ -134,23 +134,9 @@ required_output_profile(t, TProd, ToolProd, Port, Category, ProfileId) :-
 % categories that can matter at the current horizon.
 output_port_value(t, TProd, ToolProd, Port, V, Category) :-
     query(t),
-    TProd = t,
     occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
     check_relevant_output_category(t, TProd, ToolProd, Port, Category),
-    dynamic_query_output_value(ProducerCandidate, Port, V, Category).
-
-output_port_value(t, TProd, ToolProd, Port, V, Category) :-
-    query(t),
-    TProd != t,
-    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
-    dynamic_check_output_value_at_horizon(ProducerCandidate, Port, Category, t, V).
-
-output_port_value(t, TProd, ToolProd, Port, V, Category) :-
-    query(t),
-    not query_output_filter_active(t),
-    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),
-    check_relevant_output_category(t, TProd, ToolProd, Port, Category),
-    dynamic_candidate_output_choice_value(ProducerCandidate, Port, V, Category).
+    query_output_choice_value(t, TProd, ProducerCandidate, Port, V, Category).
 
 output_value_profile_violation(t, TProd, ToolProd, Port, V, Category, ProfileId) :-
     output_port_value(t, TProd, ToolProd, Port, V, Category),
@@ -170,12 +156,10 @@ output_dim_supported(t, TProd, ToolProd, Port, V, Category) :-
     not output_dim_violates_consumer(t, TProd, ToolProd, Port, V, Category),
     not output_dim_violates_goal(t, TProd, ToolProd, Port, V, Category).
 
-% Replaces a pairwise V₂ < V self-join: comparing each supported V to the
-% minimum supported V in its (TProd, ToolProd, Port, Category) group is O(V)
-% per group instead of O(V²).
 output_dim_smaller_supported(t, TProd, ToolProd, Port, V, Category) :-
     output_dim_supported(t, TProd, ToolProd, Port, V, Category),
-    V > #min { V2 : output_dim_supported(t, TProd, ToolProd, Port, V2, Category) }.
+    output_dim_supported(t, TProd, ToolProd, Port, V2, Category),
+    V2 < V.
 
 :- query(t),
    occurs(TProd, output(ToolProd, ProducerCandidate, Port)),

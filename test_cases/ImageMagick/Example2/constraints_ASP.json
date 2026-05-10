@@ -1,0 +1,7 @@
+{
+  "constraints": [
+    "use_t(Filter)",
+    "nuse_m(Borders)",
+    "next_m(cut, overlap)"
+  ]
+}

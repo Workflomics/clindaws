@@ -1,0 +1,63 @@
+{
+  "ontologyPrefixIRI": "http://geographicknowledge.de/vocab/CoreConceptData.rdf#",
+  "solutions_dir_path": "./results/solutions_QuAnGIS_QGIS/WC",
+  "tool_annotations_path": "./test_cases/QuAnGIS/FlowmapDescription.json",
+  "strict_tool_annotations": "false",
+  "ontology_path": "./test_cases/QuAnGIS/GISTaxonomy.rdf",
+  "constraints_path": "./test_cases/QuAnGIS/QGIS/constraints_SAT.json",
+  "toolsTaxonomyRoot": "http://geographicknowledge.de/vocab/GISTools.rdf#Tool",
+  "dataDimensionsTaxonomyRoots": [
+    "CoreConceptQ",
+    "LayerA",
+    "NominalA"
+  ],
+  "timeout_sec": "900",
+  "solution_length": {
+    "min": 6,
+    "max": 10
+  },
+  "solutions": "1",
+  "number_of_execution_scripts": "0",
+  "number_of_generated_graphs": "0",
+  "inputs": [
+    {
+      "CoreConceptQ": [
+        "ObjectQ"
+      ],
+      "LayerA": [
+        "VectorTessellationA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/ExtensiveMeasures.rdf#ERA"
+      ]
+    },
+    {
+      "CoreConceptQ": [
+        "ObjectQ"
+      ],
+      "LayerA": [
+        "LineA"
+      ],
+      "NominalA": [
+        "PlainNominalA"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "CoreConceptQ": [
+        "ObjectQ"
+      ],
+      "LayerA": [
+        "VectorRegionA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/ExtensiveMeasures.rdf#IRA"
+      ]
+    }
+  ],
+  "debug_mode": "false",
+  "use_workflow_input": "all",
+  "use_all_generated_data": "one",
+  "tool_seq_repeat": "false"
+}

@@ -31,7 +31,7 @@ is_workflow_input(WF) :- holds(0, avail(WF)).
 workflow_input(WF) :-
     is_workflow_input(WF).
 
-workflow_input_lineage(WF, WF) :-
+workflow_input_lineage(0, WF, WF) :-
     holds(0, avail(WF)).
 
 
@@ -61,10 +61,6 @@ dynamic_candidate_input_category(Candidate, Port, Category) :-
 
 dynamic_candidate_output_category(Candidate, Port, Category) :-
     dynamic_candidate_output_singleton(Candidate, Port, _, Category).
-
-dynamic_candidate_output_choice_value(Candidate, Port, V, Category) :-
-    dynamic_candidate_output_value_class(Candidate, Port, Class),
-    dynamic_output_value_class_choice_value(Class, V, Category).
 
 dynamic_candidate_output_category(Candidate, Port, Category) :-
     dynamic_candidate_output_choice_value(Candidate, Port, _, Category).
@@ -235,3 +231,4 @@ smaller_equivalent_eligible_input(Candidate, Port, WF, SmallerWF) :-
     eligible(Candidate, Port, WF),
     eligible(Candidate, Port, SmallerWF),
     equivalent_workflow_inputs(SmallerWF, WF).
+

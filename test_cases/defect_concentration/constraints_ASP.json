@@ -1,0 +1,21 @@
+{
+  "constraints": [
+    "at_step(CreateProject, 1)",
+    "itn_m(CreateProject, CreateProject)",
+    "depend_m(CalculateDefectFormationEnergy, RelaxStructure)",
+    "depend_m(CalculateDefectFormationEnergy, CreateDefect)",
+    "depend_m(RelaxStructure, CreateDefect)",
+    "itn_m(CreateStructure, CreateStructure)",
+    "itn_m(CalcChemicalPotentialA, CalcChemicalPotentialA)",
+    "itn_m(CalcChemicalPotentialB, CalcChemicalPotentialB)",
+    "unique_inputs(CalculateDefectFormationEnergy)",
+    "ite_m(CreateDefect, RelaxStructure)",
+    "used_iff_used(CreateAntisite, CalcChemicalPotentialB)",
+    "max_uses(CreateDefect, 2)",
+    "connected_op(CreateStructureBulk, RunDFT)",
+    "mutex_tools(RunVasp, RunSphinx)",
+    "mutex_tools(RunVasp, RunGpaw)",
+    "mutex_tools(RunSphinx, RunGpaw)",
+    "not_consecutive(RelaxStructure)"
+  ]
+}

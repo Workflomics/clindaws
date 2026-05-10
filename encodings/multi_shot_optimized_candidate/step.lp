@@ -132,14 +132,13 @@ bound_produced_satisfies_profile(t, Candidate, Port, Category) :-
    dynamic_candidate_input_category(Candidate, Port, Category),
    not bound_produced_satisfies_profile(t, Candidate, Port, Category).
 
-% Lineage atoms are t-less: the artifact term `out(t, Tool, P)` already
-% embeds the producing step, so each step emits unique fresh ground atoms
-% and clingo's monotonicity carries them forward without an explicit
-% carry-forward rule (which previously duplicated O(steps × |lineage|)).
-workflow_input_lineage(out(t, Tool, PortOut), WF) :-
+workflow_input_lineage(t, Artifact, WF) :-
+    workflow_input_lineage(t-1, Artifact, WF).
+
+workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
     occurs(t, output(Tool, _, PortOut)),
     occurs(t, bind(Tool, _, Artifact)),
-    workflow_input_lineage(Artifact, WF).
+    workflow_input_lineage(t-1, Artifact, WF).
 
 % Symmetry breaking for same-signature ports using direct term order.
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
@@ -147,6 +146,15 @@ workflow_input_lineage(out(t, Tool, PortOut), WF) :-
    occurs(t, bind(Tool, PortLow, ArtifactLow)),
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
    ArtifactHigh < ArtifactLow.
+
+% Symmetry breaking for 1:N split output sub-ports of the same producer.
+:- output_sym_ports(Candidate, PortHigh, PortLow),
+   occurs(TProducer, output(Tool, Candidate, PortLow)),
+   occurs(TProducer, output(Tool, Candidate, PortHigh)),
+   occurs(t, bind(Tool2, ConsumerPortHigh, out(TProducer, Tool, PortLow))),
+   occurs(t, bind(Tool2, ConsumerPortLow, out(TProducer, Tool, PortHigh))),
+   TProducer < t,
+   ConsumerPortLow < ConsumerPortHigh.
 
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),

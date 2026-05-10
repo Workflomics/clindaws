@@ -32,6 +32,15 @@ class ToolExpansionStat:
     dynamic_output_port_value_counts: tuple[int, ...] = ()
     dynamic_cross_product_estimate: int | None = None
 
+    @property
+    def expansion_score(self) -> int:
+        if self.candidate_count is not None:
+            return self.candidate_count
+        if self.dynamic_cross_product_estimate is not None:
+            return self.dynamic_cross_product_estimate
+        return self.input_variant_count * max(self.output_variant_count, 1)
+
+
 @dataclass(frozen=True)
 class ToolPortSpec:
     """A tool input or output port specification."""

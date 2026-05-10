@@ -1,0 +1,170 @@
+{
+  "mode": "multi-shot-lazy",
+  "grounding_strategy": "hybrid",
+  "translation_peak_rss_mb": 20.109375,
+  "base_grounding_peak_rss_mb": 24.15625,
+  "base_grounding_sec": 0.0032270000083371997,
+  "horizons": [
+    {
+      "horizon": 1,
+      "grounding_sec": 0.003639081958681345,
+      "solving_sec": 0.0007345420308411121,
+      "peak_rss_mb": 25.28125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step_initial",
+          0.0017224999610334635
+        ],
+        [
+          "constraint_step",
+          0.0003387909382581711
+        ],
+        [
+          "check",
+          0.0009390830527991056
+        ],
+        [
+          "check_usage",
+          0.0006387080065906048
+        ]
+      ]
+    },
+    {
+      "horizon": 2,
+      "grounding_sec": 0.02310133317951113,
+      "solving_sec": 0.0011612089583650231,
+      "peak_rss_mb": 31.78125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step",
+          0.01268325001001358
+        ],
+        [
+          "step_query",
+          0.0021724579855799675
+        ],
+        [
+          "constraint_step",
+          0.001696875086054206
+        ],
+        [
+          "check",
+          0.002632583025842905
+        ],
+        [
+          "check_usage",
+          0.003916167072020471
+        ]
+      ]
+    },
+    {
+      "horizon": 3,
+      "grounding_sec": 1.6583013348281384e-05,
+      "solving_sec": 1.5750061720609665e-05,
+      "peak_rss_mb": 31.78125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step",
+          6.125075742602348e-06
+        ],
+        [
+          "step_query",
+          3.2079406082630157e-06
+        ],
+        [
+          "constraint_step",
+          2.749962732195854e-06
+        ],
+        [
+          "check",
+          2.250075340270996e-06
+        ],
+        [
+          "check_usage",
+          2.249958924949169e-06
+        ]
+      ]
+    },
+    {
+      "horizon": 4,
+      "grounding_sec": 1.091579906642437e-05,
+      "solving_sec": 8.665956556797028e-06,
+      "peak_rss_mb": 31.78125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step",
+          3.4580007195472717e-06
+        ],
+        [
+          "step_query",
+          2.249958924949169e-06
+        ],
+        [
+          "constraint_step",
+          1.7909333109855652e-06
+        ],
+        [
+          "check",
+          1.7499551177024841e-06
+        ],
+        [
+          "check_usage",
+          1.6669509932398796e-06
+        ]
+      ]
+    },
+    {
+      "horizon": 5,
+      "grounding_sec": 1.0582967661321163e-05,
+      "solving_sec": 9.95793379843235e-06,
+      "peak_rss_mb": 31.78125,
+      "satisfiable": false,
+      "models_seen": 0,
+      "models_stored": 0,
+      "unique_workflows_seen": 0,
+      "unique_workflows_stored": 0,
+      "grounding_parts": [
+        [
+          "step",
+          2.749962732195854e-06
+        ],
+        [
+          "step_query",
+          2.2079329937696457e-06
+        ],
+        [
+          "constraint_step",
+          2.00001522898674e-06
+        ],
+        [
+          "check",
+          2.00001522898674e-06
+        ],
+        [
+          "check_usage",
+          1.625041477382183e-06
+        ]
+      ]
+    }
+  ]
+}

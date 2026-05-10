@@ -1,0 +1,12 @@
+test,mode,horizon,optimized_enabled,effective_parallel_mode,compressed_candidate_engaged,translation_ms,setup_grounding_ms,solving_ms,memory_used_mb,workflow_candidates_found,constraints_used,timed_out
+defect_concentration,optimized,1,true,"10,split",true,8,4,0,41.30,0,true,false
+defect_concentration,optimized,2,true,"10,split",true,8,1,0,41.30,0,true,false
+defect_concentration,optimized,3,true,"10,split",true,8,2,0,41.30,0,true,false
+defect_concentration,optimized,4,true,"10,split",true,8,3,0,100.66,0,true,false
+defect_concentration,optimized,5,true,"10,split",true,8,4,0,100.66,0,true,false
+defect_concentration,optimized,6,true,"10,split",true,8,10,2,100.66,0,true,false
+defect_concentration,optimized,7,true,"10,split",true,8,12,4,100.66,0,true,false
+defect_concentration,optimized,8,true,"10,split",true,8,16,9,100.66,0,true,false
+defect_concentration,optimized,9,true,"10,split",true,8,20,98,178.09,126,true,false
+defect_concentration,optimized,10,true,"10,split",true,8,24,717,230.14,1080,true,false
+defect_concentration,single-shot,10,false,,false,9,97,1485,171.73,1080,true,false

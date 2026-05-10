@@ -1,0 +1,71 @@
+{
+  "ontology_path": "./test_cases/metaCascabel/metaCascabel.owl",
+  "ontologyPrefixIRI": "http://www.semanticweb.org/charl/ontologies/2025/8/metaCascabel-ont#",
+  "toolsTaxonomyRoot": "Tool",
+  "dataDimensionsTaxonomyRoots": [
+    "Type",
+    "Format"
+  ],
+  "tool_annotations_path": "./test_cases/metaCascabel/tool_annotations.json",
+  "strict_tool_annotations": "false",
+  "constraints_path": "./test_cases/metaCascabel/constraints_SAT.json",
+  "timeout_sec": "900",
+  "solutions_dir_path": "./results/solutions_metaCascabel/WC",
+  "solution_length": {
+    "min": 17,
+    "max": 17
+  },
+  "solutions": "500",
+  "number_of_execution_scripts": "0",
+  "number_of_generated_graphs": "0",
+  "number_of_cwl_files": "0",
+  "number_of_snakemake_files": "0",
+  "tool_seq_repeat": "false",
+  "inputs": [
+    {
+      "Type": [
+        "project_name"
+      ],
+      "Format": [
+        "str"
+      ]
+    },
+    {
+      "Type": [
+        "sample_name"
+      ],
+      "Format": [
+        "str"
+      ]
+    },
+    {
+      "Type": [
+        "fw_reads_path"
+      ],
+      "Format": [
+        "path"
+      ]
+    },
+    {
+      "Type": [
+        "rv_reads_path"
+      ],
+      "Format": [
+        "path"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "Type": [
+        "final_report"
+      ],
+      "Format": [
+        "html"
+      ]
+    }
+  ],
+  "debug_mode": "true",
+  "use_workflow_input": "one",
+  "use_all_generated_data": "NONE"
+}

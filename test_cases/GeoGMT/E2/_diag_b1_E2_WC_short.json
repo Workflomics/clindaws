@@ -1,0 +1,49 @@
+{
+  "ontology_path": "./test_cases/GeoGMT/GMT_UseCase_taxonomy.owl",
+  "ontologyPrefixIRI": "http://www.co-ode.org/ontologies/ont.owl#",
+  "toolsTaxonomyRoot": "ToolsTaxonomy",
+  "dataDimensionsTaxonomyRoots": [
+    "TypesTaxonomy"
+  ],
+  "tool_annotations_path": "./test_cases/GeoGMT/tool_annotations.json",
+  "strict_tool_annotations": "false",
+  "constraints_path": "./test_cases/GeoGMT/E2/constraints_ASP_e2.json",
+  "timeout_sec": "300",
+  "solutions_dir_path": "./results/_diag_b1_GeoGMT_E2_WC",
+  "solution_length": {
+    "min": 8,
+    "max": 18
+  },
+  "solutions": "10000",
+  "number_of_execution_scripts": "0",
+  "number_of_generated_graphs": "0",
+  "tool_seq_repeat": "false",
+  "inputs": [
+    {
+      "TypesTaxonomy": [
+        "XYZ_table_file"
+      ],
+      "APE_label": [
+        "cities"
+      ]
+    },
+    {
+      "TypesTaxonomy": [
+        "XYZ_table_file"
+      ],
+      "APE_label": [
+        "birds"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "TypesTaxonomy": [
+        "PostScript"
+      ]
+    }
+  ],
+  "debug_mode": "false",
+  "use_workflow_input": "all",
+  "use_all_generated_data": "all"
+}

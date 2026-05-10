@@ -1,0 +1,23 @@
+{
+  "constraints": [
+    {
+      "constraintid": "use_t",
+      "parameters": [
+	 { "Type" : ["Filter"], "Format" : ["Format"]}
+      ]
+    },
+    {
+      "constraintid": "nuse_m",
+      "parameters": [
+	 { "Tool" : ["Borders"]}
+      ]
+    },
+    {
+      "constraintid": "next_m",
+      "parameters": [
+	 { "Tool" : ["cut"]},
+	 { "Tool" : ["overlap"]}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+    "constraints": [
+      "use_m(snpeff)",
+      "use_m(mutect)"
+    ]
+}
