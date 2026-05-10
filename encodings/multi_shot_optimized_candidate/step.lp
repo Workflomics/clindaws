@@ -147,6 +147,15 @@ workflow_input_lineage(t, out(t, Tool, PortOut), WF) :-
    occurs(t, bind(Tool, PortHigh, ArtifactHigh)),
    ArtifactHigh < ArtifactLow.
 
+% Symmetry breaking for 1:N split output sub-ports of the same producer.
+:- output_sym_ports(Candidate, PortHigh, PortLow),
+   occurs(TProducer, output(Tool, Candidate, PortLow)),
+   occurs(TProducer, output(Tool, Candidate, PortHigh)),
+   occurs(t, bind(Tool2, ConsumerPortHigh, out(TProducer, Tool, PortLow))),
+   occurs(t, bind(Tool2, ConsumerPortLow, out(TProducer, Tool, PortHigh))),
+   TProducer < t,
+   ConsumerPortLow < ConsumerPortHigh.
+
 :- occurs(t, use_dynamic_candidate(Tool, Candidate)),
    occurs(t, bind(Tool, Port1, WF1)),
    occurs(t, bind(Tool, Port2, WF2)),

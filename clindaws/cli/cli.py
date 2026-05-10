@@ -11,6 +11,7 @@ from clindaws.execution.runner import (
     run_once,
     run_translate_only,
 )
+from clindaws.execution.modes import validate_mode_request
 
 
 def _progress(message: str) -> None:
@@ -34,11 +35,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=(
             "single-shot",
-            "single-shot-sliding-window",
             "multi-shot",
+            "optimized",
         ),
         default="multi-shot",
         help="Solver mode to execute.",
+    )
+    parser.add_argument(
+        "--decomp",
+        choices=("kcluster", "one-to-n", "1n", "1:n"),
+        help="Optimized decompression mode. Requires --mode optimized.",
     )
     parser.add_argument(
         "--grounding",
@@ -106,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="Enable the optimized backend. For multi-shot this uses the optimized-candidate backend. Single-shot optimized mode is not implemented yet.",
+        help="Compatibility alias for --mode optimized without a decompression mode.",
     )
     parser.add_argument(
         "--translation-workers",
@@ -156,8 +162,14 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--ground-only cannot be combined with --translate-only.")
         if args.ground_only_stage != "base" and not args.ground_only:
             parser.error("--ground-only-stage requires --ground-only.")
-        if args.ground_only and args.mode == "single-shot-sliding-window":
-            parser.error("--ground-only does not support mode single-shot-sliding-window.")
+        try:
+            _, decomp_mode = validate_mode_request(
+                mode=args.mode,
+                optimized=args.optimized,
+                decompression_mode=args.decomp,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
 
         if args.ground_only:
             grounding_result = run_ground_only(
@@ -171,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 progress_callback=_progress,
                 optimized=args.optimized,
+                decompression_mode=decomp_mode,
                 max_workers=args.translation_workers,
             )
             if grounding_result.translation_path is not None:
@@ -206,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_length=args.max_length,
                 progress_callback=_progress,
                 optimized=args.optimized,
+                decompression_mode=decomp_mode,
                 max_workers=args.translation_workers,
             )
             if translation_result.translation_path is not None:
@@ -239,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
             debug=args.debug,
             progress_callback=_progress,
             optimized=args.optimized,
+            decompression_mode=decomp_mode,
             max_workers=args.translation_workers,
         )
         if run_result.translation_path is not None:

@@ -1,0 +1,7 @@
+{
+    "constraints": [
+      "use_m(operation_3631)",
+      "use_m(operation_3501)",
+"prev_m(proteinprophet, peptideprophet)"
+    ]
+}

@@ -1,0 +1,963 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://example.org/pizza#"
+     xml:base="http://example.org/pizza"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+    <owl:Ontology rdf:about="http://example.org/pizza"/>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://example.org/pizza#State -->
+
+    <owl:Class rdf:about="http://example.org/pizza#State"/>
+    
+
+
+    <!-- http://example.org/pizza#Tool -->
+
+    <owl:Class rdf:about="http://example.org/pizza#Tool"/>
+    
+
+
+    <!-- http://example.org/pizza#Type -->
+
+    <owl:Class rdf:about="http://example.org/pizza#Type"/>
+    
+
+
+    <!-- http://example.org/pizza#archived -->
+
+    <owl:Class rdf:about="http://example.org/pizza#archived">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#archived_order_item -->
+
+    <owl:Class rdf:about="http://example.org/pizza#archived_order_item">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#assembled -->
+
+    <owl:Class rdf:about="http://example.org/pizza#assembled">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#assembled_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#assembled_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#assembly -->
+
+    <owl:Class rdf:about="http://example.org/pizza#assembly">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#audited -->
+
+    <owl:Class rdf:about="http://example.org/pizza#audited">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#audited_station -->
+
+    <owl:Class rdf:about="http://example.org/pizza#audited_station">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#baked_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#baked_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#baking -->
+
+    <owl:Class rdf:about="http://example.org/pizza#baking">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#boxed -->
+
+    <owl:Class rdf:about="http://example.org/pizza#boxed">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#checked -->
+
+    <owl:Class rdf:about="http://example.org/pizza#checked">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cheesed -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cheesed">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cheesed_base -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cheesed_base">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#clean -->
+
+    <owl:Class rdf:about="http://example.org/pizza#clean">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#clean_kitchen -->
+
+    <owl:Class rdf:about="http://example.org/pizza#clean_kitchen">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cleaning_cloth -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cleaning_cloth">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#closed -->
+
+    <owl:Class rdf:about="http://example.org/pizza#closed">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#closed_ticket_item -->
+
+    <owl:Class rdf:about="http://example.org/pizza#closed_ticket_item">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cold -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cold">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cooked -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cooked">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cooled_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cooled_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#cutting -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cutting">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#finishing"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#dipping_sauce -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dipping_sauce">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#dirty -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dirty">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#dough_ingredients -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dough_ingredients">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#dough_making -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dough_making">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_prep"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#dough_prep -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dough_prep">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#drink_pairing -->
+
+    <owl:Class rdf:about="http://example.org/pizza#drink_pairing">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#finishing -->
+
+    <owl:Class rdf:about="http://example.org/pizza#finishing">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#flour -->
+
+    <owl:Class rdf:about="http://example.org/pizza#flour">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#frozen -->
+
+    <owl:Class rdf:about="http://example.org/pizza#frozen">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#frozen_pipeline -->
+
+    <owl:Class rdf:about="http://example.org/pizza#frozen_pipeline">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#garnishing -->
+
+    <owl:Class rdf:about="http://example.org/pizza#garnishing">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#finishing"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#handed_off -->
+
+    <owl:Class rdf:about="http://example.org/pizza#handed_off">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#handoff_order_item -->
+
+    <owl:Class rdf:about="http://example.org/pizza#handoff_order_item">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#home_oven_baking -->
+
+    <owl:Class rdf:about="http://example.org/pizza#home_oven_baking">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#baking"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#hot -->
+
+    <owl:Class rdf:about="http://example.org/pizza#hot">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#kitchen_shutdown_item -->
+
+    <owl:Class rdf:about="http://example.org/pizza#kitchen_shutdown_item">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#kneaded -->
+
+    <owl:Class rdf:about="http://example.org/pizza#kneaded">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#labeled -->
+
+    <owl:Class rdf:about="http://example.org/pizza#labeled">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#maintenance -->
+
+    <owl:Class rdf:about="http://example.org/pizza#maintenance">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#oiled -->
+
+    <owl:Class rdf:about="http://example.org/pizza#oiled">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#order_label -->
+
+    <owl:Class rdf:about="http://example.org/pizza#order_label">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#oven_preheating -->
+
+    <owl:Class rdf:about="http://example.org/pizza#oven_preheating">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#home_oven_baking"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#pizza_box -->
+
+    <owl:Class rdf:about="http://example.org/pizza#pizza_box">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#pizza_cutter -->
+
+    <owl:Class rdf:about="http://example.org/pizza#pizza_cutter">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#pizza_dough -->
+
+    <owl:Class rdf:about="http://example.org/pizza#pizza_dough">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#plate -->
+
+    <owl:Class rdf:about="http://example.org/pizza#plate">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#plated -->
+
+    <owl:Class rdf:about="http://example.org/pizza#plated">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#plated_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#plated_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#plating -->
+
+    <owl:Class rdf:about="http://example.org/pizza#plating">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#finishing"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#preheated -->
+
+    <owl:Class rdf:about="http://example.org/pizza#preheated">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#proofing -->
+
+    <owl:Class rdf:about="http://example.org/pizza#proofing">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_prep"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#raw -->
+
+    <owl:Class rdf:about="http://example.org/pizza#raw">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#ready -->
+
+    <owl:Class rdf:about="http://example.org/pizza#ready">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#rested -->
+
+    <owl:Class rdf:about="http://example.org/pizza#rested">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#restock_kit -->
+
+    <owl:Class rdf:about="http://example.org/pizza#restock_kit">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#restocked -->
+
+    <owl:Class rdf:about="http://example.org/pizza#restocked">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#restocked_station -->
+
+    <owl:Class rdf:about="http://example.org/pizza#restocked_station">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#risen -->
+
+    <owl:Class rdf:about="http://example.org/pizza#risen">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#risen_dough -->
+
+    <owl:Class rdf:about="http://example.org/pizza#risen_dough">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#rolled -->
+
+    <owl:Class rdf:about="http://example.org/pizza#rolled">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#rolled_dough -->
+
+    <owl:Class rdf:about="http://example.org/pizza#rolled_dough">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#salt -->
+
+    <owl:Class rdf:about="http://example.org/pizza#salt">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sanitized -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sanitized">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sanitized_station -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sanitized_station">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sanitizer -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sanitizer">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sauce_prep -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sauce_prep">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sauced -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sauced">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sauced_base -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sauced_base">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#served -->
+
+    <owl:Class rdf:about="http://example.org/pizza#served">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#served_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#served_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#shutdown -->
+
+    <owl:Class rdf:about="http://example.org/pizza#shutdown">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sliced -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sliced">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#sliced_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sliced_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#temperature_verified -->
+
+    <owl:Class rdf:about="http://example.org/pizza#temperature_verified">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#thawed -->
+
+    <owl:Class rdf:about="http://example.org/pizza#thawed">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#timer_set -->
+
+    <owl:Class rdf:about="http://example.org/pizza#timer_set">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#topped -->
+
+    <owl:Class rdf:about="http://example.org/pizza#topped">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#topped_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#topped_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#topping_application -->
+
+    <owl:Class rdf:about="http://example.org/pizza#topping_application">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#assembly"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#unit_conversion -->
+
+    <owl:Class rdf:about="http://example.org/pizza#unit_conversion">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Tool"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#warm -->
+
+    <owl:Class rdf:about="http://example.org/pizza#warm">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#water -->
+
+    <owl:Class rdf:about="http://example.org/pizza#water">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#wiped -->
+
+    <owl:Class rdf:about="http://example.org/pizza#wiped">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+    
+
+
+    <!-- http://example.org/pizza#wiped_counter -->
+
+    <owl:Class rdf:about="http://example.org/pizza#wiped_counter">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#boxed_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#boxed_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#cheese -->
+
+    <owl:Class rdf:about="http://example.org/pizza#cheese">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#topping"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#chili_flakes -->
+
+    <owl:Class rdf:about="http://example.org/pizza#chili_flakes">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#topping"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#clean_home_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#clean_home_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#clean_pizza_cutter -->
+
+    <owl:Class rdf:about="http://example.org/pizza#clean_pizza_cutter">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#pizza_cutter"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#clean_pizza_plate -->
+
+    <owl:Class rdf:about="http://example.org/pizza#clean_pizza_plate">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#plate"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#dirty_home_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dirty_home_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#dirty_pizza_cutter -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dirty_pizza_cutter">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#pizza_cutter"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#dirty_pizza_plate -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dirty_pizza_plate">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#plate"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#dirty_wood_fire_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#dirty_wood_fire_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#wood_fire_oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#drizzled -->
+
+    <owl:Class rdf:about="http://example.org/pizza#drizzled">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#frozen_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#frozen_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#garnished -->
+
+    <owl:Class rdf:about="http://example.org/pizza#garnished">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#State"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#labeled_pizza -->
+
+    <owl:Class rdf:about="http://example.org/pizza#labeled_pizza">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#marinara -->
+
+    <owl:Class rdf:about="http://example.org/pizza#marinara">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#sauce"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#oil -->
+
+    <owl:Class rdf:about="http://example.org/pizza#oil">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#preheated_home_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#preheated_home_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#preheated_wood_fire_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#preheated_wood_fire_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#wood_fire_oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#roasted_garlic -->
+
+    <owl:Class rdf:about="http://example.org/pizza#roasted_garlic">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#topping"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#sauce -->
+
+    <owl:Class rdf:about="http://example.org/pizza#sauce">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#stand_mixer -->
+
+    <owl:Class rdf:about="http://example.org/pizza#stand_mixer">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#Type"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#temperature_verified_home_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#temperature_verified_home_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#timer_set_home_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#timer_set_home_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#tomato -->
+
+    <owl:Class rdf:about="http://example.org/pizza#tomato">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#topping"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#tomato_sauce -->
+
+    <owl:Class rdf:about="http://example.org/pizza#tomato_sauce">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#sauce"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#topping -->
+
+    <owl:Class rdf:about="http://example.org/pizza#topping">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#wood_fire_oven -->
+
+    <owl:Class rdf:about="http://example.org/pizza#wood_fire_oven">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#oven"/>
+    </owl:Class>
+
+
+
+    <!-- http://example.org/pizza#yeast -->
+
+    <owl:Class rdf:about="http://example.org/pizza#yeast">
+        <rdfs:subClassOf rdf:resource="http://example.org/pizza#dough_ingredients"/>
+    </owl:Class>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->

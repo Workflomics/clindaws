@@ -1,0 +1,75 @@
+{
+  "ontology_path": "./test_cases/GeoEvents/GeoTaxonomy.owl",
+  "ontologyPrefixIRI": "http://geographicknowledge.de/vocab/CoreConceptData.rdf#",
+  "toolsTaxonomyRoot": "http://www.co-ode.org/ontologies/ont.owl#Geooperator",
+  "dataDimensionsTaxonomyRoots": [
+    "CoreConceptQ",
+    "LayerA",
+    "NominalA"
+  ],
+  "tool_annotations_path": "./test_cases/GeoEvents/GeooperatorsAnnotation.json",
+  "strict_tool_annotations": "false",
+  "constraints_path": "./test_cases/constraints_empty.json",
+  "timeout_sec": "900",
+  "solutions_dir_path": "./results/solutions_GeoEvents/NC",
+  "shared_memory": "true",
+  "solution_length": {
+    "min": 1,
+    "max": 4
+  },
+  "solutions": "1000",
+  "number_of_execution_scripts": "0",
+  "number_of_generated_graphs": "0",
+  "tool_seq_repeat": "false",
+  "inputs": [
+    {
+      "CoreConceptQ": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#ObjectQ"
+      ],
+      "LayerA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#LineA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#CountA"
+      ]
+    },
+    {
+      "CoreConceptQ": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#ObjectQ"
+      ],
+      "LayerA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#LineA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#CountA"
+      ]
+    },
+    {
+      "CoreConceptQ": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#FieldQ"
+      ],
+      "LayerA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#VectorTessellationA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#NominalA"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "CoreConceptQ": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#FieldQ"
+      ],
+      "LayerA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#VectorTessellationA"
+      ],
+      "NominalA": [
+        "http://geographicknowledge.de/vocab/CoreConceptData.rdf#NominalA"
+      ]
+    }
+  ],
+  "debug_mode": "false",
+  "use_workflow_input": "all",
+  "use_all_generated_data": "one"
+}

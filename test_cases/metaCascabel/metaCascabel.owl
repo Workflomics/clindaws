@@ -1,0 +1,1058 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://www.semanticweb.org/charl/ontologies/2025/8/metaCascabel-ont"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://www.semanticweb.org/charl/ontologies/2025/8/metaCascabel-ont">
+    <Prefix name="" IRI="http://www.semanticweb.org/charl/ontologies/2025/8/metaCascabel-ont/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Declaration>
+        <Class IRI="#Format"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Tool"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Type"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#abundance"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#abundance_coverage_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#abundance_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#all_singles"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#assembler"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bam"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bin_cvg"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binning"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binning_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binning_table"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binsanity"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binsanity_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binsanity_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#binsanity_table"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bwa"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bwa_index"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#bwt"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#checkM"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#checkM_gtdb_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#checkM_results"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#checkM_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#computeGC"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#concat_single_reads"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#concoct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#contigs"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#contigs_chunks"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#contigs_complete"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#contigs_no_std_name"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#contigs_report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#coverage"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#create_taxo_out"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#create_unbinned"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#das"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#das_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#das_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#das_table"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#depth"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#depth_avg"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#depth_avg_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#diamond_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#diamond_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#diamond_results"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#dir"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fa"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#faa"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fasta"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fastq"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fastqc_rawReads"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fastqc_trimmedReads"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ffn"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fgs"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#final_coverage"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#final_names"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#final_report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#final_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#finalize_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#flagstat"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fq"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fq2fasta"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fq_fw_internal_validation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fq_rv_internal_validation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fw_fastqc"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fw_fastqc_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#fw_reads_path"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#gene_calling"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#genes"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#gff"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#gtdbtk"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#gtdbtk_results"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#gtdbtk_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#html"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#idba"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#init_sample"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#kaiju"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#kaiju_taxonomy"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#kraken"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#kraken_taxonomy"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#mapped_against_cross-assembly"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#maxbin"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#maxbin_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#maxbin_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#maxbin_table"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#megahit"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#merge_checkM_gtdb_results"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#meta_spades"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#metabat"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#metabat_bins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#metabat_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#metabat_table"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#mgm"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#out"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#path"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prepare_kraken_report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prodigal"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#project_name"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prokka"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prokka_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prokka_results"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#prots"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#quast"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#quast_lib_config"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#rawdata_fw"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#rawdata_rv"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read1_paired"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read1_paired_fastqc"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read1_paired_fastqc_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read1_single"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read2_paired"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read2_paired_fastqc"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read2_paired_fastqc_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#read2_single"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#reads_merged"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#rv_fastqc"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#rv_fastqc_summary"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#rv_reads_path"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#sam_flags"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#sample_name"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#scaffolds"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#scaffolds_no_std_name"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#scaffolds_report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#split_assembly"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#split_flag"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#std_assembly"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#std_splitted_assembly"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#str"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#summarize_bam"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#tableBins"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#taxonomy"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#taxonomy_labels"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#taxonomy_profiling"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#taxonomy_report"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#tmp"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#trimmed_fq_fw_internal_validation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#trimmed_fq_rv_internal_validation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#trimmomatic"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#trimmomatic_log"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#tsv"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#txt"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#unbinned_contigs"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#unbinned_list"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#validateQC"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#validateQC_trimmed"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#validateQuast"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#validate_assembly"/>
+    </Declaration>
+    <SubClassOf>
+        <Class IRI="#abundance"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#abundance_coverage_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#abundance_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#all_singles"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#assembler"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bam"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bin_cvg"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binning"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binning_log"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binning_table"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bins"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binsanity"/>
+        <Class IRI="#binning"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binsanity_bins"/>
+        <Class IRI="#bins"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binsanity_log"/>
+        <Class IRI="#binning_log"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#binsanity_table"/>
+        <Class IRI="#binning_table"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bwa"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bwa_index"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#bwt"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#checkM"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#checkM_gtdb_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#checkM_results"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#checkM_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#computeGC"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#concat_single_reads"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#concoct"/>
+        <Class IRI="#binning"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#contigs"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#contigs_chunks"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#contigs_complete"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#contigs_no_std_name"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#contigs_report"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#coverage"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#create_taxo_out"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#create_unbinned"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#das"/>
+        <Class IRI="#binning"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#das_bins"/>
+        <Class IRI="#bins"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#das_log"/>
+        <Class IRI="#binning_log"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#das_table"/>
+        <Class IRI="#binning_table"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#depth"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#depth_avg"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#depth_avg_log"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#diamond_bins"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#diamond_log"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#diamond_results"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#dir"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fa"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#faa"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fasta"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fastq"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fastqc_rawReads"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fastqc_trimmedReads"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ffn"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fgs"/>
+        <Class IRI="#gene_calling"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#final_coverage"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#final_names"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#final_report"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#final_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#finalize_bins"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#flagstat"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fq"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fq2fasta"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fq_fw_internal_validation"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fq_rv_internal_validation"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fw_fastqc"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fw_fastqc_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#fw_reads_path"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#gene_calling"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#genes"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#gff"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#gtdbtk"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#gtdbtk_results"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#gtdbtk_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#html"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#idba"/>
+        <Class IRI="#assembler"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#init_sample"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#kaiju"/>
+        <Class IRI="#taxonomy_profiling"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#kaiju_taxonomy"/>
+        <Class IRI="#taxonomy"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#kraken"/>
+        <Class IRI="#taxonomy_profiling"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#kraken_taxonomy"/>
+        <Class IRI="#taxonomy"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#log"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#mapped_against_cross-assembly"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#maxbin"/>
+        <Class IRI="#binning"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#maxbin_bins"/>
+        <Class IRI="#bins"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#maxbin_log"/>
+        <Class IRI="#binning_log"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#maxbin_table"/>
+        <Class IRI="#binning_table"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#megahit"/>
+        <Class IRI="#assembler"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#merge_checkM_gtdb_results"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#meta_spades"/>
+        <Class IRI="#assembler"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#metabat"/>
+        <Class IRI="#binning"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#metabat_bins"/>
+        <Class IRI="#bins"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#metabat_log"/>
+        <Class IRI="#binning_log"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#metabat_table"/>
+        <Class IRI="#binning_table"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#mgm"/>
+        <Class IRI="#gene_calling"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#out"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#path"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prepare_kraken_report"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prodigal"/>
+        <Class IRI="#gene_calling"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#project_name"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prokka"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prokka_log"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prokka_results"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#prots"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#quast"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#quast_lib_config"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#rawdata_fw"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#rawdata_rv"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read1_paired"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read1_paired_fastqc"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read1_paired_fastqc_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read1_single"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read2_paired"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read2_paired_fastqc"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read2_paired_fastqc_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#read2_single"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#reads_merged"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#report"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#rv_fastqc"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#rv_fastqc_summary"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#rv_reads_path"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#sam_flags"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#sample_name"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#scaffolds"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#scaffolds_no_std_name"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#scaffolds_report"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#split_assembly"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#split_flag"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#std_assembly"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#std_splitted_assembly"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#str"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#summarize_bam"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#tableBins"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#taxonomy"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#taxonomy_labels"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#taxonomy_profiling"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#taxonomy_report"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#tmp"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#trimmed_fq_fw_internal_validation"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#trimmed_fq_rv_internal_validation"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#trimmomatic"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#trimmomatic_log"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#tsv"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#txt"/>
+        <Class IRI="#Format"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#unbinned_contigs"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#unbinned_list"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#validateQC"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#validateQC_trimmed"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#validateQuast"/>
+        <Class IRI="#Tool"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#validate_assembly"/>
+        <Class IRI="#Type"/>
+    </SubClassOf>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->
+

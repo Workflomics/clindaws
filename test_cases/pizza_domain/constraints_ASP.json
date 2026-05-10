@@ -1,0 +1,5 @@
+{
+  "constraints": [
+    "use_m(make_sauce_from_tomato)"
+  ]
+}

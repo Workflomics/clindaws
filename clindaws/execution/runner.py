@@ -8,25 +8,21 @@ The runner owns the end-to-end lifecycle around the lower-level clingo solver:
 - execute grounding/solving in a worker process with timeout control,
 - reconstruct canonical workflow candidates and write run artifacts.
 
-Public modes stay small (`single-shot`, `single-shot-sliding-window`, `multi-shot`), while this module maps
+Public modes stay small (`single-shot`, `multi-shot`, `optimized`), while this module maps
 them onto the internal backends used by translation and solving.
 """
 
 from __future__ import annotations
 
-import csv
 import json
 import multiprocessing
 import os
 import queue
-import re
 import traceback
-from datetime import datetime, timezone
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
 from typing import Callable
-from uuid import uuid4
 
 import clingo
 
@@ -58,13 +54,26 @@ from clindaws.execution.solver import (
     ground_single_shot,
     ground_multi_shot,
     ground_multi_shot_optimized_candidate,
-    ground_multi_shot_compressed_candidate,
     program_paths_for_mode,
     solve_multi_shot,
     solve_multi_shot_optimized_candidate,
-    solve_multi_shot_compressed_candidate,
     solve_single_shot,
-    solve_single_shot_sliding_window,
+)
+from clindaws.execution.artifacts import (
+    RunCsvWriters,
+    answer_sets_filename,
+    horizon_record_payload,
+    workflow_signatures_filename,
+)
+from clindaws.execution.modes import (
+    OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
+    ModeConfig,
+    approach_label,
+    effective_translation_strategy as resolve_translation_strategy,
+    mode_config as get_mode_config,
+    solver_approach,
+    solver_family,
+    validate_mode_request,
 )
 from clindaws.core.tool_annotations import (
     load_candidate_tool_annotations,
@@ -75,7 +84,7 @@ from clindaws.translators.translator_direct import (
     build_fact_bundle,
     build_fact_bundle_ape_multi_shot,
 )
-from clindaws.translators.translator_optimized_candidate import build_optimized_candidate_fact_bundle
+from clindaws.translators.optimized_candidate import build_optimized_candidate_fact_bundle
 from clindaws.core.workflow import reconstruct_solution
 
 
@@ -119,76 +128,18 @@ SCHEMA_PREDICATES = (
     "dynamic_candidate_output_singleton",
     "dynamic_candidate_output_choice_value",
 )
-RUNTIME_TRANSLATION_BUILDER = "runtime_legacy"
-OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER = "candidate_optimized"
-COMPRESSED_CANDIDATE_TRANSLATION_BUILDER = "candidate_compressed"
 ProgressCallback = Callable[[object], None] | None
-
-
-@dataclass(frozen=True)
-class _ModeConfig:
-    solver_family: str
-    solver_approach: str
-    translation_pathway: str
-    translation_builder: TranslationBuilder
-    supports_ground_only: bool
-
-
-_MODE_CONFIGS = {
-    # Public single-shot currently shares the APE-style multi-shot translation
-    # surface, then changes only the grounding/solving strategy downstream.
-    "single-shot": _ModeConfig(
-        solver_family="single-shot",
-        solver_approach="one-shot",
-        translation_pathway="ape_multi_shot",
-        translation_builder=RUNTIME_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
-    "single-shot-sliding-window": _ModeConfig(
-        solver_family="single-shot",
-        solver_approach="sliding_window",
-        translation_pathway="ape_multi_shot",
-        translation_builder=RUNTIME_TRANSLATION_BUILDER,
-        supports_ground_only=False,
-    ),
-    "multi-shot": _ModeConfig(
-        solver_family="multi-shot",
-        solver_approach="legacy",
-        translation_pathway="ape_multi_shot",
-        translation_builder=RUNTIME_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
-    # Optimized multi-shot is an explicit optimized-candidate backend rather
-    # than a small variation of the direct multi-shot encoding family.
-    "multi-shot-optimized-candidate": _ModeConfig(
-        solver_family="multi-shot",
-        solver_approach="optimized_candidate",
-        translation_pathway="optimized_candidate",
-        translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
-    "multi-shot-compressed-candidate": _ModeConfig(
-        solver_family="multi-shot",
-        solver_approach="optimized_candidate",
-        translation_pathway="optimized_candidate",
-        translation_builder=OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER,
-        supports_ground_only=True,
-    ),
-}
 
 _SOLVER_DISPATCH = {
     "single-shot": solve_single_shot,
-    "single-shot-sliding-window": solve_single_shot_sliding_window,
     "multi-shot": solve_multi_shot,
     "multi-shot-optimized-candidate": solve_multi_shot_optimized_candidate,
-    "multi-shot-compressed-candidate": solve_multi_shot_compressed_candidate,
 }
 
 _GROUNDER_DISPATCH = {
     "single-shot": ground_single_shot,
     "multi-shot": ground_multi_shot,
     "multi-shot-optimized-candidate": ground_multi_shot_optimized_candidate,
-    "multi-shot-compressed-candidate": ground_multi_shot_compressed_candidate,
 }
 
 
@@ -208,22 +159,6 @@ class RunContext:
     effective_translation_strategy: str
     resolved_translation_builder: str
     run_metadata: dict[str, object]
-
-
-def _mode_config(mode: str) -> _ModeConfig:
-    try:
-        return _MODE_CONFIGS[mode]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported mode: {mode}") from exc
-
-
-def _effective_translation_strategy(mode: str, grounding_strategy: str) -> str:
-    translation_pathway = _mode_config(mode).translation_pathway
-    if translation_pathway == "optimized_candidate":
-        return "python"
-    if translation_pathway == "ape_multi_shot":
-        return "ape_clingo_legacy"
-    return grounding_strategy
 
 
 def _workflow_input_dims_from_config(config: SnakeConfig) -> dict[str, dict[str, tuple[str, ...]]]:
@@ -261,23 +196,6 @@ def _load_tools_for_mode(config, translation_pathway: str):
     if translation_pathway == "ape_multi_shot":
         return load_multi_shot_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
     return load_direct_tool_annotations(config.tool_annotations_path, config.ontology_prefix)
-
-
-def _solver_family(mode: str) -> str:
-    return _mode_config(mode).solver_family
-
-
-def _solver_approach(mode: str) -> str:
-    return _mode_config(mode).solver_approach
-
-
-def _approach_label(mode: str, optimized: bool) -> str:
-    family = _mode_config(mode).solver_family
-    if family == "single-shot":
-        return "single_shot"
-    if optimized or _mode_config(mode).solver_approach == "optimized_candidate":
-        return "optimized_multi_shot"
-    return "multi-shot"
 
 
 def _report(progress_callback: ProgressCallback, message: str) -> None:
@@ -644,7 +562,6 @@ def _run_metadata_payload(*, config, ontology, tools) -> dict[str, object]:
 def _compressed_candidate_engaged(fact_bundle) -> bool:
     return fact_bundle.internal_solver_mode in {
         "multi-shot-optimized-candidate",
-        "multi-shot-compressed-candidate",
     }
 
 
@@ -652,301 +569,6 @@ def _effective_solve_start_horizon(*, config, fact_bundle) -> int:
     if _compressed_candidate_engaged(fact_bundle):
         return max(config.solution_length_min, fact_bundle.earliest_solution_step)
     return config.solution_length_min
-
-
-def _sanitize_filename_token(value: str) -> str:
-    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
-    sanitized = re.sub(r"_+", "_", sanitized).strip("._-")
-    return sanitized or "default"
-
-
-def _answer_sets_filename(
-    *,
-    config,
-    mode: str,
-    optimized_enabled: bool,
-    effective_parallel_mode: str | None,
-) -> str:
-    parts = [
-        "answer_sets",
-        _sanitize_filename_token(config.config_path.stem),
-        _sanitize_filename_token(mode),
-        "opt" if optimized_enabled else "noopt",
-    ]
-    if effective_parallel_mode:
-        parts.append(f"parallel_{_sanitize_filename_token(effective_parallel_mode)}")
-    return "__".join(parts) + ".txt"
-
-
-def _workflow_signatures_filename(
-    *,
-    config,
-    mode: str,
-    optimized_enabled: bool,
-    effective_parallel_mode: str | None,
-) -> str:
-    parts = [
-        "workflow_signatures",
-        _sanitize_filename_token(config.config_path.stem),
-        _sanitize_filename_token(mode),
-        "opt" if optimized_enabled else "noopt",
-    ]
-    if effective_parallel_mode:
-        parts.append(f"parallel_{_sanitize_filename_token(effective_parallel_mode)}")
-    return "__".join(parts) + ".json"
-
-
-def _horizon_record_payload(records: tuple[HorizonRecord, ...]) -> list[dict[str, object]]:
-    return [asdict(record) for record in records]
-
-
-def _ensure_csv_header(csv_path: Path, fieldnames: list[str]) -> None:
-    if not csv_path.exists():
-        with csv_path.open("a", encoding="utf-8", newline="") as handle:
-            csv.DictWriter(handle, fieldnames=fieldnames).writeheader()
-        return
-
-    with csv_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.reader(handle)
-        existing_header = next(reader, None)
-
-    if existing_header == fieldnames:
-        return
-
-    rows: list[dict[str, str]] = []
-    with csv_path.open("r", encoding="utf-8", newline="") as handle:
-        dict_reader = csv.DictReader(handle)
-        for row in dict_reader:
-            migrated_row: dict[str, str] = {}
-            for name in fieldnames:
-                value = row.get(name, "")
-                if not value and name == "workflow_candidates_found":
-                    value = row.get("solutions_found", "")
-                migrated_row[name] = value
-            rows.append(migrated_row)
-
-    temp_path = csv_path.with_suffix(csv_path.suffix + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    temp_path.replace(csv_path)
-
-
-class _RunLogWriter:
-    """APE-style per-horizon CSV logger."""
-
-    fieldnames = [
-        "test",
-        "mode",
-        "horizon",
-        "optimized_enabled",
-        "effective_parallel_mode",
-        "compressed_candidate_engaged",
-        "translation_ms",
-        "setup_grounding_ms",
-        "solving_ms",
-        "memory_used_mb",
-        "workflow_candidates_found",
-        "constraints_used",
-        "timed_out",
-    ]
-
-    def __init__(
-        self,
-        *,
-        csv_path: Path,
-        mode: str,
-        grounding_strategy: str,
-        fact_count: int,
-        run_metadata: dict[str, object],
-        translation_builder: TranslationBuilder,
-        translation_schema: str,
-        run_id: str,
-        timestamp_utc: str,
-        optimized_enabled: bool,
-        effective_parallel_mode: str | None,
-        compressed_candidate_engaged: bool,
-    ) -> None:
-        self.csv_path = csv_path
-        self.cumulative_unique_solutions = 0
-        self.test_name = Path(str(run_metadata["config_path"])).resolve().parent.name
-        self.constraints_used = str(bool(run_metadata["constraints_used"])).lower()
-        self.mode = mode
-        self.optimized_enabled = optimized_enabled
-        self.effective_parallel_mode = effective_parallel_mode or ""
-        self.compressed_candidate_engaged = str(compressed_candidate_engaged).lower()
-        self.base_grounding_ms = 0
-        self.base_grounding_peak_rss_mb = 0.0
-        self._translation_ms = 0
-        _ensure_csv_header(self.csv_path, self.fieldnames)
-
-    def _write_row(self, row: dict[str, object]) -> None:
-        with self.csv_path.open("a", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=self.fieldnames)
-            writer.writerow(row)
-
-    def log_translation(self, *, translation_sec: float, translation_peak_rss_mb: float) -> None:
-        self._translation_ms = round(translation_sec * 1000)
-
-    def log_base_grounding(self, *, base_grounding_sec: float, base_grounding_peak_rss_mb: float) -> None:
-        self.base_grounding_ms = round(base_grounding_sec * 1000)
-        self.base_grounding_peak_rss_mb = base_grounding_peak_rss_mb
-
-    def log_horizon(self, record: HorizonRecord) -> None:
-        self.cumulative_unique_solutions += record.unique_workflows_stored
-        setup_grounding_ms = round(record.grounding_sec * 1000)
-        memory_used_mb = record.peak_rss_mb or 0.0
-        if record.horizon == 1:
-            setup_grounding_ms += self.base_grounding_ms
-        self._write_row(
-            {
-                "test": self.test_name,
-                "mode": self.mode,
-                "horizon": record.horizon,
-                "optimized_enabled": str(self.optimized_enabled).lower(),
-                "effective_parallel_mode": self.effective_parallel_mode,
-                "compressed_candidate_engaged": self.compressed_candidate_engaged,
-                "translation_ms": self._translation_ms,
-                "setup_grounding_ms": setup_grounding_ms,
-                "solving_ms": round(record.solving_sec * 1000),
-                "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
-                "workflow_candidates_found": self.cumulative_unique_solutions,
-                "constraints_used": self.constraints_used,
-                "timed_out": "false",
-            }
-        )
-
-    def log_timeout(self, *, elapsed_ms: int, memory_used_mb: float | None = None) -> None:
-        """Write a sentinel row marking the step that was interrupted by timeout."""
-        self._write_row(
-            {
-                "test": self.test_name,
-                "mode": self.mode,
-                "horizon": "timeout",
-                "optimized_enabled": str(self.optimized_enabled).lower(),
-                "effective_parallel_mode": self.effective_parallel_mode,
-                "compressed_candidate_engaged": self.compressed_candidate_engaged,
-                "translation_ms": self._translation_ms,
-                "setup_grounding_ms": elapsed_ms,
-                "solving_ms": "",
-                "memory_used_mb": f"{memory_used_mb:.2f}" if memory_used_mb else "",
-                "workflow_candidates_found": self.cumulative_unique_solutions,
-                "constraints_used": self.constraints_used,
-                "timed_out": "true",
-            }
-        )
-
-
-class _RunSummaryWriter:
-    """Append-only per-run summary CSV logger."""
-
-    fieldnames = [
-        "approach",
-        "config_file",
-        "total_sec",
-        "translation_sec",
-        "grounding_sec_total",
-        "solving_sec_total",
-        "peak_rss_mb",
-    ]
-
-    def __init__(
-        self,
-        *,
-        csv_path: Path,
-        mode: str,
-        grounding_strategy: str,
-        fact_count: int,
-        run_metadata: dict[str, object],
-        translation_builder: TranslationBuilder,
-        translation_schema: str,
-        run_id: str,
-        timestamp_utc: str,
-        optimized_enabled: bool,
-        compressed_candidate_engaged: bool,
-    ) -> None:
-        self.csv_path = csv_path
-        self.base_row = {
-            "approach": _approach_label(mode, optimized_enabled),
-            "config_file": Path(str(run_metadata["config_path"])).name,
-        }
-        _ensure_csv_header(self.csv_path, self.fieldnames)
-
-    def log_summary(
-        self,
-        *,
-        timings: TimingBreakdown,
-        combined_peak_rss_mb: float,
-        **_ignored: object,
-    ) -> None:
-        row = {
-            **self.base_row,
-            "total_sec": f"{timings.total_sec:.6f}",
-            "translation_sec": f"{timings.translation_sec:.6f}",
-            "grounding_sec_total": f"{timings.grounding_sec:.6f}",
-            "solving_sec_total": f"{timings.solving_sec:.6f}",
-            "peak_rss_mb": f"{combined_peak_rss_mb:.3f}" if combined_peak_rss_mb else "",
-        }
-        with self.csv_path.open("a", encoding="utf-8", newline="") as handle:
-            csv.DictWriter(handle, fieldnames=self.fieldnames).writerow(row)
-
-
-class _RunCsvWriters:
-    """Per-run CSV writers sharing one run id."""
-
-    def __init__(
-        self,
-        *,
-        csv_dir: Path,
-        mode: str,
-        grounding_strategy: str,
-        fact_count: int,
-        run_metadata: dict[str, object],
-        translation_builder: TranslationBuilder,
-        translation_schema: str,
-        optimized_enabled: bool,
-        effective_parallel_mode: str | None,
-        compressed_candidate_engaged: bool,
-    ) -> None:
-        run_id = str(uuid4())
-        timestamp_utc = datetime.now(timezone.utc).isoformat()
-        csv_dir.mkdir(parents=True, exist_ok=True)
-        self.step_writer = _RunLogWriter(
-            csv_path=csv_dir / "asp_run_log.csv",
-            mode=mode,
-            grounding_strategy=grounding_strategy,
-            fact_count=fact_count,
-            run_metadata=run_metadata,
-            translation_builder=translation_builder,
-            translation_schema=translation_schema,
-            run_id=run_id,
-            timestamp_utc=timestamp_utc,
-            optimized_enabled=optimized_enabled,
-            effective_parallel_mode=effective_parallel_mode,
-            compressed_candidate_engaged=compressed_candidate_engaged,
-        )
-        self.summary_writer = _RunSummaryWriter(
-            csv_path=csv_dir / "asp_run_summary.csv",
-            mode=mode,
-            grounding_strategy=grounding_strategy,
-            fact_count=fact_count,
-            run_metadata=run_metadata,
-            translation_builder=translation_builder,
-            translation_schema=translation_schema,
-            run_id=run_id,
-            timestamp_utc=timestamp_utc,
-            optimized_enabled=optimized_enabled,
-            compressed_candidate_engaged=compressed_candidate_engaged,
-        )
-
-    @property
-    def run_log_path(self) -> Path:
-        return self.step_writer.csv_path
-
-    @property
-    def run_summary_path(self) -> Path:
-        return self.summary_writer.csv_path
 
 
 def _translation_schema(fact_bundle) -> str:
@@ -1023,7 +645,7 @@ def _translation_warnings(
     warnings: list[str] = []
     translation_schema = _translation_schema(fact_bundle)
     encoding_presence = encoding_summary["predicate_presence"]
-    translation_pathway = _mode_config(mode).translation_pathway
+    translation_pathway = get_mode_config(mode).translation_pathway
 
     if translation_pathway in {"dynamic", "optimized_candidate"} and translation_schema != "optimized_candidate":
         warnings.append(
@@ -1161,13 +783,14 @@ def _translation_summary_payload(
 
     return {
         "mode": mode,
-        "solver_family": _solver_family(mode),
-        "solver_approach": _solver_approach(mode),
+        "solver_family": solver_family(mode),
+        "solver_approach": solver_approach(mode),
         "internal_solver_mode": internal_mode,
         "internal_schema": fact_bundle.internal_schema,
         "grounding_strategy": grounding_strategy,
         "translation_builder": translation_builder,
         "effective_translation_strategy": effective_translation_strategy,
+        "decompression_mode": fact_bundle.backend_stats.get("decompression_mode", "none"),
         "translation_schema": _translation_schema(fact_bundle),
         "fact_count": fact_bundle.fact_count,
         "tool_count": len(fact_bundle.tool_stats),
@@ -1310,26 +933,18 @@ def _optimized_candidate_internal_bundle(
     tools,
     *,
     max_workers: int = 1,
+    decompression_mode: str | None = None,
 ):
     return replace(
-        build_optimized_candidate_fact_bundle(config, ontology, tools, max_workers=max_workers),
+        build_optimized_candidate_fact_bundle(
+            config,
+            ontology,
+            tools,
+            max_workers=max_workers,
+            decompression_mode=decompression_mode,
+        ),
         internal_schema="optimized_candidate",
         internal_solver_mode="multi-shot-optimized-candidate",
-    )
-
-
-def _compressed_candidate_internal_bundle(
-    config: SnakeConfig,
-    ontology: Ontology,
-    tools,
-    *,
-    max_workers: int = 1,
-):
-    return _optimized_candidate_internal_bundle(
-        config,
-        ontology,
-        tools,
-        max_workers=max_workers,
     )
 
 
@@ -1360,7 +975,7 @@ def _validate_run_config(config: SnakeConfig) -> None:
 
 def _select_fact_bundle(
     *,
-    mode_config: _ModeConfig,
+    mode_config: ModeConfig,
     mode: str,
     config: SnakeConfig,
     ontology: Ontology,
@@ -1369,6 +984,7 @@ def _select_fact_bundle(
     effective_translation_strategy: str,
     progress_callback: ProgressCallback,
     max_workers: int = 1,
+    decompression_mode: str | None = None,
 ) -> tuple[FactBundle, str]:
     """Select and build the fact bundle, applying backend fallback logic.
 
@@ -1388,8 +1004,6 @@ def _select_fact_bundle(
             internal_solver_mode=(
                 "single-shot"
                 if mode == "single-shot"
-                else "single-shot-sliding-window"
-                if mode == "single-shot-sliding-window"
                 else "multi-shot"
             ),
         )
@@ -1406,6 +1020,7 @@ def _select_fact_bundle(
                 ontology,
                 optimized_candidate_tools,
                 max_workers=max_workers,
+                decompression_mode=decompression_mode,
             )
             resolved_translation_builder = OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER
             _report(
@@ -1422,6 +1037,22 @@ def _select_fact_bundle(
                 fact_bundle,
                 optimized_programs=False,
             )
+
+    elif mode_config.translation_pathway == "optimized_candidate":
+        _report(progress_callback, "Step 1b: optimized-candidate translation started.")
+        fact_bundle = _optimized_candidate_internal_bundle(
+            config,
+            ontology,
+            tools,
+            max_workers=max_workers,
+            decompression_mode=decompression_mode,
+        )
+        resolved_translation_builder = OPTIMIZED_CANDIDATE_TRANSLATION_BUILDER
+        _report(
+            progress_callback,
+            "Step 1b complete: selected optimized-candidate schema "
+            f"with {fact_bundle.fact_count} facts.",
+        )
 
     elif mode_config.translation_pathway == "normal":
         # Reserved for the legacy direct translation family where optimized mode
@@ -1464,6 +1095,7 @@ def _prepare_run_context(
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    decompression_mode: str | None = None,
     max_workers: int = 1,
     memory_monitor: ProcessTreePeakMonitor | None = None,
 ) -> RunContext:
@@ -1475,11 +1107,12 @@ def _prepare_run_context(
     object so callers do not need to thread anonymous tuples around.
     """
 
-    mode_config = _mode_config(mode)
-    if optimized and mode_config.solver_family == "single-shot":
-        raise ValueError("--optimized is not yet supported for single-shot modes.")
-    if optimized and mode != "multi-shot":
-        raise ValueError("--optimized supports only multi-shot.")
+    mode, decompression_mode = validate_mode_request(
+        mode=mode,
+        optimized=optimized,
+        decompression_mode=decompression_mode,
+    )
+    selected_mode_config = get_mode_config(mode)
     config = load_config(config_path)
     config = config.model_copy(update={
         "solutions": solutions if solutions is not None else config.solutions,
@@ -1490,15 +1123,15 @@ def _prepare_run_context(
     solution_dir = Path(output_dir).resolve() if output_dir else _default_solution_dir(config)
     solution_dir.mkdir(parents=True, exist_ok=True)
 
-    effective_translation_strategy = _effective_translation_strategy(mode, grounding_strategy)
+    effective_translation_strategy = resolve_translation_strategy(mode, grounding_strategy)
 
     _report(progress_callback, "Step 1: translation started.")
     start = perf_counter()
     ontology = Ontology.from_file(config.ontology_path, config.ontology_prefix)
-    tools = _load_tools_for_mode(config, mode_config.translation_pathway)
+    tools = _load_tools_for_mode(config, selected_mode_config.translation_pathway)
     run_metadata = _run_metadata_payload(config=config, ontology=ontology, tools=tools)
     fact_bundle, resolved_translation_builder = _select_fact_bundle(
-        mode_config=mode_config,
+        mode_config=selected_mode_config,
         mode=mode,
         config=config,
         ontology=ontology,
@@ -1507,6 +1140,7 @@ def _prepare_run_context(
         effective_translation_strategy=effective_translation_strategy,
         progress_callback=progress_callback,
         max_workers=max_workers,
+        decompression_mode=decompression_mode,
     )
     translation_sec = perf_counter() - start
     translation_peak_rss_mb = current_peak_rss_mb()
@@ -1544,6 +1178,7 @@ def run_translate_only(
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    decompression_mode: str | None = None,
     max_workers: int = 1,
 ) -> TranslationRunResult:
     """Run translation only and write translation diagnostics."""
@@ -1559,10 +1194,12 @@ def run_translate_only(
             max_length=max_length,
             progress_callback=progress_callback,
             optimized=optimized,
+            decompression_mode=decompression_mode,
             max_workers=max_workers,
             memory_monitor=memory_monitor,
         )
-        csv_writers = _RunCsvWriters(
+        optimized_active = bool(optimized or mode == "optimized")
+        csv_writers = RunCsvWriters(
             csv_dir=ctx.config.solutions_dir_path,
             mode=mode,
             grounding_strategy=grounding_strategy,
@@ -1570,7 +1207,7 @@ def run_translate_only(
             run_metadata=ctx.run_metadata,
             translation_builder=ctx.resolved_translation_builder,
             translation_schema=_translation_schema(ctx.fact_bundle),
-            optimized_enabled=optimized,
+            optimized_enabled=optimized_active,
             effective_parallel_mode=None,
             compressed_candidate_engaged=_compressed_candidate_engaged(ctx.fact_bundle),
         )
@@ -1651,6 +1288,7 @@ def run_once(
     debug: bool = False,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    decompression_mode: str | None = None,
     max_workers: int = 1,
 ) -> RunResult:
     """Run one snakeAPE execution."""
@@ -1666,6 +1304,7 @@ def run_once(
             max_length=max_length,
             progress_callback=progress_callback,
             optimized=optimized,
+            decompression_mode=decompression_mode,
             max_workers=max_workers,
             memory_monitor=memory_monitor,
         )
@@ -1676,9 +1315,10 @@ def run_once(
         translation_peak_rss_mb = ctx.translation_peak_combined_rss_mb
         run_metadata = ctx.run_metadata
         _translation_builder = ctx.resolved_translation_builder
-        effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, optimized)
+        optimized_active = bool(optimized or mode == "optimized")
+        effective_parallel_mode = _effective_parallel_mode(mode, parallel_mode, optimized_active)
         internal_solver_mode = _effective_internal_solver_mode(mode, fact_bundle)
-        csv_writers = _RunCsvWriters(
+        csv_writers = RunCsvWriters(
             csv_dir=config.solutions_dir_path,
             mode=mode,
             grounding_strategy=grounding_strategy,
@@ -1686,7 +1326,7 @@ def run_once(
             run_metadata=run_metadata,
             translation_builder=_translation_builder,
             translation_schema=_translation_schema(fact_bundle),
-            optimized_enabled=optimized,
+            optimized_enabled=optimized_active,
             effective_parallel_mode=effective_parallel_mode,
             compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
         )
@@ -1786,6 +1426,7 @@ def run_once(
                     debug=debug,
                     progress_callback=progress_callback,
                     optimized=True,
+                    decompression_mode=decompression_mode,
                     max_workers=max_workers,
                 )
             raise
@@ -1876,10 +1517,10 @@ def run_once(
         if write_raw_answer_sets:
             # Raw answer sets are a debug artifact. The default machine-readable
             # result surface is the config/mode-specific workflow-signature file below.
-            answer_set_path = solution_dir / _answer_sets_filename(
+            answer_set_path = solution_dir / answer_sets_filename(
                 config=config,
                 mode=mode,
-                optimized_enabled=optimized,
+                optimized_enabled=optimized_active,
                 effective_parallel_mode=effective_parallel_mode,
             )
             if solve_output.raw_solutions:
@@ -1895,10 +1536,10 @@ def run_once(
                 answer_set_path.write_text(_answer_set_content, encoding="utf-8")
         workflow_signature_path = write_workflow_signatures(
             solution_dir
-            / _workflow_signatures_filename(
+                / workflow_signatures_filename(
                 config=config,
                 mode=mode,
-                optimized_enabled=optimized,
+                optimized_enabled=optimized_active,
                 effective_parallel_mode=effective_parallel_mode,
             ),
             solutions,
@@ -1922,6 +1563,7 @@ def run_once(
                     "grounding_strategy": grounding_strategy,
                     "internal_schema": fact_bundle.internal_schema,
                     "internal_solver_mode": internal_solver_mode,
+                    "decompression_mode": fact_bundle.backend_stats.get("decompression_mode", "none"),
                     "earliest_solution_step": fact_bundle.earliest_solution_step,
                     "effective_solve_start_horizon": _effective_solve_start_horizon(
                         config=config,
@@ -1947,7 +1589,7 @@ def run_once(
                     "base_grounding_peak_rss_mb": solve_output.base_grounding_peak_rss_mb,
                     "base_grounding_sec": solve_output.base_grounding_sec,
                     "timed_out": _timed_out,
-                    "horizons": _horizon_record_payload(horizon_records),
+                    "horizons": horizon_record_payload(horizon_records),
                 },
                 indent=2,
             )
@@ -2030,6 +1672,7 @@ def run_ground_only(
     max_length: int | None = None,
     progress_callback: ProgressCallback = None,
     optimized: bool = False,
+    decompression_mode: str | None = None,
     max_workers: int = 1,
 ) -> GroundingRunResult:
     """Run translation plus grounding without solving."""
@@ -2045,6 +1688,7 @@ def run_ground_only(
             max_length=max_length,
             progress_callback=progress_callback,
             optimized=optimized,
+            decompression_mode=decompression_mode,
             max_workers=max_workers,
             memory_monitor=memory_monitor,
         )
@@ -2056,7 +1700,8 @@ def run_ground_only(
         translation_builder = ctx.resolved_translation_builder
         effective_translation_strategy = ctx.effective_translation_strategy
         run_metadata = ctx.run_metadata
-        csv_writers = _RunCsvWriters(
+        optimized_active = bool(optimized or mode == "optimized")
+        csv_writers = RunCsvWriters(
             csv_dir=config.solutions_dir_path,
             mode=mode,
             grounding_strategy=grounding_strategy,
@@ -2064,7 +1709,7 @@ def run_ground_only(
             run_metadata=run_metadata,
             translation_builder=translation_builder,
             translation_schema=_translation_schema(fact_bundle),
-            optimized_enabled=optimized,
+            optimized_enabled=optimized_active,
             effective_parallel_mode=None,
             compressed_candidate_engaged=_compressed_candidate_engaged(fact_bundle),
         )
@@ -2085,7 +1730,7 @@ def run_ground_only(
             translation_sec=translation_sec,
         )
 
-        mode_config = _mode_config(mode)
+        mode_config = get_mode_config(mode)
         if not mode_config.supports_ground_only:
             raise ValueError(f"Ground-only runs do not support mode {mode}.")
 
@@ -2129,6 +1774,7 @@ def run_ground_only(
                     "stage": stage,
                     "internal_schema": fact_bundle.internal_schema,
                     "internal_solver_mode": internal_solver_mode,
+                    "decompression_mode": fact_bundle.backend_stats.get("decompression_mode", "none"),
                     "fact_count": fact_bundle.fact_count,
                     "translation_path": None,
                     "translation_summary_path": str(translation_summary_path),
@@ -2147,7 +1793,7 @@ def run_ground_only(
                     "combined_peak_rss_mb": combined_peak_rss_mb,
                     "base_grounding_peak_rss_mb": grounding_output.base_grounding_peak_rss_mb,
                     "base_grounding_sec": grounding_output.base_grounding_sec,
-                    "horizon_records": _horizon_record_payload(horizon_records),
+                    "horizon_records": horizon_record_payload(horizon_records),
                     "translation_sec": translation_sec,
                     "grounding_sec": grounding_output.grounding_sec,
                     "total_sec": translation_sec + grounding_output.grounding_sec,

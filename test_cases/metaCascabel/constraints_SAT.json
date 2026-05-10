@@ -1,0 +1,160 @@
+{
+  "constraints": [
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["trimmomatic"]}, { "Tool" : ["trimmomatic"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["init_sample"]}, { "Tool" : ["init_sample"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["fastqc_rawReads"]}, { "Tool" : ["fastqc_rawReads"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["fastqc_trimmedReads"]}, { "Tool" : ["fastqc_trimmedReads"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["validateQC"]}, { "Tool" : ["validateQC"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["validateQC_trimmed"]}, { "Tool" : ["validateQC_trimmed"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["meta_spades"]}, { "Tool" : ["meta_spades"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["megahit"]}, { "Tool" : ["megahit"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["idba"]}, { "Tool" : ["idba"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["concat_single_reads"]}, { "Tool" : ["concat_single_reads"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["std_assembly"]}, { "Tool" : ["std_assembly"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["quast"]}, { "Tool" : ["quast"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["split_assembly"]}, { "Tool" : ["split_assembly"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["validate_assembly"]}, { "Tool" : ["validate_assembly"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["gene_calling"]}, { "Tool" : ["gene_calling"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["bwa"]}, { "Tool" : ["bwa"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["sam_flags"]}, { "Tool" : ["sam_flags"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["summarize_bam"]}, { "Tool" : ["summarize_bam"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["bins_to_table"]}, { "Tool" : ["bins_to_table"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["checkM"]}, { "Tool" : ["checkM"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["gtdbtk"]}, { "Tool" : ["gtdbtk"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["merge_checkM_gtdb_results"]}, { "Tool" : ["merge_checkM_gtdb_results"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["bin_cvg"]}, { "Tool" : ["bin_cvg"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["computeGC"]}, { "Tool" : ["computeGC"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["create_unbinned"]}, { "Tool" : ["create_unbinned"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["prokka"]}, { "Tool" : ["prokka"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["diamond"]}, { "Tool" : ["diamond"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["finalize_bins"]}, { "Tool" : ["finalize_bins"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["report"]}, { "Tool" : ["report"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["kraken"]}, { "Tool" : ["kraken"]}]
+    },
+    {
+      "constraintid": "itn_m",
+      "parameters": [{ "Tool" : ["kaiju"]}, { "Tool" : ["kaiju"]}]
+    },
+    {
+      "constraintid": "ite_m",
+      "parameters": [{ "Tool" : ["fastqc_rawReads"]}, { "Tool" : ["validateQC"]}]
+    },
+    {
+      "constraintid": "ite_m",
+      "parameters": [{ "Tool" : ["fastqc_trimmedReads"]}, { "Tool" : ["validateQC_trimmed"]}]
+    },
+    {
+      "constraintid": "ite_m",
+      "parameters": [{ "Tool" : ["assembler"]}, { "Tool" : ["validate_assembly"]}]
+    },
+    {
+      "constraintid": "depend_m",
+      "parameters": [{ "Tool" : ["prokka"]}, { "Tool" : ["checkM"]}]
+    },
+    {
+      "constraintid": "depend_m",
+      "parameters": [{ "Tool" : ["gtdbtk"]}, { "Tool" : ["checkM"]}]
+    },
+    {
+      "constraintid": "depend_m",
+      "parameters": [{ "Tool" : ["binning"]}, { "Tool" : ["quast"]}]
+    },
+    {
+      "constraintid": "next_m",
+      "parameters": [{ "Tool" : ["quast"]}, { "Tool" : ["validate_assembly"]}]
+    },
+    {
+      "constraintid": "next_m",
+      "parameters": [{ "Tool" : ["bwa"]}, { "Tool" : ["sam_flags"]}]
+    }
+ ]
+}

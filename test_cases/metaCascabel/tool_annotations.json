@@ -1,0 +1,549 @@
+{
+    "functions": [
+        {
+        "label": "init_sample",
+        "id": "init_sample",
+        "taxonomyOperations": ["init_sample"],
+        "inputs": [
+          { "Type": ["project_name"], "Format": ["str"] },
+          { "Type": ["sample_name"], "Format": ["str"] },
+          { "Type": ["fw_reads_path"], "Format": ["path"] },
+          { "Type": ["rv_reads_path"], "Format": ["path"] }
+        ],
+        "outputs": [
+          { "Type": ["rawdata_fw"], "Format": ["fastq"] },
+          { "Type": ["rawdata_rv"], "Format": ["fastq"] }
+        ],
+        "implementation": {"code": "Scripts/init_sample.sh ${PROJECT} ${SAMPLE} FW RV\n"}
+      },
+      {
+        "label": "fastqc_rawReads",
+        "id": "fastqc_rawReads",
+        "taxonomyOperations": ["fastqc_rawReads"],
+        "inputs": [
+          { "Type": ["rawdata_fw"], "Format": ["fastq"] },
+          { "Type": ["rawdata_rv"], "Format": ["fastq"] }
+        ],
+        "outputs": [
+          { "Type": ["fw_fastqc"], "Format": ["html"] },
+          { "Type": ["rv_fastqc"], "Format": ["html"] },
+          { "Type": ["fw_fastqc_summary"], "Format": ["txt"] },
+          { "Type": ["rv_fastqc_summary"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/samples/${SAMPLE}/qc\nfastqc ${PROJECT}/samples/${SAMPLE}/rawdata/fw.fastq.gz ${PROJECT}/samples/${SAMPLE}/rawdata/rv.fastq.gz --extract -t 4 -o ${PROJECT}/samples/${SAMPLE}/qc/\n"}
+      },
+      {
+        "label": "validateQC",
+        "id": "validateQC",
+        "taxonomyOperations": ["validateQC"],
+        "inputs": [
+          { "Type": ["fw_fastqc_summary"], "Format": ["txt"] },
+          { "Type": ["rv_fastqc_summary"], "Format": ["txt"] }
+        ],
+        "outputs": [
+          { "Type": ["fq_fw_internal_validation"], "Format": ["txt"] },
+          { "Type": ["fq_rv_internal_validation"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "python Scripts/validateQC.py ${PROJECT}/samples/${SAMPLE}/qc/fw_fastqc.html ${PROJECT}/samples/${SAMPLE}/qc/fq_fw_internal_validation.txt ${PROJECT}/samples/${SAMPLE}/rawdata/fw.fastq.gz ${PROJECT}/samples/${SAMPLE}/qc/fw_fastqc/summary.txt ${PROJECT}/samples/${SAMPLE}/qc/rv_fastqc.html ${PROJECT}/samples/${SAMPLE}/qc/fq_rv_internal_validation.txt ${PROJECT}/samples/${SAMPLE}/rawdata/rv.fastq.gz ${PROJECT}/samples/${SAMPLE}/qc/rv_fastqc/summary.txt\n"}
+      },
+      {
+        "label": "trimmomatic",
+        "id": "trimmomatic",
+        "taxonomyOperations": ["trimmomatic"],
+        "inputs": [
+          { "Type": ["rawdata_fw"], "Format": ["fastq"] },
+          { "Type": ["rawdata_rv"], "Format": ["fastq"] }
+        ],
+        "outputs": [
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read1_single"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] },
+          { "Type": ["read2_single"], "Format": ["fq"] },
+          { "Type": ["trimmomatic_log"], "Format": ["log"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed\ntrimmomatic PE -threads 15 ${PROJECT}/samples/${SAMPLE}/rawdata/fw.fastq.gz ${PROJECT}/samples/${SAMPLE}/rawdata/rv.fastq.gz ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_singles.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_singles.fq ILLUMINACLIP:/export/lv5/software/anaconda/2022.05/envs/metacascabel_c_env/share/trimmomatic-0.39-2/adapters/TruSeq3-PE-2.fa:1:30:10:5:TRUE SLIDINGWINDOW:5:22 MAXINFO:40:0.6 MINLEN:100 > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/trimmomatic.log 2>&1\n"}
+      },
+      {
+        "label": "fastqc_trimmedReads",
+        "id": "fastqc_trimmedReads",
+        "taxonomyOperations": ["fastqc_trimmedReads"],
+        "inputs": [
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["read1_paired_fastqc"], "Format": ["html"] },
+          { "Type": ["read2_paired_fastqc"], "Format": ["html"] },
+          { "Type": ["read1_paired_fastqc_summary"], "Format": ["txt"] },
+          { "Type": ["read1_paired_fastqc_summary"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/\nfastqc ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq --extract -t 4 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/\n"}
+      },
+      {
+        "label": "validateQC_trimmed",
+        "id": "validateQC_trimmed",
+        "taxonomyOperations": ["validateQC_trimmed"],
+        "inputs": [
+          { "Type": ["read1_paired_fastqc"], "Format": ["html"] },
+          { "Type": ["read2_paired_fastqc"], "Format": ["html"] }
+        ],
+        "outputs": [
+          { "Type": ["trimmed_fq_fw_internal_validation"], "Format": ["txt"] },
+          { "Type": ["trimmed_fq_rv_internal_validation"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "python Scripts/validateQC.py ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/read1_paired_fastqc.html ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/fq_fw_internal_validation.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/read1_paired_fastqc/summary.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/read2_paired_fastqc.html ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/fq_rv_internal_validation.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/qc/read2_paired_fastqc/summary.txt\n"}
+      },
+      {
+        "label": "kraken",
+        "id": "kraken",
+        "taxonomyOperations": ["kraken"],
+        "inputs": [
+          
+          { "Type": ["rawdata_fw", "read1_paired"], "Format": ["fastq", "fq"] },
+          { "Type": ["rawdata_rv", "read2_paired"], "Format": ["fastq", "fq"] }
+        ],
+        "outputs": [
+          { "Type": ["kraken_taxonomy"], "Format": ["out"] },
+          { "Type": ["kraken_taxonomy"], "Format": ["tmp"] },
+          { "Type": ["taxonomy_labels"], "Format": ["txt"] },
+          { "Type": ["taxonomy_report"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy\nkraken --preload --db /export/data01/databases/kraken/std_db/ --paired ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq --threads 30 > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out\n#OR RAW\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out | cut -f1,2,3 > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out.tmp\nkaiju-addTaxonNames -t /export/data01/databases/kraken/std_db/taxonomy/nodes.dmp -n /export/data01/databases/kraken/std_db/taxonomy/names.dmp -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out.tmp -r species  -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out.labels\nkaiju2table -t /export/data01/databases/kraken/std_db/taxonomy/nodes.dmp -n /export/data01/databases/kraken/std_db/taxonomy/names.dmp -r species  -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.report ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kraken.taxonomy.out.labels\n"}
+      },
+      {
+        "label": "kaiju",
+        "id": "kaiju",
+        "taxonomyOperations": ["kaiju"],
+        "inputs": [
+          { "Type": ["rawdata_fw", "read1_paired"], "Format": ["fastq", "fq"] },
+          { "Type": ["rawdata_rv", "read2_paired"], "Format": ["fastq", "fq"] }
+        ],
+        "outputs": [
+          { "Type": ["kaiju_taxonomy"], "Format": ["out"] },
+          { "Type": ["taxonomy_labels"], "Format": ["txt"] },
+          { "Type": ["taxonomy_report"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy\nkaiju -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq -j ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq -t /export/data01/databases/kaiju/nodes.dmp  -f /export/data01/databases/kaiju/refseq/kaiju_db.fmi -z 30 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kaiju.taxonomy.out\n#OR RAW\nkaiju-addTaxonNames -t /export/data01/databases/kaiju/nodes.dmp -n /export/data01/databases/kaiju/names.dmp -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kaiju.taxonomy.out.tmp -r species  -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kaiju.taxonomy.out.labels\nkaiju2table -t /export/data01/databases/kaiju/nodes.dmp -n /export/data01/databases/kaiju/names.dmp -r species  -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kaiju.taxonomy.report ${PROJECT}/runs/${RUN}/${SAMPLE}_data/taxonomy/kaiju.taxonomy.out.labels\n"}
+      },
+      {
+        "label": "fq2fasta",
+        "id": "fq2fasta",
+        "taxonomyOperations": ["fq2fasta"],
+        "inputs": [
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["reads_merged"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "fq2fa --merge ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/reads_merged.fasta\n"}
+      },
+      {
+        "label": "concat_single_reads",
+        "id": "concat_single_reads",
+        "taxonomyOperations": ["concat_single_reads"],
+        "inputs": [
+          { "Type": ["read1_single"], "Format": ["fq"] },
+          { "Type": ["read2_single"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["all_singles"], "Format": ["fq"] }
+        ],
+        "implementation": {"code": "cat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_singles.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_singles.fq > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/all_singles.fq\n"}
+      },
+      {
+        "label": "meta_spades",
+        "id": "meta_spades",
+        "taxonomyOperations": ["meta_spades"],
+        "inputs": [
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] },
+          { "Type": ["all_singles"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["contigs"], "Format": ["fasta"] },
+          { "Type": ["scaffolds"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "nice -5 spades.py --meta -t 35 -m 350 -k 21,33,55,77 --pe1-1 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq --pe1-2 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq --pe1-s ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/all_singles.fq -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/\n"}
+      },
+      {
+        "label": "megahit",
+        "id": "megahit",
+        "taxonomyOperations": ["megahit"],
+        "inputs": [
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["contigs_no_std_name"], "Format": ["fa"] }
+        ],
+        "implementation": {"code": "megahit -1 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq -2 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq -f --k-min 21 --k-max 141 --k-step 14 -m 0.3 -t 35 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}\n"}
+      },
+      {
+        "label": "std_assembly",
+        "id": "std_assembly",
+        "taxonomyOperations": ["std_assembly"],
+        "inputs": [
+          { "Type": ["contigs_no_std_name"], "Format": ["fasta", "fa"] }
+        ],
+        "outputs": [
+          { "Type": ["contigs"], "Format": ["fasta"] },
+          { "Type": ["scaffolds"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "mv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/final.contigs.fa ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta && ln -sr ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/scaffolds.fasta\n# if idba: mv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contig.fa ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta && mv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/scaffold.fa ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/scaffolds.fasta\n"}
+      },
+      {
+        "label": "idba",
+        "id": "idba",
+        "taxonomyOperations": ["idba"],
+        "inputs": [
+          { "Type": ["reads_merged"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["contigs_no_std_name"], "Format": ["fa"] },
+          { "Type": ["scaffolds_no_std_name"], "Format": ["fa"] }
+        ],
+        "implementation": {"code": "idba_ud -r ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/reads_merged.fasta -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/ --step 10 --num_threads 35\n"}
+      },
+      {
+        "label": "quast",
+        "id": "quast",
+        "taxonomyOperations": ["quast"],
+        "inputs": [
+          { "Type": ["contigs"], "Format": ["fasta"] },
+          { "Type": ["scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["quast_lib_config"], "Format": ["txt"] },
+          { "Type": ["contigs_report"], "Format": ["txt"] },
+          { "Type": ["scaffolds_report"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast\nexport PYTHONPATH=/opt/Downloads/biolinux/quast-4.6.3/ && touch ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/quast_lib_config.txt\nquast.py -t 25 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/contigs/ ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta\nquast.py -t 25 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/scaffolds/ -s ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/scaffolds.fasta\n"}
+      },
+      {
+        "label": "split_assembly",
+        "id": "split_assembly",
+        "taxonomyOperations": ["split_assembly"],
+        "inputs": [
+          { "Type": ["contigs"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["split_flag"], "Format": ["txt"] },
+          { "Type": ["contigs_complete"], "Format": ["fasta"] },
+          { "Type": ["contigs"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "/opt/biolinux/anaconda2.2019.07/bin/cut_up_fasta.py -c 10000 -o 0 -m ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.chunks.fasta\nmv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.complete.fasta && mv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.chunks.fasta ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/contigs.fasta && echo \"contigs.fasta has been splitted by cut_up_fasta.py original contig file is: contigs.complete.fasta\" > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/split_flag.txt\n"}
+      },
+      {
+        "label": "validate_assembly",
+        "id": "validate_assembly",
+        "taxonomyOperations": ["validate_assembly"],
+        "inputs": [
+          { "Type": ["contigs_report"], "Format": ["txt"] },
+          { "Type": ["scaffolds_report"], "Format": ["txt"] }
+        ],
+        "outputs": [
+          { "Type": ["validate_assembly"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "python Scripts/validateQuast.py ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/contigs/report.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/scaffolds/report.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/quast/validate_assembly.txt\n"}
+      },
+      {
+        "label": "mgm",
+        "id": "mgm",
+        "taxonomyOperations": ["mgm"],
+        "inputs": [
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["genes"], "Format": ["gff"] },
+          { "Type": ["genes"], "Format": ["fasta"] },
+          { "Type": ["prots"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/mgm_${ANALYSIS}\n/export/data/aabdala/utils/MetaGeneMark_linux_64/mgm/gmhmmp -a -d -f G -m /export/data/aabdala/utils/MetaGeneMark_linux_64/mgm/MetaGeneMark_v1.mod -A ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/mgm_${ANALYSIS}/genes.fasta -D ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/mgm_${ANALYSIS}/prots.fasta -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/mgm_${ANALYSIS}/genes.gff ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta\n"}
+      },
+      {
+        "label": "fgs",
+        "id": "fgs",
+        "taxonomyOperations": ["fgs"],
+        "inputs": [
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["genes"], "Format": ["gff"] },
+          { "Type": ["genes"], "Format": ["ffn"] },
+          { "Type": ["prots"], "Format": ["faa"] },
+          { "Type": ["genes"], "Format": ["out"] }
+        ],
+        "implementation": {"code": "/export/data/aabdala/utils/FragGeneScan/run_FragGeneScan.pl -genome=${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta -out=${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/fgs_${ANALYSIS}/genes -complete=0 -train=/export/data/aabdala/utils/FragGeneScan/train/complete -thread=4\n"}
+      },
+      {
+        "label": "prodigal",
+        "id": "prodigal",
+        "taxonomyOperations": ["prodigal"],
+        "inputs": [
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["genes"], "Format": ["gff"] },
+          { "Type": ["genes"], "Format": ["ffn"] },
+          { "Type": ["prots"], "Format": ["faa"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/prodigal_${ANALYSIS}\nprodigal -a ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/prodigal_${ANALYSIS}/genes.faa -d ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/prodigal_${ANALYSIS}/genes.ffn -f gff -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta -p meta -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/prodigal_${ANALYSIS}/genes.gff\n"}
+      },
+      {
+        "label": "bwa",
+        "id": "bwa",
+        "taxonomyOperations": ["bwa"],
+        "inputs": [
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] },
+          { "Type": ["read1_paired"], "Format": ["fq"] },
+          { "Type": ["read2_paired"], "Format": ["fq"] }
+        ],
+        "outputs": [
+          { "Type": ["bwa_index"], "Format": ["bwt"] },
+          { "Type": ["mapped_against_cross-assembly"], "Format": ["bam"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_assembly\nbwa index -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_assembly ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta\nnice -5 bwa mem -t 15 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_assembly ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read1_paired.fq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/trimmed/read2_paired.fq | samtools view --threads 15 -b - | samtools sort - -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_mapped_against_cross-assembly_sorted.bam --threads 15\n"}
+      },
+      {
+        "label": "sam_flags",
+        "id": "sam_flags",
+        "taxonomyOperations": ["sam_flags"],
+        "inputs": [
+          { "Type": ["mapped_against_cross-assembly"], "Format": ["bam"] }
+        ],
+        "outputs": [
+          { "Type": ["mapped_against_cross-assembly"], "Format": ["flagstat"] }
+        ],
+        "implementation": {"code": "samtools flagstat --threads 15 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_mapped_against_cross-assembly_sorted.bam > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_mapped_against_cross-assembly_sorted.flagstat\n"}
+      },
+      {
+        "label": "summarize_bam",
+        "id": "summarize_bam",
+        "taxonomyOperations": ["summarize_bam"],
+        "inputs": [
+          { "Type": ["mapped_against_cross-assembly"], "Format": ["bam"] }
+        ],
+        "outputs": [
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["depth_avg"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "jgi_summarize_bam_contig_depths --outputDepth ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_mapped_against_cross-assembly_sorted.bam\ncut -f1,3 ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth_avg.txt\n"}
+      },
+      {
+        "label": "metabat",
+        "id": "metabat",
+        "taxonomyOperations": ["metabat"],
+        "inputs": [
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["metabat_log"], "Format": ["log"] },
+          { "Type": ["metabat_bins"], "Format": ["dir"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER}\nmetabat2 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER}/bin -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta -t 20 -m 2500 -a ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt --minS 30 --maxP 98 --maxEdges 400 -s 200000 --saveCls -v > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER}/metabat.log\n"}
+      },
+      {
+        "label": "maxbin",
+        "id": "maxbin",
+        "taxonomyOperations": ["maxbin"],
+        "inputs": [
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["maxbin_log"], "Format": ["log"] },
+          { "Type": ["maxbin_bins"], "Format": ["dir"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER}\nrun_MaxBin.pl -contig ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta -abund  ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt -out ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER}/bin -thread 20 -prob_threshold 0.9 -markerset 107 -min_contig_length 2500 -plotmarker > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER}/maxbin.log\n"}
+      },
+      {
+        "label": "binsanity",
+        "id": "binsanity",
+        "taxonomyOperations": ["binsanity"],
+        "inputs": [
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["depth_avg_log"], "Format": ["txt"] },
+          { "Type": ["binsanity_log"], "Format": ["log"] },
+          { "Type": ["binsanity_bins"], "Format": ["dir"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/binsanity/${ANALYSIS}_${ASSEMBLER}\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt | awk 'NR>1 && $3>1{{ if($3 <= 1) a = 0; else  a = log($3)/log(10); printf(\"%s\\t%0.4f\\n\",$1,a)}}' > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth_avg_log.txt\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth_avg_log.txt | cut -f1 | grep -w -A1 --no-group-separator -F -f - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta  > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/assembly_coverage_gt0.fasta\nBinsanity-wf -f ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER} -l ${ANALYSIS}.fasta -c ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth_avg_log.txt -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/binsanity/${ANALYSIS}_${ASSEMBLER}/ --binPrefix  final -p -3 -x 2500 --threads 20\n"}
+      },
+      {
+        "label": "bins_to_table",
+        "id": "bins_to_table",
+        "taxonomyOperations": ["bins_to_table"],
+        "inputs": [
+          { "Type": ["metabat_bins"], "Format": ["dir"] },
+          { "Type": ["maxbin_bins"], "Format": ["dir"] },
+          { "Type": ["binsanity_bins"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["metabat_table"], "Format": ["tsv"] },
+          { "Type": ["maxbin_table"], "Format": ["tsv"] },
+          { "Type": ["binsanity_table"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "python Scripts/tableBins.py ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/binsanity/${ANALYSIS}_${ASSEMBLER}/BinSanity-Final-bins/ ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER}/binTable.tsv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER}/binTable.tsv ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/binsanity/${ANALYSIS}_${ASSEMBLER}/binTable.tsv\n"}
+      },
+      {
+        "label": "das",
+        "id": "das",
+        "taxonomyOperations": ["das"],
+        "inputs": [
+          { "Type": ["metabat_table"], "Format": ["tsv"] },
+          { "Type": ["maxbin_table"], "Format": ["tsv"] },
+          { "Type": ["binsanity_table"], "Format": ["tsv"] },
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["das_log"], "Format": ["log"] },
+          { "Type": ["das_bins"], "Format": ["dir"] },
+          { "Type": ["das_table"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/das/${ANALYSIS}_${ASSEMBLER}/DasOut\nDAS_Tool -i ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/metabat2/${ANALYSIS}_${ASSEMBLER}/binTable.tsv,${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/maxbin/${ANALYSIS}_${ASSEMBLER}/binTable.tsv,${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/binsanity/${ANALYSIS}_${ASSEMBLER}/binTable.tsv -l metabat,maxbin,binsanity -c ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta -t 20 --write_bins  --dbDirectory /export/lv5/software/anaconda/2022.05/envs/metacascabel_c_env/share/das_tool-1.1.5-0/db/ --search_engine diamond --duplicate_penalty 0.4 --megabin_penalty 0.4 -o ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/das/${ANALYSIS}_${ASSEMBLER}/DasOut > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/das/${ANALYSIS}_${ASSEMBLER}/das.log 2>&1\n"}
+      },
+      {
+        "label": "checkM",
+        "id": "checkM",
+        "taxonomyOperations": ["checkM"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["checkM_results"], "Format": ["dir"] },
+          { "Type": ["checkM_summary"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/checkM\ncheckm lineage_wf -f ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/checkM_${BINTOOL}/summary.txt -t  15 -x ${EXTENSION} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/checkM_${BINTOOL}/\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\nln -s ../checkM_${BINTOOL}/summary.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/checkM/summary.txt\n"}
+      },
+      {
+        "label": "gtdbtk",
+        "id": "gtdbtk",
+        "taxonomyOperations": ["gtdbtk"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["gtdbtk_results"], "Format": ["dir"] },
+          { "Type": ["gtdbtk_summary"], "Format": ["txt"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk/\nmkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk_${BINTOOL}\ngtdbtk classify_wf --genome_dir ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ --out_dir ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk_${BINTOOL}/  -x ${EXTENSION} --cpus 35 --min_perc_aa 0.5 --force > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk_${BINTOOL}/summary.txt\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\nln -s ../gtdbtk_${BINTOOL}/summary.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk/summary.txt\n"}
+      },
+      {
+        "label": "merge_checkM_gtdb_results",
+        "id": "merge_checkM_gtdb_results",
+        "taxonomyOperations": ["merge_checkM_gtdb_results"],
+        "inputs": [
+          { "Type": ["checkM_results"], "Format": ["dir"] },
+          { "Type": ["gtdbtk_results"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["checkM_summary"], "Format": ["tsv"] },
+          { "Type": ["gtdbtk_summary"], "Format": ["tsv"] },
+          { "Type": ["checkM_gtdb_summary"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "Scripts/summary_gtdb.sh ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gtdbtk_\\*/summary.txt\nScripts/summary_checkM.sh ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/checkM_\\*/summary.txt\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_gtdb.tsv | awk -F\"\\t\" 'BEGIN{{OFS=\"\\t\"}} NR==FNR{{if(NR==1){{ header=\"GTDB_\"$3\"\\tGTDB_\"$4\"\\tGTDB_\"$5\"\\tGTDB_\"$6}} else{{bin[$1$2]=$3\"\\t\"$4\"\\t\"$5\"\\t\"$6}};next}}  BEGIN{{OFS=\"\\t\"}} {{if(FNR==1){{print $0,header}} else{{if(bin[$1$2]){{print $0,bin[$1$2]}}else{{print $0,\"Filtered\",\"-\",\"-\",\"-\"}}}}}}' - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_checkM.tsv > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary.tsv\n"}
+      },
+      {
+        "label": "bin_cvg",
+        "id": "bin_cvg",
+        "taxonomyOperations": ["bin_cvg"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] },
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["checkM_gtdb_summary"], "Format": ["tsv"] }
+        ],
+        "outputs": [
+          { "Type": ["abundance"], "Format": ["tsv"] },
+          { "Type": ["abundance_summary"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "Scripts/summary_coverage_${COVERAGESCRIPT}.sh ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ ${EXTENSION} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/abundance.${BINTOOL}.tsv\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/abundance*.tsv | grep  -v num_contigs | awk -F \"\\t\" 'FNR==NR{{if(NR>1){{h[$1$2]=$3\"\\t\"$4\"\\t\"$5}};next }} BEGIN{{OFS=\"\\t\"}} {{if(FNR==1){{print $0,\"num_contigs\",\"total_length\",\"avg_depth\" }}else{{print $0,h[$1$2]}} }}' - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary.tsv > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_abundance.tsv\n"}
+      },
+      {
+        "label": "computeGC",
+        "id": "computeGC",
+        "taxonomyOperations": ["computeGC"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] },
+          { "Type": ["abundance_summary"], "Format": ["tsv"] }
+        ],
+        "outputs": [
+          { "Type": ["coverage"], "Format": ["tsv"] },
+          { "Type": ["abundance_coverage_summary"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "Scripts/computeGC.sh ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ ${EXTENSION} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gc_prc.${BINTOOL}.tsv\n# check Extension and for binsanity, das check bin folder name: /BinSanity-Final-bins/, /DasOut_DASTool_bins/\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/gc_prc*.tsv | awk -F \"\\t\" 'FNR==NR{{if(NR>1){{h[$1$2]=$3}};next }} BEGIN{{OFS=\"\\t\"}} {{if(FNR==1){{print $0,\"avg_gc\" }}else{{print $0,h[$1$2]}} }}' - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_abundance.tsv > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_abundance_coverage.tsv\n"}
+      },
+      {
+        "label": "create_unbinned",
+        "id": "create_unbinned",
+        "taxonomyOperations": ["create_unbinned"],
+        "inputs": [
+          { "Type": ["binning_table"], "Format": ["tsv"] },
+          { "Type": ["contigs", "scaffolds"], "Format": ["fasta"] }
+        ],
+        "outputs": [
+          { "Type": ["unbinned_list"], "Format": ["txt"] },
+          { "Type": ["unbinned_contigs"], "Format": ["fasta"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/unbinned\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/binTable.tsv | cut -f1 | grep -v -F -w -f - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta | grep \"^>\" | sed 's/^>//' > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/unbinned/unbinned_contigs_list.txt\n# for DAS binTable is called DasOut_DASTool_summary.tsv instead\nseqtk subseq ${PROJECT}/runs/${RUN}/${SAMPLE}_data/assembly_${ASSEMBLER}/${ANALYSIS}.fasta ${PROJECT}/runs/${RUN}/${SAMPLE}_data/unbinned/unbinned_contigs_list.txt > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/unbinned/unbinned.fasta\n"}
+      },
+      {
+        "label": "prokka",
+        "id": "prokka",
+        "taxonomyOperations": ["prokka"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["prokka_log"], "Format": ["log"] },
+          { "Type": ["prokka_results"], "Format": ["dir"] }
+        ],
+        "implementation": {"code": "#python Scripts/annotateProkkaBins.py ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ ${EXTENSION} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/prokka.log\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\n"}
+      },
+      {
+        "label": "diamond",
+        "id": "diamond",
+        "taxonomyOperations": ["diamond"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] },
+          { "Type": ["prokka_results"], "Format": ["dir"] }
+        ],
+        "outputs": [
+          { "Type": ["diamond_log"], "Format": ["log"] },
+          { "Type": ["diamond_results"], "Format": ["dir"] }
+        ],
+        "implementation": {"code": "#python Scripts/diamondProkkaBins.py ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ faa ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/diamond.log\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\n"}
+      },
+      {
+        "label": "finalize_bins",
+        "id": "finalize_bins",
+        "taxonomyOperations": ["finalize_bins"],
+        "inputs": [
+          { "Type": ["bins"], "Format": ["dir"] },
+          { "Type": ["depth"], "Format": ["txt"] },
+          { "Type": ["abundance_coverage_summary"], "Format": ["tsv"] }
+        ],
+        "outputs": [
+          { "Type": ["final_names"], "Format": ["txt"] },
+          { "Type": ["final_coverage"], "Format": ["txt"] },
+          { "Type": ["final_summary"], "Format": ["tsv"] }
+        ],
+        "implementation": {"code": "mkdir -p ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins\nScripts/renameFinalBins.sh ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/${BINTOOL}/${ANALYSIS}_${ASSEMBLER}/ ${EXTENSION} ${SAMPLE} ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins/ ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins/new_names.txt\n# check Extension and for binsanity, das check bin folder name: BinSanity-Final-bins/, DasOut_DASTool_bins/\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins/*.fna  | grep \"^>\" | sed 's/>// ; s/ /\t/g' | awk -F\"\\t\" 'NR==FNR{{h[$2]=$1;next}}BEGIN{{OFS=\"\\t\"; FS=\"\\t\"}}{{if(h[$1]){{print h[$1],$3}}}}' - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/bwa-mem/${ANALYSIS}_${ASSEMBLER}_depth.txt > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins/contig_coverage.txt\ncat ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins/new_names.txt | awk -F \"\\t\" 'FNR==NR{{ parts=split($2,n,\".\");name=n[1]; for(i=2;i<parts;i++){{name=name\".\"n[i]}}; nparts=split($3,nn,\".\");nname=nn[1]; for(i=2;i<nparts;i++){{nname=nname\".\"nn[i]}}; h[$1name]=nname;next }} BEGIN{{OFS=\"\\t\"}} {{if(FNR==1){{print \"New_BinID\",$0}}else if(h[$1$2]){{print h[$1$2],$0}} }}' - ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/summary_abundance_coverage.tsv > ${PROJECT}/runs/${RUN}/${SAMPLE}_data/binning/FinalBins.summary.tsv\n"}
+      },
+      {
+        "label": "report",
+        "id": "report",
+        "taxonomyOperations": ["report"],
+        "inputs": [
+          { "Type": ["final_summary"], "Format": ["tsv"] }
+        ],
+        "outputs": [
+          { "Type": ["final_report"], "Format": ["html"] }
+        ],
+        "implementation": {"code": "touch ${PROJECT}/runs/${RUN}/${SAMPLE}_data/report_f.html\n"}
+      }
+    ]
+}

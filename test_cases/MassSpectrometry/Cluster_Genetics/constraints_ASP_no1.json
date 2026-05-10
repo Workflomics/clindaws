@@ -1,0 +1,8 @@
+{
+    "constraints": [
+      "use_m(rsubread)",
+      "use_m(clusterprofiler)",
+      "use_m(limma)",
+      "nuse_m(edger)"
+    ]
+}

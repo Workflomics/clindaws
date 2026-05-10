@@ -33,48 +33,18 @@ from clindaws.core.workflow import (
     extract_canonical_workflow_keys,
     workflow_signature_length,
 )
+from clindaws.execution.programs import (
+    multi_shot_program_paths,
+    optimized_candidate_program_paths,
+    program_paths_for_mode,
+    single_shot_program_paths,
+    single_shot_overlay,
+)
 
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-ENCODINGS_ROOT = PACKAGE_ROOT / "encodings"
 ProgressCallback = Callable[[object], None] | None
 BaseGroundingCallback = Callable[[float, float], None] | None
 HorizonRecordCallback = Callable[[HorizonRecord], None] | None
-
-
-SINGLE_SHOT_OVERLAY_PREFIX = ""
-
-
-def _single_shot_overlay(min_length: int, horizon: int) -> str:
-    """Return one-shot constraints layered on top of the shared multi-shot core.
-
-    The overlay enforces that the final grounded horizon reaches the goal and
-    exposes external atoms used by Python to solve exact ``(goal_time,
-    run_count)`` slices in a deterministic shortest-first order.
-    """
-    overlay = [
-        SINGLE_SHOT_OVERLAY_PREFIX,
-        f":- not holds({horizon}, goal).",
-        ":- occurs(T, run(_)), not occurs(T-1, run(_)), T > 1.",
-        ":- occurs(T, run(ToolA)), occurs(T, run(ToolB)), ToolA < ToolB.",
-        "",
-        "% One-shot ordering layer: solve exact (goal_time, run_count) slices on one",
-        "% grounded control object, lexicographically by earlier goal then shorter",
-        "% active prefix.",
-        "single_shot_goal_time(1) :- holds(1, goal).",
-        "single_shot_goal_time(T) :- T > 1, holds(T, goal), not holds(T-1, goal).",
-        "single_shot_run_count(N) :- N = #count { T : occurs(T, run(_)) }.",
-        "#external single_shot_target_goal_time(T) : time(T).",
-        "#external single_shot_target_run_count(N) : time(N).",
-        ":- single_shot_target_goal_time(T), not single_shot_goal_time(T).",
-        ":- single_shot_target_goal_time(Target), single_shot_goal_time(Actual), Actual != Target.",
-        ":- single_shot_target_run_count(N), not single_shot_run_count(N).",
-        ":- single_shot_target_run_count(Target), single_shot_run_count(Actual), Actual != Target.",
-    ]
-    if min_length > 1:
-        overlay.append(f":- holds({min_length - 1}, goal).")
-    return "\n".join(overlay) + "\n"
-
 
 
 def _make_solve_control(
@@ -207,80 +177,6 @@ class _SolvePassMetrics:
     seen_tool_sequence_count: int
     stored_tool_sequence_count: int
     solve_elapsed: float
-
-
-def _single_shot_program_paths(*, optimized: bool = False) -> tuple[Path, ...]:
-    """Return the active program set for public single-shot mode.
-
-    The current single-shot runtime deliberately reuses the direct multi-shot
-    encoding family. Solver behavior differs by grounding/solving strategy, not
-    by a separate active ASP program family.
-    """
-    if optimized:
-        raise ValueError("--optimized is not yet supported for single-shot.")
-    return _multi_shot_program_paths()
-
-
-def _multi_shot_program_paths() -> tuple[Path, ...]:
-    """Return the plain direct incremental multi-shot program set."""
-    base = ENCODINGS_ROOT / "multi_shot"
-    return (
-        base / "base.lp",
-        base / "init.lp",
-        base / "step.lp",
-        base / "constraints.lp",
-        base / "check.lp",
-        base / "ape_extract.lp",
-        base / "tool_inclusion.lp",
-        base / "tool_dependency.lp",
-        base / "temporal_constraint.lp",
-        base / "input_usage.lp",
-        base / "output_usage.lp",
-    )
-
-
-
-def _multi_shot_optimized_candidate_program_paths() -> tuple[Path, ...]:
-    """Return the optimized-candidate incremental program set."""
-    base = ENCODINGS_ROOT / "multi_shot_optimized_candidate"
-    return (
-        base / "base.lp",
-        base / "step_initial.lp",
-        base / "step.lp",
-        base / "step_query.lp",
-        base / "exact_certificate.lp",
-        base / "possible.lp",
-        base / "constraints.lp",
-        base / "check.lp",
-        base / "ape_extract.lp",
-        base / "tool_inclusion.lp",
-        base / "input_usage.lp",
-        base / "output_usage.lp",
-    )
-
-
-def _multi_shot_compressed_candidate_program_paths() -> tuple[Path, ...]:
-    """Compatibility alias for the legacy optimized backend path helper."""
-
-    return _multi_shot_optimized_candidate_program_paths()
-
-
-def program_paths_for_mode(
-    mode: str,
-    *,
-    optimized: bool = False,
-) -> tuple[Path, ...]:
-    """Return the concrete ASP program family for one effective solver mode."""
-
-    if mode in {"single-shot", "single-shot-sliding-window"}:
-        return _single_shot_program_paths(optimized=optimized)
-    if mode == "multi-shot":
-        if optimized:
-            return _multi_shot_optimized_candidate_program_paths()
-        return _multi_shot_program_paths()
-    if mode in {"multi-shot-optimized-candidate", "multi-shot-compressed-candidate"}:
-        return _multi_shot_optimized_candidate_program_paths()
-    raise ValueError(f"Unsupported mode: {mode}")
 
 
 def _report(progress_callback: ProgressCallback, message: str) -> None:
@@ -815,17 +711,6 @@ def _multi_shot_grounding_horizon_parts(
     return tuple(parts)
 
 
-def _single_shot_horizon_parts(
-    horizon: int,
-) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
-    parts: list[tuple[str, tuple[clingo.Symbol, ...]]] = []
-    if horizon == 1:
-        parts.append(("init", ()))
-    parts.append(("step", (clingo.Number(horizon),)))
-    parts.append(("constraint_step", (clingo.Number(horizon),)))
-    return tuple(parts)
-
-
 def _single_shot_full_ground_parts(
     horizon: int,
 ) -> tuple[tuple[str, tuple[clingo.Symbol, ...]], ...]:
@@ -863,7 +748,6 @@ def _dynamic_grounding_horizon_parts(
 def _smart_expansion_enabled(facts: FactBundle) -> bool:
     return facts.internal_solver_mode in {
         "multi-shot-optimized-candidate",
-        "multi-shot-compressed-candidate",
     }
 
 
@@ -1691,275 +1575,6 @@ def _solve_multi_shot_with_programs(
     )
 
 
-def _solve_single_shot_with_programs(
-    config: SnakeConfig,
-    facts: FactBundle,
-    program_paths: tuple[Path, ...],
-    *,
-    ontology: Ontology | None = None,
-    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-    solve_all_horizons: bool = False,
-    capture_raw_models: bool = False,
-    diagnostic_counts_enabled: bool = True,
-    parallel_mode: str | None = None,
-    project_models: bool = False,
-) -> SolveOutput:
-    """Solve using the single-shot encoding by iterating horizons."""
-
-    raw_solutions: list[tuple[clingo.Symbol, ...]] = []
-    unique_solutions: list[tuple[clingo.Symbol, ...]] = []
-    stored_unique_keys: set[tuple[object, ...]] = set()
-    total_grounding = 0.0
-    total_solving = 0.0
-    base_grounding_peak_rss_mb = 0.0
-    base_grounding_sec = 0.0
-    horizon_records: list[HorizonRecord] = []
-    solving_started = False
-    tool_input_signatures = dict(facts.tool_input_signatures)
-    horizon = config.solution_length_min
-    while horizon <= config.solution_length_max:
-        if not solve_all_horizons and _stored_solution_quota_reached(
-            unique_count=len(unique_solutions),
-            solution_limit=config.solutions,
-        ):
-            break
-
-        control = _make_solve_control(
-            parallel_mode=parallel_mode,
-            project_models=project_models,
-        )
-        for program_path in program_paths:
-            control.load(str(program_path))
-        control.add("base", [], facts.facts)
-        runtime_facts = _projection_runtime_facts(mode="single-shot", project_models=project_models)
-        if runtime_facts:
-            control.add("base", [], runtime_facts)
-        if facts.python_precomputed_facts:
-            control.add("base", [], facts.python_precomputed_facts)
-        control.add("single_shot", [], _single_shot_overlay(config.solution_length_min, horizon))
-
-        _horizon_interrupted = False
-        try:
-            with _interrupt_guard(control) as is_interrupted:
-                if horizon == config.solution_length_min:
-                    _report(progress_callback, "Step 2: grounding started.")
-                _report(progress_callback, f"Grounding: single-shot horizon {horizon}...")
-                grounding_parts: list[tuple[str, float]] = []
-                start = perf_counter()
-                _run_interruptible(lambda: control.ground([("base", [])]), is_interrupted)
-                base_elapsed = perf_counter() - start
-                ground_elapsed = base_elapsed
-                grounding_parts.append(("base", base_elapsed))
-                total_grounding += base_elapsed
-                if horizon == config.solution_length_min:
-                    base_grounding_sec += base_elapsed
-                    base_grounding_peak_rss_mb = current_peak_rss_mb()
-                    if base_grounding_callback is not None:
-                        base_grounding_callback(base_grounding_sec, base_grounding_peak_rss_mb)
-                full_ground_parts = _single_shot_full_ground_parts(horizon)
-                start = perf_counter()
-                _run_interruptible(
-                    lambda: control.ground(
-                        [(name, list(args)) for name, args in full_ground_parts]
-                    ),
-                    is_interrupted,
-                )
-                full_ground_elapsed = perf_counter() - start
-                ground_elapsed += full_ground_elapsed
-                grounding_parts.append(("single_shot_full", full_ground_elapsed))
-                total_grounding += full_ground_elapsed
-                _report(
-                    progress_callback,
-                    f"Grounding progress: single-shot horizon {horizon} finished after {ground_elapsed:.3f}s.",
-                )
-
-                if not solving_started:
-                    _report(progress_callback, "Step 3: solving started.")
-                    solving_started = True
-                _report(progress_callback, f"Solving: single-shot horizon {horizon}...")
-                any_model_seen = False
-                models_seen = 0
-                models_stored = 0
-                unique_workflows_seen = 0
-                unique_workflows_stored = 0
-                model_callback_sec = 0.0
-                shown_symbols_sec = 0.0
-                workflow_signature_key_sec = 0.0
-                canonicalization_sec = 0.0
-                seen_unique_keys: set[tuple[object, ...]] = set()
-                seen_tool_sequence_keys: set[tuple[object, ...]] = set()
-                stored_tool_sequence_keys: set[tuple[object, ...]] = set()
-                start = perf_counter()
-                query_symbol = clingo.Function("query", [clingo.Number(horizon)])
-                control.assign_external(query_symbol, True)
-
-                def _solve() -> None:
-                    with control.solve(yield_=True) as handle:
-                        for model in handle:
-                            nonlocal models_seen, models_stored, unique_workflows_seen, unique_workflows_stored
-                            nonlocal model_callback_sec, shown_symbols_sec
-                            nonlocal workflow_signature_key_sec, canonicalization_sec
-                            nonlocal any_model_seen
-                            callback_start = perf_counter()
-                            any_model_seen = True
-                            if diagnostic_counts_enabled:
-                                models_seen += 1
-                            sample_start = perf_counter()
-                            shown_symbols = tuple(model.symbols(shown=True))
-                            shown_symbols_sec += perf_counter() - sample_start
-                            sample_start = perf_counter()
-                            tool_sequence_key, workflow_key = extract_canonical_workflow_keys(
-                                shown_symbols,
-                                tool_input_signatures,
-                                workflow_input_dims,
-                                tool_output_dims,
-                                ontology=ontology,
-                                use_binding_target_abstraction=(
-                                    not config.tool_seq_repeat
-                                ),
-                            )
-                            workflow_signature_key_sec += perf_counter() - sample_start
-                            workflow_storage_key = _stored_workflow_key(
-                                config=config,
-                                tool_sequence_key=tool_sequence_key,
-                                workflow_key=workflow_key,
-                            )
-                            workflow_length = workflow_signature_length(workflow_key)
-                            in_length_window = (
-                                config.solution_length_min
-                                <= workflow_length
-                                <= config.solution_length_max
-                            )
-                            if diagnostic_counts_enabled:
-                                if tool_sequence_key not in seen_tool_sequence_keys:
-                                    seen_tool_sequence_keys.add(tool_sequence_key)
-                                if workflow_storage_key not in seen_unique_keys:
-                                    seen_unique_keys.add(workflow_storage_key)
-                                    unique_workflows_seen += 1
-                            store_raw = (
-                                in_length_window
-                                and
-                                capture_raw_models
-                                and len(raw_solutions) < config.solutions
-                            )
-                            store_unique = (
-                                in_length_window
-                                and
-                                workflow_storage_key not in stored_unique_keys
-                                and len(unique_solutions) < config.solutions
-                            )
-                            if store_raw:
-                                raw_solutions.append(shown_symbols)
-                                models_stored += 1
-                            if store_unique:
-                                sample_start = perf_counter()
-                                canonical_shown = canonicalize_shown_symbols(
-                                    shown_symbols,
-                                    tool_input_signatures,
-                                    workflow_input_dims,
-                                    tool_output_dims,
-                                )
-                                canonicalization_sec += perf_counter() - sample_start
-                                stored_unique_keys.add(workflow_storage_key)
-                                stored_tool_sequence_keys.add(tool_sequence_key)
-                                unique_solutions.append(canonical_shown)
-                                unique_workflows_stored += 1
-                            elif (
-                                solve_all_horizons
-                                and _stored_solution_quota_reached(
-                                    unique_count=len(unique_solutions),
-                                    solution_limit=config.solutions,
-                                )
-                            ):
-                                model_callback_sec += perf_counter() - callback_start
-                                break
-                            if not solve_all_horizons and _stored_solution_quota_reached(
-                                unique_count=len(unique_solutions),
-                                solution_limit=config.solutions,
-                            ):
-                                model_callback_sec += perf_counter() - callback_start
-                                break
-                            model_callback_sec += perf_counter() - callback_start
-
-                try:
-                    _run_interruptible(_solve, is_interrupted)
-                    solve_elapsed = perf_counter() - start
-                    total_solving += solve_elapsed
-                    record = HorizonRecord(
-                        horizon=horizon,
-                        grounding_sec=ground_elapsed,
-                        solving_sec=solve_elapsed,
-                        peak_rss_mb=current_peak_rss_mb(),
-                        satisfiable=any_model_seen,
-                        models_seen=models_seen,
-                        models_stored=models_stored,
-                        unique_workflows_seen=unique_workflows_seen,
-                        unique_workflows_stored=unique_workflows_stored,
-                        diagnostic_counts_enabled=diagnostic_counts_enabled,
-                        model_callback_sec=model_callback_sec,
-                        shown_symbols_sec=shown_symbols_sec,
-                        workflow_signature_key_sec=workflow_signature_key_sec,
-                        canonicalization_sec=canonicalization_sec,
-                        grounding_parts=tuple(grounding_parts),
-                    )
-                    horizon_records.append(record)
-                    if horizon_record_callback is not None:
-                        horizon_record_callback(record)
-                    if progress_callback is not None:
-                        progress_callback(
-                            {
-                                "event": "horizon_complete",
-                                "horizon": horizon,
-                                "timestamp_ns": perf_counter_ns(),
-                            }
-                        )
-                    _report(
-                        progress_callback,
-                        f"Solving progress: single-shot horizon {horizon} finished after {solve_elapsed:.3f}s, "
-                        f"{_format_progress_counts(
-                            diagnostic_counts_enabled=diagnostic_counts_enabled,
-                            capture_raw_models=capture_raw_models,
-                            models_seen=models_seen,
-                            models_stored=models_stored,
-                            unique_workflows_seen=unique_workflows_seen,
-                            unique_workflows_stored=unique_workflows_stored,
-                            seen_tool_sequence_count=len(seen_tool_sequence_keys),
-                            stored_tool_sequence_count=len(stored_tool_sequence_keys),
-                        )}, "
-                        f"satisfiable={'yes' if any_model_seen else 'no'}.",
-                    )
-                finally:
-                    control.release_external(query_symbol)
-        except KeyboardInterrupt:
-            _report(progress_callback, "Interrupted/timeout: returning partial results.")
-            _horizon_interrupted = True
-        finally:
-            control.cleanup()
-
-        if _horizon_interrupted:
-            break
-        if not solve_all_horizons and _stored_solution_quota_reached(
-            unique_count=len(unique_solutions),
-            solution_limit=config.solutions,
-        ):
-            break
-        horizon += 1
-
-    return SolveOutput(
-        raw_solutions=tuple(raw_solutions),
-        solutions=tuple(unique_solutions),
-        base_grounding_peak_rss_mb=base_grounding_peak_rss_mb,
-        base_grounding_sec=base_grounding_sec,
-        grounding_sec=total_grounding,
-        solving_sec=total_solving,
-        horizon_records=tuple(horizon_records),
-    )
-
-
 def _solve_single_shot_once(
     config: SnakeConfig,
     facts: FactBundle,
@@ -1988,7 +1603,7 @@ def _solve_single_shot_once(
     tool_input_signatures = dict(facts.tool_input_signatures)
     horizon = config.solution_length_max
 
-    static_overlay = _single_shot_overlay(config.solution_length_min, horizon)
+    static_overlay = single_shot_overlay(config.solution_length_min, horizon)
 
     control = _make_solve_control(
         parallel_mode=parallel_mode,
@@ -2260,48 +1875,13 @@ def solve_single_shot(
     return _solve_single_shot_once(
         config,
         facts,
-        _single_shot_program_paths(optimized=facts.python_precompute_enabled),
+        single_shot_program_paths(optimized=facts.python_precompute_enabled),
         ontology=ontology,
         workflow_input_dims=workflow_input_dims,
         tool_output_dims=tool_output_dims,
         progress_callback=progress_callback,
         base_grounding_callback=base_grounding_callback,
         horizon_record_callback=horizon_record_callback,
-        capture_raw_models=capture_raw_models,
-        diagnostic_counts_enabled=diagnostic_counts_enabled,
-        parallel_mode=parallel_mode,
-        project_models=project_models,
-    )
-
-
-def solve_single_shot_sliding_window(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    ontology: Ontology | None = None,
-    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-    capture_raw_models: bool = False,
-    diagnostic_counts_enabled: bool = True,
-    parallel_mode: str | None = None,
-    project_models: bool = False,
-) -> SolveOutput:
-    """Solve single-shot mode by traversing the configured horizon range."""
-
-    return _solve_single_shot_with_programs(
-        config,
-        facts,
-        _single_shot_program_paths(optimized=facts.python_precompute_enabled),
-        ontology=ontology,
-        workflow_input_dims=workflow_input_dims,
-        tool_output_dims=tool_output_dims,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        solve_all_horizons=False,
         capture_raw_models=capture_raw_models,
         diagnostic_counts_enabled=diagnostic_counts_enabled,
         parallel_mode=parallel_mode,
@@ -2321,7 +1901,7 @@ def ground_single_shot(
     """Ground the one-shot single-shot backend without solving."""
 
     control = _make_grounding_control()
-    for program_path in _single_shot_program_paths(optimized=facts.python_precompute_enabled):
+    for program_path in single_shot_program_paths(optimized=facts.python_precompute_enabled):
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     runtime_facts = _projection_runtime_facts(mode="single-shot", project_models=False)
@@ -2333,7 +1913,7 @@ def ground_single_shot(
         control.add(
             "single_shot",
             [],
-            _single_shot_overlay(config.solution_length_min, config.solution_length_max),
+            single_shot_overlay(config.solution_length_min, config.solution_length_max),
         )
 
     total_grounding = 0.0
@@ -2524,7 +2104,7 @@ def solve_multi_shot(
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _multi_shot_program_paths(),
+        multi_shot_program_paths(),
         mode="multi-shot",
         ontology=ontology,
         workflow_input_dims=workflow_input_dims,
@@ -2554,7 +2134,7 @@ def ground_multi_shot(
     """Ground the multi-shot encoding without solving."""
 
     control = _make_grounding_control()
-    for program_path in _multi_shot_program_paths():
+    for program_path in multi_shot_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     if facts.python_precomputed_facts:
@@ -2592,7 +2172,7 @@ def solve_multi_shot_optimized_candidate(
     return _solve_multi_shot_with_programs(
         config,
         facts,
-        _multi_shot_optimized_candidate_program_paths(),
+        optimized_candidate_program_paths(),
         mode="multi-shot-optimized-candidate",
         ontology=ontology,
         workflow_input_dims=workflow_input_dims,
@@ -2616,39 +2196,6 @@ def solve_multi_shot_optimized_candidate(
     )
 
 
-def solve_multi_shot_compressed_candidate(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    ontology: Ontology | None = None,
-    workflow_input_dims: dict[str, dict[str, tuple[str, ...]]] | None = None,
-    tool_output_dims: dict[tuple[str, int], dict[str, tuple[str, ...]]] | None = None,
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-    capture_raw_models: bool = False,
-    diagnostic_counts_enabled: bool = True,
-    parallel_mode: str | None = None,
-    project_models: bool = False,
-) -> SolveOutput:
-    """Compatibility wrapper for the legacy optimized backend entrypoint."""
-
-    return solve_multi_shot_optimized_candidate(
-        config,
-        facts,
-        ontology=ontology,
-        workflow_input_dims=workflow_input_dims,
-        tool_output_dims=tool_output_dims,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
-        capture_raw_models=capture_raw_models,
-        diagnostic_counts_enabled=diagnostic_counts_enabled,
-        parallel_mode=parallel_mode,
-        project_models=project_models,
-    )
-
-
 def ground_multi_shot_optimized_candidate(
     config: SnakeConfig,
     facts: FactBundle,
@@ -2661,7 +2208,7 @@ def ground_multi_shot_optimized_candidate(
     """Ground the optimized-candidate multi-shot encoding without solving."""
 
     control = _make_grounding_control()
-    for program_path in _multi_shot_optimized_candidate_program_paths():
+    for program_path in optimized_candidate_program_paths():
         control.load(str(program_path))
     control.add("base", [], facts.facts)
     return _ground_multi_shot_control(
@@ -2677,25 +2224,4 @@ def ground_multi_shot_optimized_candidate(
             initial_step_program="step_initial",
             initial_seed_program=None,
         ),
-    )
-
-
-def ground_multi_shot_compressed_candidate(
-    config: SnakeConfig,
-    facts: FactBundle,
-    *,
-    stage: str = "base",
-    progress_callback: ProgressCallback = None,
-    base_grounding_callback: BaseGroundingCallback = None,
-    horizon_record_callback: HorizonRecordCallback = None,
-) -> GroundingOutput:
-    """Compatibility wrapper for the legacy optimized grounding entrypoint."""
-
-    return ground_multi_shot_optimized_candidate(
-        config,
-        facts,
-        stage=stage,
-        progress_callback=progress_callback,
-        base_grounding_callback=base_grounding_callback,
-        horizon_record_callback=horizon_record_callback,
     )

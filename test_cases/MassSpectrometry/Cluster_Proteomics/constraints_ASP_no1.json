@@ -1,0 +1,8 @@
+{
+    "constraints": [
+      "use_m(ipk_blast)",
+      "use_m(MAFFT)",
+      "use_m(phyml)",
+      "nuse_m(hmmer3_op4)"
+    ]
+}
