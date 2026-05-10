@@ -1,3 +1,0 @@
-approach,config_file,total_sec,translation_sec,grounding_sec_total,solving_sec_total,peak_rss_mb
-optimized_multi_shot,config_ASP_defect_2000_8_WC.json,0.938974,0.007897,0.096689,0.831455,230.141
-single_shot,config_ASP_defect_2000_8_WC.json,1.594218,0.008902,0.096806,1.484695,182.406
