@@ -121,6 +121,9 @@ python -m clindaws test_cases/GeoGMT/E0/config_ASP_GeoGMT_E0_NC.json --mode opti
 ## Output Artifacts
 
 Each run writes artifacts into `--output-dir` or the directory derived from the config.
+No result path flag is required for the provided test cases because the result
+location is already defined in each config file. Use `--output-dir` only when
+you want to store results somewhere else.
 
 Important files:
 
